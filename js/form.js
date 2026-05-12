@@ -278,7 +278,9 @@
   }
 
   function nextStep() {
-    if (!validatePanel(state.step)) return;
+    // Preview mode: admin walkthrough, skip validation so the reviewer can
+    // see every step without filling in required fields.
+    if (!PREVIEW_MODE && !validatePanel(state.step)) return;
     const target = state.step + 1;
     if (target > totalSteps()) return;
     goTo(target);
