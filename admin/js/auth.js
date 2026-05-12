@@ -20,6 +20,15 @@
     $('loginView').style.display = '';
     $('dashboardView').style.display = 'none';
     $('admUser').style.display = 'none';
+    // Reset any leftover lock state from a previous verify flow so the
+    // login form is fully usable on every return to this view.
+    verifying = false;
+    const vbtn = $('loginVerify');
+    if (vbtn) { vbtn.disabled = false; vbtn.innerHTML = 'Verify and sign in'; }
+    const codeInput = $('loginCode');
+    if (codeInput) { codeInput.disabled = false; codeInput.value = ''; }
+    const sendBtn = $('loginSend');
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = 'Send my code'; }
     showStep('email');
   }
 
@@ -235,7 +244,7 @@
     }
 
     $('admSignOut').addEventListener('click', async () => {
-      await sb.auth.signOut();
+      try { await sb.auth.signOut(); } catch (e) { console.warn('signOut failed:', e); }
       window.AdminAuth.currentUser = null;
       window.AdminAuth.profile = null;
       showLogin();
