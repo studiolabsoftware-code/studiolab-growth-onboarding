@@ -100,35 +100,47 @@
       btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Sending...';
       const r = await callFn('manage-admin-users', { action: 'resend_invite', id });
       btn.disabled = false; btn.textContent = orig;
-      if (!r.ok) { window.alert(r.error || 'Could not resend.'); return; }
-      window.alert('Invite resent to ' + row.email);
+      if (!r.ok) { await window.AdminModal.alert({ title: 'Could not resend', message: escapeHtml(r.error || 'Unknown error.') }); return; }
+      await window.AdminModal.alert({ title: 'Invite sent', message: `Invite resent to <strong>${escapeHtml(row.email)}</strong>.` });
       return;
     }
 
     if (action === 'deactivate') {
-      if (!window.confirm(`Deactivate ${row.name}? They will no longer be able to sign in.`)) return;
+      const ok = await window.AdminModal.confirm({
+        title: 'Deactivate user?',
+        message: `<p>Deactivate <strong>${escapeHtml(row.name)}</strong>? They will no longer be able to sign in.</p>`,
+        confirmLabel: 'Deactivate',
+        danger: true,
+      });
+      if (!ok) return;
       const r = await callFn('manage-admin-users', { action: 'set_active', id, is_active: false });
-      if (!r.ok) { window.alert(r.error || 'Failed.'); return; }
+      if (!r.ok) { await window.AdminModal.alert({ title: 'Failed', message: escapeHtml(r.error || 'Unknown error.') }); return; }
       await load();
       return;
     }
 
     if (action === 'reactivate') {
       const r = await callFn('manage-admin-users', { action: 'set_active', id, is_active: true });
-      if (!r.ok) { window.alert(r.error || 'Failed.'); return; }
+      if (!r.ok) { await window.AdminModal.alert({ title: 'Failed', message: escapeHtml(r.error || 'Unknown error.') }); return; }
       await load();
       return;
     }
 
     if (action === 'role') {
-      const next = window.prompt(`Change role for ${row.name}. Enter: owner, admin, or va`, row.role);
-      if (!next) return;
-      if (!['owner','admin','va'].includes(next.trim().toLowerCase())) {
-        window.alert('Role must be owner, admin, or va.');
-        return;
-      }
-      const r = await callFn('manage-admin-users', { action: 'set_role', id, role: next.trim().toLowerCase() });
-      if (!r.ok) { window.alert(r.error || 'Failed.'); return; }
+      const next = await window.AdminModal.prompt({
+        title: 'Change role',
+        message: `Set a new role for <strong>${escapeHtml(row.name)}</strong>.`,
+        value: row.role,
+        confirmLabel: 'Save role',
+        options: [
+          { value: 'va', label: 'VA — only sees assigned submissions' },
+          { value: 'admin', label: 'Admin — sees all submissions' },
+          { value: 'owner', label: 'Owner — full access, can manage users' },
+        ],
+      });
+      if (!next || next === row.role) return;
+      const r = await callFn('manage-admin-users', { action: 'set_role', id, role: next });
+      if (!r.ok) { await window.AdminModal.alert({ title: 'Failed', message: escapeHtml(r.error || 'Unknown error.') }); return; }
       await load();
       return;
     }

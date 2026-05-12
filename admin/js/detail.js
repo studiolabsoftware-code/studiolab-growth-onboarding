@@ -224,19 +224,38 @@
 
   async function handleDelete() {
     if (!current) return;
-    const msg = `Delete submission for "${current.studio_name || current.contact_email}"? This cannot be undone.\n\nAny logo file will be removed too.`;
-    if (!window.confirm(msg)) return;
+    const studio = current.studio_name || current.contact_email || 'this submission';
+    const ok = await window.AdminModal.confirm({
+      title: 'Delete submission?',
+      message:
+        `<p>Delete <strong>${escapeHtml(studio)}</strong>? This cannot be undone.</p>` +
+        '<p style="color:var(--g6);margin-top:8px;">Any uploaded logo will be removed too.</p>',
+      confirmLabel: 'Delete submission',
+      cancelLabel: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
+
     const client = sb();
-    // Best-effort logo cleanup
     if (current.logo_url) {
       const [bucket, ...rest] = current.logo_url.split('/');
       try { await client.storage.from(bucket).remove([rest.join('/')]); }
       catch (e) { console.warn('logo cleanup failed:', e); }
     }
-    const { error } = await client.from('submissions').delete().eq('id', current.id);
+    const { data: deleted, error } = await client.from('submissions')
+      .delete()
+      .eq('id', current.id)
+      .select('id');
     if (error) {
       console.error('delete failed:', error);
-      window.alert('Delete failed. ' + (error.message || ''));
+      await window.AdminModal.alert({ title: 'Delete failed', message: escapeHtml(error.message || 'Unknown error.') });
+      return;
+    }
+    if (!deleted || !deleted.length) {
+      await window.AdminModal.alert({
+        title: 'Delete blocked',
+        message: 'The database refused the delete. Run the latest migration (007_submissions_delete_admin.sql) to grant admins delete permission, then try again.',
+      });
       return;
     }
     current = null;
@@ -327,7 +346,7 @@
     if (error) {
       console.error('field update failed:', error);
       if (save) { save.disabled = false; save.textContent = 'Save'; }
-      window.alert('Save failed. ' + (error.message || ''));
+      window.AdminModal.alert({ title: 'Save failed', message: escapeHtml(error.message || 'Unknown error.') });
       return;
     }
     await client.from('activity_log').insert({
@@ -502,7 +521,7 @@
       const { error } = await client.from('submission_assignments')
         .update({ status: 'cancelled' })
         .eq('id', currentAssignment.id);
-      if (error) { window.alert('Could not unassign: ' + error.message); return; }
+      if (error) { window.AdminModal.alert({ title: 'Could not unassign', message: escapeHtml(error.message) }); return; }
       await client.from('submissions').update({ assigned_to: null }).eq('id', current.id);
       await client.from('activity_log').insert({
         submission_id: current.id, action: 'assigned',
@@ -521,7 +540,7 @@
       assigned_by: profile?.id || null,
       status: 'assigned',
     }).select('*').single();
-    if (error) { window.alert('Could not assign: ' + error.message); return; }
+    if (error) { window.AdminModal.alert({ title: 'Could not assign', message: escapeHtml(error.message) }); return; }
 
     // Mirror to legacy free-text field so existing dashboard cards and Sheet sync keep working.
     const assignee = currentAssignees.find((u) => u.id === adminUserId);
@@ -558,7 +577,7 @@
         .eq('id', currentAssignment.id);
       error = r.error;
     }
-    if (error) { window.alert('Could not update: ' + error.message); return; }
+    if (error) { window.AdminModal.alert({ title: 'Could not update', message: escapeHtml(error.message) }); return; }
 
     // Refresh assignment from server (completed_at gets set by trigger)
     const { data: refreshed } = await client.from('submission_assignments')
@@ -584,9 +603,14 @@
   async function sendHandoff(btn) {
     if (!currentAssignment) return;
     const isResend = !!currentAssignment.last_sent_at;
-    if (!window.confirm(isResend
-      ? 'Resend the handoff document to the assignee?'
-      : 'Generate and send the handoff document?')) return;
+    const ok = await window.AdminModal.confirm({
+      title: isResend ? 'Resend handoff?' : 'Send handoff?',
+      message: isResend
+        ? '<p>Resend the handoff document to the assignee?</p>'
+        : '<p>Generate and send the handoff document to the assignee?</p>',
+      confirmLabel: isResend ? 'Resend' : 'Send handoff',
+    });
+    if (!ok) return;
 
     const client = sb();
     const orig = btn.textContent;
@@ -598,10 +622,10 @@
       });
       if (error) throw error;
       if (data && data.ok === false) throw new Error(data.error || 'Send failed.');
-      window.alert(`Handoff sent to ${data.sent_to}`);
+      await window.AdminModal.alert({ title: 'Handoff sent', message: `Sent to <strong>${escapeHtml(data.sent_to)}</strong>.` });
       await refreshAssignmentBlock();
     } catch (err) {
-      window.alert('Could not send handoff: ' + (err.message || err));
+      await window.AdminModal.alert({ title: 'Could not send handoff', message: escapeHtml(err.message || String(err)) });
     } finally {
       btn.disabled = false;
       btn.textContent = orig;
@@ -678,7 +702,7 @@
       if (fresh) { current = fresh; open(current.id); }
     } catch (err) {
       console.error('sync-to-sheet failed:', err);
-      window.alert('Sheet sync failed. ' + (err.message || err));
+      window.AdminModal.alert({ title: 'Sheet sync failed', message: escapeHtml(err.message || String(err)) });
       btn.disabled = false;
       btn.textContent = orig;
     }
@@ -821,6 +845,12 @@
     if (action === 'change_request_sent' && Array.isArray(d?.fields)) return `${d.fields.length} field(s)`;
     if (action === 'change_request_completed' && Array.isArray(d?.fields_updated)) return `${d.fields_updated.length} field(s) updated`;
     return '';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   // Delegated handlers for copy and inline-edit interactions across the detail view.

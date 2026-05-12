@@ -198,7 +198,7 @@
         status.classList.add('warn');
         status.title = String(err.message || err);
       }
-      window.alert('Sheet sync failed. ' + (err.message || err));
+      window.AdminModal.alert({ title: 'Sheet sync failed', message: escapeHtml(err.message || String(err)) });
     } finally {
       btn.disabled = false;
       btn.textContent = orig;

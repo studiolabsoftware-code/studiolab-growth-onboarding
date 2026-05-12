@@ -51,12 +51,6 @@
     port_number:        { label: 'Existing number to port', type: 'tel' },
     sms_tone:           { label: 'SMS tone notes', type: 'text' },
 
-    // Automations
-    season_name:        { label: 'Season or term name', type: 'text' },
-    enrol_open_date:    { label: 'Enrolment open date', type: 'text' },
-    billing_start:      { label: 'Billing or tuition start date', type: 'text' },
-    season_end:         { label: 'Season end date', type: 'text' },
-
     // AI KB
     kb_profile:         { label: 'Studio locations, hours and contact', type: 'textarea' },
     kb_classes:         { label: 'Classes and timetable', type: 'textarea' },

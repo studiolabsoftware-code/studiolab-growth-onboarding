@@ -159,6 +159,7 @@
             <option value="AU">Australia</option>
             <option value="US">United States</option>
             <option value="CA">Canada</option>
+            <option value="NZ">New Zealand</option>
             <option value="UK">United Kingdom</option>
           </select>
           <span class="field-err">Please select your country.</span>
@@ -185,6 +186,9 @@
             </optgroup>
             <optgroup label="United Kingdom">
               <option value="Europe/London">London (GMT / BST)</option>
+            </optgroup>
+            <optgroup label="New Zealand">
+              <option value="Pacific/Auckland">Auckland (NZST / NZDT)</option>
             </optgroup>
           </select>
           <span class="field-err">Please select your time zone.</span>
@@ -214,7 +218,7 @@
       <div class="fr x1">
         <div class="f">
           <label for="website">Website URL <span class="req">*</span></label><span class="field-note" style="margin-top:3px; display:block;">Just the domain works fine. We will add https:// for you.</span>
-          <input type="text" id="website" data-required placeholder="yourstudio.com.au">
+          <input type="text" id="website" data-required placeholder="yourstudio.com">
           <span class="field-err">Please enter a valid website URL.</span>
         </div>
     </div>
@@ -349,7 +353,7 @@
         </div>
         <div class="f">
           <label for="replyEmail">Reply-to email address <span class="req">*</span></label>
-          <input type="email" id="replyEmail" data-required placeholder="hello@yourstudio.com.au">
+          <input type="email" id="replyEmail" data-required placeholder="hello@yourstudio.com">
           <span class="field-note">Where family replies will go. Usually your main studio email.</span>
           <span class="field-err">Please enter a valid reply-to email.</span>
         </div>
@@ -358,7 +362,7 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🌐</div>Custom email domain</div>
-      <div class="co co-amber"><strong>Strongly recommended.</strong> Sending from your own domain (e.g. @yourstudio.com.au) significantly improves deliverability and prevents emails landing in spam. Requires a DNS record change. We provide the exact records to add.</div>
+      <div class="co co-amber"><strong>Strongly recommended.</strong> Sending from your own domain (e.g. @yourstudio.com) significantly improves deliverability and prevents emails landing in spam. Requires a DNS record change. We provide the exact records to add.</div>
       <div class="f">
         <span class="f-q-label" id="lbl-dns">Would you like to set up a custom sending domain?</span>
         <div class="yn" id="dnsYN" role="radiogroup" aria-labelledby="lbl-dns">
@@ -370,7 +374,7 @@
         <div class="fr x1">
           <div class="f">
             <label for="emailDomain">Your email domain <span class="req">*</span></label>
-            <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com.au">
+            <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com">
             <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
           </div>
         </div>
@@ -445,78 +449,28 @@
     </div>
   </div>
 
-  <!-- ─────────────── STEP 6: Automations ─────────────── -->
+  <!-- ─────────────── STEP 6: Automations (informational) ─────────────── -->
   <div class="panel" id="s6">
     <div class="sh">
       <div class="sh-tag">Step 6 of 8</div>
-      <h2 class="sh-title">Your season and enrolment setup</h2>
-      <div class="sh-desc">The automations are driven by StudioLAB events: season data and enrolment status. We need context on your current setup so triggers are timed correctly.</div>
+      <h2 class="sh-title">Your automations</h2>
+      <div class="sh-desc">These are included in your plan and configured by our team. We'll set the timing based on your current StudioLAB season. Nothing to fill in here.</div>
     </div>
 
     <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">📅</div>Current season status</div>
-      <div class="co co-amber"><strong>Important for timing.</strong> The re-enrolment automation is driven by your season's open date and billing start date. We need to know where you are in your cycle so the emails trigger at exactly the right time.</div>
-      <div class="f">
-        <span class="f-q-label" id="lbl-season">Do you have an active season set up in StudioLAB?</span>
-        <div class="yn" role="radiogroup" aria-labelledby="lbl-season">
-          <button type="button" class="yn-b" id="seasonY" data-yn="season" data-val="true" role="radio" aria-checked="false">Yes, season is live</button>
-          <button type="button" class="yn-b" id="seasonN" data-yn="season" data-val="false" role="radio" aria-checked="false">Not yet</button>
-        </div>
+      <div class="auto-card-hdr">
+        <div class="ct"><div class="ct-icon" aria-hidden="true">⚡</div>Included in Dominate AI</div>
+        <span class="plan-badge badge-ai">Dominate AI</span>
       </div>
-      <div class="cond" id="seasonCond">
-        <div class="fr">
-          <div class="f">
-            <label for="seasonName">Season or term name</label>
-            <input type="text" id="seasonName" placeholder="e.g. Term 2 2025 or Fall Semester 2025">
-          </div>
-          <div class="f">
-            <label for="enrollOpenDate">Enrolment open date</label>
-            <input type="text" id="enrollOpenDate" placeholder="e.g. 14 April 2025">
-          </div>
-        </div>
-        <div class="fr">
-          <div class="f">
-            <label for="billingStart">Billing or tuition start date</label>
-            <input type="text" id="billingStart" placeholder="e.g. 28 April 2025">
-          </div>
-          <div class="f">
-            <label for="seasonEnd">Season end date</label>
-            <input type="text" id="seasonEnd" placeholder="e.g. 27 June 2025">
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">⚡</div>Confirm active workflows</div>
-      <div class="co co-blue">These are the workflows included in your Dominate AI plan. All are pre-configured. Confirm which should be active at launch. You can turn any on or off later.</div>
-      <div class="tg-group">
-        <label class="tg chk" data-toggle>
-          <input type="checkbox" value="ae" data-workflow checked>
-          <div class="tg-box" aria-hidden="true"></div>
-          <div><div class="tg-lbl">Abandoned enrolment recovery</div><div class="tg-desc">3-touch email sequence (60 min, 24 hr, 72 hr) when a family starts registration but doesn't complete it. Stops the moment enrolment is completed.</div></div>
-        </label>
-        <label class="tg chk" data-toggle>
-          <input type="checkbox" value="re" data-workflow checked>
-          <div class="tg-box" aria-hidden="true"></div>
-          <div><div class="tg-lbl">Re-enrolment campaign</div><div class="tg-desc">6-email countdown sequence triggered when a new season opens. Runs until the family re-enrols or the season closes.</div></div>
-        </label>
-        <label class="tg chk" data-toggle>
-          <input type="checkbox" value="ae_sms" data-workflow checked>
-          <div class="tg-box" aria-hidden="true"></div>
-          <div><div class="tg-lbl">Abandoned enrolment: SMS</div><div class="tg-desc">SMS at 24 hours alongside email (sent only if SMS consent is confirmed). Roadblock-targeted emails based on where the family dropped off.</div></div>
-        </label>
-        <label class="tg chk" data-toggle>
-          <input type="checkbox" value="mct" data-workflow checked>
-          <div class="tg-box" aria-hidden="true"></div>
-          <div><div class="tg-lbl">Missed call text-back</div><div class="tg-desc">Sends an automatic SMS and email when a call to the studio is missed. No enquiry falls through the cracks.</div></div>
-        </label>
-        <label class="tg chk" data-toggle>
-          <input type="checkbox" value="re_sms" data-workflow checked>
-          <div class="tg-box" aria-hidden="true"></div>
-          <div><div class="tg-lbl">Re-enrolment: SMS</div><div class="tg-desc">SMS at season open and last call, alongside the email sequence.</div></div>
-        </label>
-      </div>
+      <ul class="auto-list" role="list">
+        <li><strong>Abandoned Enrolment Recovery</strong>3-email sequence (60 min, 24 hr, 72 hr) when a family starts but doesn't complete registration.</li>
+        <li><strong>Abandoned Enrolment SMS</strong>SMS follow-up at 24 hours alongside the email sequence. Includes roadblock-targeted messaging based on where the family dropped off.</li>
+        <li><strong>Re-Enrolment Campaign</strong>6-email countdown when a new season opens.</li>
+        <li><strong>Re-Enrolment SMS</strong>SMS at season open and last call, alongside the email sequence.</li>
+        <li><strong>Missed Call Text-Back</strong>Automatic SMS and email when a call to the studio is missed.</li>
+      </ul>
+      <div class="co co-blue" style="margin-top:16px;"><strong>AI features.</strong> Your AI chat widget and voice agent are configured separately using the knowledge base you'll provide in the next step.</div>
+      <div class="co co-green" style="margin-top:10px;">All automations are pre-built and activate automatically once your account is live. SMS workflows use the number configured in the previous step. AI features activate after knowledge base review and approval.</div>
     </div>
 
     <div class="fnav">
@@ -602,7 +556,12 @@
           <div class="sum-f"><div class="sum-k">From name</div><div class="sum-v" id="sv-fromname">Not provided</div></div>
           <div class="sum-f"><div class="sum-k">Reply-to</div><div class="sum-v" id="sv-replyto">Not provided</div></div>
           <div class="sum-f"><div class="sum-k">Custom domain</div><div class="sum-v" id="sv-domain">Not provided</div></div>
-          <div class="sum-f"><div class="sum-k">Season active</div><div class="sum-v" id="sv-season">Not provided</div></div>
+        </div>
+      </div>
+      <div class="sum-sec">
+        <div class="sum-hdr"><span aria-hidden="true">⚡</span> Automations</div>
+        <div class="sum-body">
+          <div class="sum-f"><div class="sum-k">Included</div><div class="sum-v" id="sv-automations">All Dominate AI automations will be activated during setup</div></div>
         </div>
       </div>
     </div>
@@ -611,7 +570,7 @@
       <div class="ct"><div class="ct-icon" aria-hidden="true">📝</div>Additional notes</div>
       <div class="f">
         <label for="extraNotes">Anything else we should know?</label>
-        <textarea id="extraNotes" rows="4" placeholder="Any specific requirements, questions, or context that doesn't fit the form above. e.g. We run holiday intensives outside normal seasons. We have 2 locations. We want to launch in May."></textarea>
+        <textarea id="extraNotes" rows="4" placeholder="Any specific requirements, questions, or context that doesn't fit the form above. e.g. We have 2 locations. We want to launch in May. We run a unique enrolment cycle."></textarea>
       </div>
     </div>
 

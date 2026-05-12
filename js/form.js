@@ -111,7 +111,7 @@
     step: 1,
     plan: PLAN,
     setup: 'dfy',
-    yn: { dns: null, season: null, quotePrice: null },
+    yn: { dns: null, quotePrice: null },
     logoUrl: null,
     uploading: false,
   };
@@ -221,6 +221,70 @@
       cSel.value = def;
     }
     applyCountryToTimezone();
+    applyRegionalCopy();
+  }
+
+  // ── Regional copy ─────────────────────────────────────────────────────────
+  // AU keeps single-l spelling ('enrolment'), AU-style phone example, and the
+  // Melbourne studio example. Every other region (US, NZ, UK, CA) flips to
+  // US English spelling, US phone example, and a generic studio name.
+  function applyRegionalCopy() {
+    const isAU = REGION === 'AU';
+
+    // Phone placeholder
+    const phone = document.getElementById('contactPhone');
+    if (phone) phone.placeholder = isAU ? '+61 4XX XXX XXX' : '+1 (555) 555-0123';
+
+    // Studio name placeholder
+    const studioName = document.getElementById('studioName');
+    if (studioName) studioName.placeholder = isAU ? 'e.g. Dance Academy Melbourne' : 'e.g. Dance Academy';
+
+    // From-name placeholder
+    const fromName = document.getElementById('fromName');
+    if (fromName) fromName.placeholder = isAU ? 'e.g. Sarah at Dance Academy' : 'e.g. Sarah at Dance Academy';
+
+    // Sign-off placeholder uses an AU studio example; swap for non-AU
+    const signOff = document.getElementById('signOff');
+    if (signOff && !isAU) signOff.placeholder = signOff.placeholder.replace('Melbourne', '');
+
+    // Single-l → double-l spelling everywhere except AU
+    if (!isAU) {
+      swapSpelling(document.body);
+    }
+  }
+
+  // Recursive case-preserving swap of 'enrol' family words across text nodes,
+  // placeholder attributes, and aria-labels. Skips inputs/script/style/textareas
+  // that already contain user input.
+  function swapSpelling(root) {
+    const SWAPS = [
+      [/Enrolment/g, 'Enrollment'],
+      [/enrolment/g, 'enrollment'],
+      [/Enrol(?!l)/g, 'Enroll'],
+      [/enrol(?!l)/g, 'enroll'],
+    ];
+    function apply(text) {
+      if (!text) return text;
+      let out = text;
+      for (const [re, rep] of SWAPS) out = out.replace(re, rep);
+      return out;
+    }
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+      const swapped = apply(node.nodeValue);
+      if (swapped !== node.nodeValue) node.nodeValue = swapped;
+    }
+    root.querySelectorAll('[placeholder]').forEach((el) => {
+      const v = el.getAttribute('placeholder');
+      const s = apply(v);
+      if (s !== v) el.setAttribute('placeholder', s);
+    });
+    root.querySelectorAll('[aria-label]').forEach((el) => {
+      const v = el.getAttribute('aria-label');
+      const s = apply(v);
+      if (s !== v) el.setAttribute('aria-label', s);
+    });
   }
 
   // ── Website URL normalisation ─────────────────────────────────────────────
@@ -514,17 +578,6 @@
   }
 
   // ── Collectors ────────────────────────────────────────────────────────────
-  function collectWorkflows() {
-    const out = [];
-    $$('input[data-workflow]').forEach((cb) => {
-      const label = cb.closest('label');
-      if (!label) return;
-      if (!isVisible(label)) return;
-      if (cb.checked) out.push(cb.value);
-    });
-    return out;
-  }
-
   function collectLeads() {
     const out = [];
     $$('input[data-lead]').forEach((cb) => {
@@ -574,8 +627,6 @@
     setSum('sv-replyto', val('replyEmail'));
     const dns = state.yn.dns;
     setSum('sv-domain', dns === true ? (val('emailDomain') || 'Yes') : (dns === false ? 'No, built-in email' : 'Not provided'));
-    const season = state.yn.season;
-    setSum('sv-season', season === true ? (val('seasonName') || 'Yes') : (season === false ? 'Not yet' : 'Not provided'));
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -621,13 +672,6 @@
       port_number: isScalePlus ? valOrNull('portNum') : null,
       sms_tone: isScalePlus ? valOrNull('smsTone') : null,
       lead_sources: isScalePlus ? collectLeads() : null,
-
-      season_active: state.yn.season,
-      season_name: state.yn.season ? valOrNull('seasonName') : null,
-      enrol_open_date: state.yn.season ? valOrNull('enrollOpenDate') : null,
-      billing_start: state.yn.season ? valOrNull('billingStart') : null,
-      season_end: state.yn.season ? valOrNull('seasonEnd') : null,
-      active_workflows: collectWorkflows(),
 
       kb_profile: isAi ? valOrNull('kb-profile') : null,
       kb_classes: isAi ? valOrNull('kb-classes') : null,
@@ -1007,7 +1051,6 @@
       'firstName','lastName','contactPhone','contactRole',
       'col1t','col2t','signOff','fromName','replyEmail','emailDomain',
       'smsType','portNum',
-      'seasonName','enrollOpenDate','billingStart','seasonEnd',
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
     ].forEach((id) => setVal(id, sub[idToColumn(id)]));
@@ -1025,21 +1068,9 @@
       const btn = document.querySelector('[data-yn="dns"][data-val="' + (sub.custom_domain ? 'true' : 'false') + '"]');
       if (btn) handleYn(btn);
     }
-    if (sub.season_active != null) {
-      const btn = document.querySelector('[data-yn="season"][data-val="' + (sub.season_active ? 'true' : 'false') + '"]');
-      if (btn) handleYn(btn);
-    }
     if (sub.kb_price_quoting != null) {
       const btn = document.querySelector('[data-yn="quotePrice"][data-val="' + (sub.kb_price_quoting ? 'true' : 'false') + '"]');
       if (btn) handleYn(btn);
-    }
-    // Restore workflow checkboxes
-    if (Array.isArray(sub.active_workflows)) {
-      $$('input[data-workflow]').forEach((cb) => {
-        cb.checked = sub.active_workflows.indexOf(cb.value) >= 0;
-        const lbl = cb.closest('.tg');
-        if (lbl) lbl.classList.toggle('chk', cb.checked);
-      });
     }
     if (Array.isArray(sub.lead_sources)) {
       $$('input[data-lead]').forEach((cb) => {
@@ -1060,8 +1091,6 @@
       contactRole: 'role', col1t: 'primary_colour', col2t: 'secondary_colour',
       signOff: 'sign_off', fromName: 'from_name', replyEmail: 'reply_email',
       emailDomain: 'email_domain', smsType: 'sms_type', portNum: 'port_number',
-      seasonName: 'season_name', enrollOpenDate: 'enrol_open_date',
-      billingStart: 'billing_start', seasonEnd: 'season_end',
       'kb-profile': 'kb_profile', 'kb-classes': 'kb_classes', 'kb-pricing': 'kb_pricing',
       'kb-policies': 'kb_policies', 'kb-events': 'kb_events', 'kb-restricted': 'kb_restricted',
       'kb-tone': 'kb_tone', voiceHours: 'voice_hours', voiceEscalate: 'voice_escalate',

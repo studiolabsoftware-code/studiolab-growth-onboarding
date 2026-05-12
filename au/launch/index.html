@@ -153,6 +153,7 @@
             <option value="AU">Australia</option>
             <option value="US">United States</option>
             <option value="CA">Canada</option>
+            <option value="NZ">New Zealand</option>
             <option value="UK">United Kingdom</option>
           </select>
           <span class="field-err">Please select your country.</span>
@@ -179,6 +180,9 @@
             </optgroup>
             <optgroup label="United Kingdom">
               <option value="Europe/London">London (GMT / BST)</option>
+            </optgroup>
+            <optgroup label="New Zealand">
+              <option value="Pacific/Auckland">Auckland (NZST / NZDT)</option>
             </optgroup>
           </select>
           <span class="field-err">Please select your time zone.</span>
@@ -208,7 +212,7 @@
       <div class="fr x1">
         <div class="f">
           <label for="website">Website URL <span class="req">*</span></label><span class="field-note" style="margin-top:3px; display:block;">Just the domain works fine. We will add https:// for you.</span>
-          <input type="text" id="website" data-required placeholder="yourstudio.com.au">
+          <input type="text" id="website" data-required placeholder="yourstudio.com">
           <span class="field-err">Please enter a valid website URL.</span>
         </div>
     </div>
@@ -343,7 +347,7 @@
         </div>
         <div class="f">
           <label for="replyEmail">Reply-to email address <span class="req">*</span></label>
-          <input type="email" id="replyEmail" data-required placeholder="hello@yourstudio.com.au">
+          <input type="email" id="replyEmail" data-required placeholder="hello@yourstudio.com">
           <span class="field-note">Where family replies will go. Usually your main studio email.</span>
           <span class="field-err">Please enter a valid reply-to email.</span>
         </div>
@@ -352,7 +356,7 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🌐</div>Custom email domain</div>
-      <div class="co co-amber"><strong>Strongly recommended.</strong> Sending from your own domain (e.g. @yourstudio.com.au) significantly improves deliverability and prevents emails landing in spam. Requires a DNS record change. We provide the exact records to add.</div>
+      <div class="co co-amber"><strong>Strongly recommended.</strong> Sending from your own domain (e.g. @yourstudio.com) significantly improves deliverability and prevents emails landing in spam. Requires a DNS record change. We provide the exact records to add.</div>
       <div class="f">
         <span class="f-q-label" id="lbl-dns">Would you like to set up a custom sending domain?</span>
         <div class="yn" id="dnsYN" role="radiogroup" aria-labelledby="lbl-dns">
@@ -364,7 +368,7 @@
         <div class="fr x1">
           <div class="f">
             <label for="emailDomain">Your email domain <span class="req">*</span></label>
-            <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com.au">
+            <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com">
             <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
           </div>
         </div>
