@@ -1,11 +1,18 @@
 // Mailgun sender. Reads env at call time so deployment env vars are honoured.
 
+interface Attachment {
+  filename: string;
+  content: Uint8Array;
+  contentType?: string;
+}
+
 interface SendArgs {
   to: string | string[];
   subject: string;
   html: string;
   text?: string;
   replyTo?: string;
+  attachments?: Attachment[];
 }
 
 export async function sendEmail(args: SendArgs): Promise<void> {
@@ -22,6 +29,12 @@ export async function sendEmail(args: SendArgs): Promise<void> {
   form.append('html', args.html);
   if (args.text) form.append('text', args.text);
   if (args.replyTo) form.append('h:Reply-To', args.replyTo);
+  if (args.attachments) {
+    for (const att of args.attachments) {
+      const blob = new Blob([att.content], { type: att.contentType || 'application/octet-stream' });
+      form.append('attachment', blob, att.filename);
+    }
+  }
 
   const auth = btoa('api:' + apiKey);
   const resp = await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {

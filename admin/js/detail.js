@@ -443,13 +443,25 @@
         <div class="det-static">${a ? ESC(assigneeName) : '<span class="empty">Unassigned</span>'}</div>
       </div>`;
 
+    const lastSent = a?.last_sent_at ? new Date(a.last_sent_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : null;
     const statusBlock = a ? `
       <div class="det-field">
         <label>Assignment status</label>
         <div class="det-asgn-status">
           <span class="bdg ${statusBdgClass}">${ESC(statusLabel)}</span>
-          <span class="det-asgn-since">since ${ESC(assignedAt)}</span>
+          <span class="det-asgn-since">since ${ESC(assignedAt)}${lastSent ? ` · handoff sent ${ESC(lastSent)}` : ''}</span>
         </div>
+      </div>` : '';
+
+    const handoffBlock = (a && canManage) ? `
+      <div class="det-field det-asgn-actions">
+        <label>Handoff document</label>
+        <div class="det-asgn-btns">
+          <button type="button" class="btn btn-p" data-asgn-action="send_handoff">
+            ${a.last_sent_at ? 'Resend handoff' : 'Send handoff'}
+          </button>
+        </div>
+        <p class="det-asgn-hint">Generates a .docx with every field and emails it to ${ESC(assigneeName)}.</p>
       </div>` : '';
 
     // VAs viewing their own assignment can advance the status. Admins can too.
@@ -464,14 +476,19 @@
         </div>
       </div>` : '';
 
-    return dropdown + statusBlock + vaControls;
+    return dropdown + statusBlock + handoffBlock + vaControls;
   }
 
   function bindAssignmentControls() {
     const select = document.getElementById('detAssignee');
     if (select) select.addEventListener('change', (e) => changeAssignee(e.target.value || null));
     document.querySelectorAll('[data-asgn-action]').forEach((btn) => {
-      btn.addEventListener('click', () => updateAssignmentStatus(btn.dataset.asgnAction));
+      const action = btn.dataset.asgnAction;
+      if (action === 'send_handoff') {
+        btn.addEventListener('click', () => sendHandoff(btn));
+      } else {
+        btn.addEventListener('click', () => updateAssignmentStatus(action));
+      }
     });
   }
 
@@ -562,6 +579,33 @@
     });
     await refreshAssignmentBlock();
     refreshTimeline();
+  }
+
+  async function sendHandoff(btn) {
+    if (!currentAssignment) return;
+    const isResend = !!currentAssignment.last_sent_at;
+    if (!window.confirm(isResend
+      ? 'Resend the handoff document to the assignee?'
+      : 'Generate and send the handoff document?')) return;
+
+    const client = sb();
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    try {
+      const { data, error } = await client.functions.invoke('send-handoff', {
+        body: { submission_id: current.id },
+      });
+      if (error) throw error;
+      if (data && data.ok === false) throw new Error(data.error || 'Send failed.');
+      window.alert(`Handoff sent to ${data.sent_to}`);
+      await refreshAssignmentBlock();
+    } catch (err) {
+      window.alert('Could not send handoff: ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
   }
 
   async function refreshAssignmentBlock() {
@@ -751,6 +795,7 @@
     note_added: 'Note added',
     assigned: 'Reassigned',
     assignment_status_changed: 'Assignment status changed',
+    handoff_sent: 'Handoff document sent',
     plan_changed: 'Plan changed',
   };
 

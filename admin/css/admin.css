@@ -251,3 +251,5 @@ body.role-va .adm-preview-link { display: none !important; }
 .det-static { padding: 8px 0; font-size: 13px; color: var(--g8); }
 .det-asgn-actions .det-asgn-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .det-asgn-actions .btn { font-size: 12px; padding: 6px 12px; min-height: 32px; }
+
+.det-asgn-hint { margin: 4px 0 0; font-size: 11px; color: var(--g6); line-height: 1.4; }

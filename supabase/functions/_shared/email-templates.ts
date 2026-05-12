@@ -122,6 +122,46 @@ export function adminInvite(opts: {
   return { subject, html: layout({ previewText: 'You have been invited to StudioLAB Growth Admin.', body }) };
 }
 
+export function handoffEmail(opts: {
+  studioName: string;
+  assigneeName: string;
+  isRevision: boolean;
+  changedFields: string[];
+  plan: string;
+}): { subject: string; html: string; text: string } {
+  const planLabel = opts.plan === 'launch' ? 'Launch' : opts.plan === 'scale' ? 'Scale' : opts.plan === 'ai' ? 'Dominate AI' : opts.plan;
+  const verb = opts.isRevision ? 'Updated handoff' : 'New handoff';
+  const subject = `${verb}: ${opts.studioName} (${planLabel})`;
+  const revisionBanner = opts.isRevision ? `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;margin:0 0 16px;"><tr>
+      <td style="padding:12px 14px;color:#92400E;font-size:13px;">
+        <strong>This is a revised handoff.</strong> Please re-check the fields marked
+        <strong>[UPDATED]</strong> in the attached document.
+        ${opts.changedFields.length ? `<br><span style="font-size:12px;">Changed: ${opts.changedFields.map(escape).join(', ')}</span>` : ''}
+      </td>
+    </tr></table>` : '';
+
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">${verb} — ${escape(opts.studioName)}</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.assigneeName)},</p>
+    ${revisionBanner}
+    <p style="margin:0 0 14px;">Attached is the handoff document for <strong>${escape(opts.studioName)}</strong> on the <strong>${escape(planLabel)}</strong> plan. Open it in Word or Google Docs — each field is on its own line so you can triple-click a value and copy it straight into GHL.</p>
+    <p style="margin:0 0 14px;">Section order matches the GHL implementation flow:</p>
+    <ol style="margin:0 0 14px;padding-left:22px;font-size:13px;line-height:1.7;">
+      <li>Account setup</li>
+      <li>Primary contact</li>
+      <li>Branding</li>
+      <li>Email configuration</li>
+      ${opts.plan === 'scale' || opts.plan === 'ai' ? '<li>SMS configuration</li>' : ''}
+      ${opts.plan === 'ai' ? '<li>AI knowledge base</li>' : ''}
+      <li>Notes</li>
+    </ol>
+    <p style="margin:0 0 14px;">When you're done, mark the assignment <strong>Completed</strong> in the admin panel.</p>
+    <p style="margin:0;color:${COL.g6};font-size:12px;">If anything looks incomplete, ping back with what's missing.</p>`;
+  const text = `${verb} — ${opts.studioName}\n\nAttached is the handoff document. Open in Word or Google Docs.\n${opts.isRevision ? `\nUpdated fields: ${opts.changedFields.join(', ')}\n` : ''}\nWhen done, mark the assignment Completed in the admin panel.`;
+  return { subject, html: layout({ previewText: subject, body }), text };
+}
+
 function escape(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
 }

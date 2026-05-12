@@ -92,6 +92,34 @@ Deno.serve(async (req) => {
       console.warn('Admin notification email failed:', e);
     }
 
+    // If this submission has an active assignment that's already received a
+    // handoff, auto-resend with the updated values flagged. Server-to-server
+    // call into send-handoff with the service role token as auth bypass.
+    try {
+      const { data: activeAsgn } = await sb.from('submission_assignments')
+        .select('id, last_sent_at')
+        .eq('submission_id', cr.submission_id)
+        .in('status', ['assigned','in_progress','needs_recheck'])
+        .order('assigned_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeAsgn?.last_sent_at) {
+        const fnUrl = Deno.env.get('SUPABASE_URL') + '/functions/v1/send-handoff';
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+        await fetch(fnUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({
+            submission_id: cr.submission_id,
+            __internal_skip_auth: serviceKey,
+          }),
+        });
+      }
+    } catch (e) {
+      console.warn('Handoff auto-resend failed:', e);
+    }
+
     return jsonResponse({ ok: true });
   } catch (err) {
     console.error('apply-change-request error:', err);
