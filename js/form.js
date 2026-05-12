@@ -756,8 +756,31 @@
   function showAuthGate(visible) {
     const gate = document.getElementById('authGate');
     const wrap = document.getElementById('formWrap');
-    if (gate) gate.style.display = visible ? '' : 'none';
+    const signoutRow = document.getElementById('signoutRow');
+    if (gate) gate.style.display = visible ? 'block' : 'none';
     if (wrap) wrap.classList.toggle('form-hidden', visible);
+    if (signoutRow) signoutRow.style.display = visible ? 'none' : '';
+  }
+
+  function ensureSignoutRow() {
+    if (document.getElementById('signoutRow')) return;
+    const session = loadSession();
+    const email = (session && session.email) || '';
+    const row = document.createElement('div');
+    row.id = 'signoutRow';
+    row.className = 'signout-row';
+    row.style.display = 'none';
+    row.innerHTML = 'Signed in as <strong style="color:var(--g6);">' + (email || '') + '</strong> · <button type="button" id="signoutBtn">Not you? Sign out</button>';
+    const wrap = document.getElementById('formWrap');
+    if (wrap && wrap.parentNode) wrap.parentNode.insertBefore(row, wrap);
+    const btn = row.querySelector('#signoutBtn');
+    if (btn) btn.addEventListener('click', signOut);
+  }
+
+  function signOut() {
+    clearSession();
+    // Reset form fields and reload the gate flow
+    location.reload();
   }
 
   function showAuthStep(which) {
@@ -1047,29 +1070,37 @@
       btns.forEach((b, i) => { b.tabIndex = i === 0 ? 0 : -1; });
     });
 
-    // Auth check: existing session in localStorage?
+    ensureSignoutRow();
+
+    // Auth check: existing session in localStorage? Synchronous check first,
+    // then async validation against save-draft (which now returns the row so
+    // we can hydrate fields and jump to last completed step).
     const session = loadSession();
     if (sessionValid(session)) {
-      // Try to resume by calling save-draft with empty payload to validate session.
-      // verify-otp returns the submission, but that requires a fresh OTP. Instead,
-      // we ping save-draft (which returns 401 on stale session). On success the
-      // session is alive but we don't get the draft data back. So we only rely on
-      // localStorage to skip the gate; for hydration we need a fresh verify-otp.
-      // Simplest: trust the session if not expired, reveal the form, jump to step 1.
-      // Returning studios with stale data should re-enter email + OTP.
+      // Optimistically reveal the form so there's no gate flicker.
+      showAuthGate(false);
       const r = await callFn('save-draft', {
         session_token: session.token,
         payload: {},
-        last_step_completed: 0,
+        last_step_completed: undefined,
         finalize: false,
       });
-      if (r.ok && r.data && r.data.ok) {
-        showAuthGate(false);
+      if (r.ok && r.data && r.data.ok && r.data.submission) {
+        hydrateFromSubmission(r.data.submission);
+        const target = Math.max(1, Math.min(totalSteps(), r.data.submission.last_step_completed || 1));
+        goTo(target);
+        return;
+      } else if (r.status === 401) {
+        clearSession();
+        showAuthGate(true);
+        showAuthStep('email');
         goTo(1);
         return;
-      } else {
-        clearSession();
       }
+      // Network or unknown error: assume session valid but couldn't hydrate.
+      // Show form at step 1 and let auto-save take over from here.
+      goTo(1);
+      return;
     }
 
     // No valid session: show gate, hide form

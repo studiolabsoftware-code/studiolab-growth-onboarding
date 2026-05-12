@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     const { data: saved, error: updErr } = await sb.from('submissions')
       .update(update)
       .eq('id', row.id)
-      .select('id, status, last_saved_at, submitted_at')
+      .select('*')
       .single();
     if (updErr) throw updErr;
 
@@ -124,7 +124,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, finalized: true, submission_id: saved.id, ref });
     }
 
-    return jsonResponse({ ok: true, finalized: false, last_saved_at: saved.last_saved_at });
+    // Strip server-only field before returning
+    const { session_token_hash: _h, ...safe } = saved;
+    return jsonResponse({ ok: true, finalized: false, last_saved_at: saved.last_saved_at, submission: safe });
   } catch (err) {
     console.error('save-draft error:', err);
     return jsonResponse({ ok: false, error: String(err) }, 500);
