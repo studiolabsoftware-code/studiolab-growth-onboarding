@@ -160,7 +160,9 @@
     setTimeout(() => { const ci = $('loginCode'); if (ci) ci.focus(); }, 50);
   }
 
+  let verifying = false;
   async function verifyOtp() {
+    if (verifying) return; // Hard guard — second click or extra Enter is a no-op.
     const code = ($('loginCode').value || '').trim();
     setErr('loginCodeErr', '');
     if (!/^\d{6}$/.test(code)) {
@@ -168,31 +170,47 @@
       return;
     }
     const btn = $('loginVerify');
+    const codeInput = $('loginCode');
     const orig = btn.innerHTML;
+    verifying = true;
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Verifying...';
+    btn.innerHTML = '<span class="spinner"></span> Verifying…';
+    if (codeInput) codeInput.disabled = true;
 
-    const r = await callFn('verify-admin-otp', { email: pendingEmail, code });
-    btn.disabled = false;
-    btn.innerHTML = orig;
+    try {
+      const r = await callFn('verify-admin-otp', { email: pendingEmail, code });
+      if (!r.ok || !r.data || !r.data.ok) {
+        setErr('loginCodeErr', (r.data && r.data.error) || 'Verification failed.');
+        return;
+      }
 
-    if (!r.ok || !r.data || !r.data.ok) {
-      setErr('loginCodeErr', (r.data && r.data.error) || 'Verification failed.');
-      return;
+      // Hydrate the Supabase Auth session so all subsequent queries on the
+      // dashboard run with the authenticated role and pass existing RLS.
+      const { access_token, refresh_token } = r.data;
+      const { error: setErrSb } = await sb.auth.setSession({ access_token, refresh_token });
+      if (setErrSb) {
+        console.error('setSession failed:', setErrSb);
+        setErr('loginCodeErr', 'Sign-in failed. Please try again.');
+        return;
+      }
+
+      window.AdminAuth.currentUser = pendingEmail;
+      // Don't release the button or in-flight flag — the dashboard takes over
+      // the view from here. Releasing would let a stray Enter re-fire verify
+      // against an already-used code and bounce the user back to the login.
+      try { await showDashboard(pendingEmail); } catch (e) { console.error('showDashboard failed:', e); }
+    } finally {
+      // Only release locks if the session never landed (we're still on the
+      // login screen). Otherwise leave them locked so the just-used code is
+      // never reverified.
+      const stillOnLogin = $('loginView') && $('loginView').style.display !== 'none';
+      if (stillOnLogin) {
+        verifying = false;
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (codeInput) codeInput.disabled = false;
+      }
     }
-
-    // Hydrate the Supabase Auth session so all subsequent queries on the
-    // dashboard run with the authenticated role and pass existing RLS.
-    const { access_token, refresh_token } = r.data;
-    const { error: setErrSb } = await sb.auth.setSession({ access_token, refresh_token });
-    if (setErrSb) {
-      console.error('setSession failed:', setErrSb);
-      setErr('loginCodeErr', 'Sign-in failed. Please try again.');
-      return;
-    }
-
-    window.AdminAuth.currentUser = pendingEmail;
-    showDashboard(pendingEmail);
   }
 
   function bind() {
