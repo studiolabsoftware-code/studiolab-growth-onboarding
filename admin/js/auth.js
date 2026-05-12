@@ -154,15 +154,10 @@
     }
     emailInput.closest('.f').classList.remove('has-error');
 
-    // Pre-check the allowlist via the public RPC (security definer) so we do
-    // not even attempt to send a code to a stranger.
-    const { data: allowed, error: rpcErr } = await sb.rpc('is_admin_email', { p_email: email });
-    if (rpcErr) {
-      console.warn('is_admin_email rpc failed:', rpcErr);
-    } else if (allowed !== true) {
-      setErr('loginEmailErr', 'This email is not authorised as an admin.');
-      return;
-    }
+    // We used to pre-check the admin allowlist here via the is_admin_email
+    // RPC for a faster "not authorised" message, but the RPC has been hanging
+    // and the verify path already enforces the allowlist server-side. Send
+    // the code unconditionally — non-admins simply won't be able to verify.
 
     const btn = $('loginSend');
     const orig = btn.innerHTML;
