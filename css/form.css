@@ -491,31 +491,69 @@ select {
 .preview-banner strong { font-weight: 700; }
 .preview-banner a { color: #fff; }
 
-/* ── Payment block (final step) ─────────────────────────────────────── */
-.payblock { background: #fff; border: 1px solid var(--g2); border-radius: 14px; padding: 22px 24px; margin-top: 18px; box-shadow: 0 2px 8px rgba(19,16,46,0.04); }
-.payblock-hdr { font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 14px; }
-.payblock-rows { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--g2); }
-.payblock-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 14px; color: var(--g8); }
-.payblock-row .payblock-k { color: var(--g6); }
-.payblock-row .payblock-v { font-weight: 600; color: var(--in-d); font-variant-numeric: tabular-nums; }
-.payblock-total { padding-top: 8px; border-top: 1px dashed var(--g2); margin-top: 4px; font-size: 16px; }
-.payblock-total .payblock-k { color: var(--in-d); font-weight: 700; }
-.payblock-total .payblock-v { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; color: var(--in-d); }
-.payblock-error { color: var(--rd, #B91C1C); font-weight: 600; text-align: center; padding: 8px 0; }
+/* ── Pay bar (final step header) ──────────────────────────────────────
+   Sticky-feeling strip at the top of the review step showing the total and
+   the primary Pay CTA. The body below stays a calm review summary. */
+.paybar { background: #fff; border: 1px solid var(--g2); border-radius: 14px; padding: 18px 22px; margin: 8px 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; box-shadow: 0 2px 8px rgba(19,16,46,0.05); flex-wrap: wrap; }
+.paybar-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.paybar-label { font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.7px; }
+.paybar-amt { font-size: 28px; font-weight: 800; color: var(--in-d); letter-spacing: -0.6px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.paybar-sub { font-size: 12px; color: var(--g6); }
+.paybar-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.paybar-pay { padding: 12px 28px; font-size: 14px; font-weight: 700; min-height: 48px; }
+.paybar-later { background: transparent; border: none; color: var(--in); font-weight: 600; font-size: 12px; cursor: pointer; padding: 4px 8px; font-family: inherit; text-decoration: none; }
+.paybar-later:hover { color: var(--in-d); text-decoration: underline; }
+.paybar-later:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; border-radius: 4px; }
+@media (max-width: 560px) {
+  .paybar { flex-direction: column; align-items: stretch; }
+  .paybar-actions { align-items: stretch; }
+  .paybar-pay { width: 100%; }
+}
 
-.payblock-discount { padding-top: 14px; }
-.payblock-discount label { display: block; font-size: 12px; font-weight: 600; color: var(--in-d); margin-bottom: 6px; }
-.payblock-discount-row { display: flex; gap: 8px; }
-.payblock-discount-row input { flex: 1; padding: 10px 14px; border: 1px solid var(--g2); border-radius: 10px; font-size: 13px; font-family: inherit; background: #fff; color: var(--g8); letter-spacing: 0.5px; text-transform: uppercase; }
-.payblock-discount-row input:focus-visible { outline: none; border-color: var(--in); box-shadow: 0 0 0 3px rgba(74,63,138,0.18); }
-.payblock-apply { padding: 8px 16px; font-size: 13px; min-height: 40px; }
-.payblock-discount-msg { display: block; min-height: 16px; margin-top: 6px; font-size: 11px; font-weight: 600; }
+/* ── Pay modal ────────────────────────────────────────────────────────
+   Confirmation overlay. White card on tinted backdrop, mirrors the
+   StudioLAB platform drawer/panel spec. Closes via Escape, backdrop click,
+   or the close button. */
+.pay-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.pay-modal[hidden] { display: none !important; }
+.pay-modal-backdrop { position: absolute; inset: 0; background: rgba(19,16,46,0.55); }
+.pay-modal-card { position: relative; background: #fff; border: 1px solid var(--g2); border-radius: 18px; width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(19,16,46,0.25); }
+body.pay-modal-open { overflow: hidden; }
+
+.pay-modal-hdr { padding: 22px 24px 14px; border-bottom: 1px solid var(--g2); position: relative; }
+.pay-modal-eyebrow { font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 4px; }
+.pay-modal-title { font-size: 18px; font-weight: 800; color: var(--in-d); margin: 0; letter-spacing: -0.3px; }
+.pay-modal-close { position: absolute; top: 14px; right: 14px; background: transparent; border: none; font-size: 22px; line-height: 1; color: var(--g6); cursor: pointer; padding: 6px 12px; border-radius: 8px; font-family: inherit; }
+.pay-modal-close:hover { background: var(--g1); color: var(--in-d); }
+.pay-modal-close:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+
+.pay-modal-body { padding: 18px 24px; }
+.pay-modal-product { padding: 12px 14px; background: var(--g1); border: 1px solid var(--g2); border-radius: 10px; margin-bottom: 16px; }
+.pay-modal-product-name { font-size: 14px; font-weight: 700; color: var(--in-d); }
+.pay-modal-product-desc { font-size: 12px; color: var(--g6); margin-top: 2px; line-height: 1.5; }
+.pay-modal-product-desc:empty { display: none; }
+
+.pay-modal-rows { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--g2); }
+.pay-modal-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 13px; }
+.pay-modal-row .pay-modal-k { color: var(--g6); }
+.pay-modal-row .pay-modal-v { font-weight: 600; color: var(--in-d); font-variant-numeric: tabular-nums; }
+.pay-modal-total { padding-top: 8px; border-top: 1px dashed var(--g2); margin-top: 4px; }
+.pay-modal-total .pay-modal-k { color: var(--in-d); font-weight: 700; font-size: 14px; }
+.pay-modal-total .pay-modal-v { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; }
+
+.pay-modal-discount { padding-top: 14px; }
+.pay-modal-discount label { display: block; font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.pay-modal-discount-row { display: flex; gap: 8px; }
+.pay-modal-discount-row input { flex: 1; padding: 9px 12px; border: 1px solid var(--g2); border-radius: 10px; font-size: 13px; font-family: inherit; background: #fff; color: var(--g8); letter-spacing: 0.5px; text-transform: uppercase; }
+.pay-modal-discount-row input:focus-visible { outline: none; border-color: var(--in); box-shadow: 0 0 0 3px rgba(74,63,138,0.18); }
+.pay-modal-apply { padding: 6px 14px; font-size: 12px; min-height: 38px; }
+.pay-modal-discount-msg { display: block; min-height: 16px; margin-top: 6px; font-size: 11px; font-weight: 600; }
 .payblock-discount-ok  { color: var(--gr, #047857); }
 .payblock-discount-err { color: var(--rd, #B91C1C); }
 
-.payblock-actions { display: flex; flex-direction: column; gap: 10px; align-items: center; padding-top: 18px; border-top: 1px solid var(--g2); margin-top: 18px; }
-.payblock-pay { width: 100%; max-width: 320px; padding: 14px 22px; font-size: 15px; font-weight: 700; }
-.payblock-later { background: transparent; border: none; color: var(--in); font-weight: 600; font-size: 13px; cursor: pointer; padding: 6px 10px; font-family: inherit; }
-.payblock-later:hover { color: var(--in-d); text-decoration: underline; }
-.payblock-later:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; border-radius: 4px; }
-.payblock-foot { margin: 12px 0 0; font-size: 11px; color: var(--g6); text-align: center; line-height: 1.5; }
+.pay-modal-ftr { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px; border-top: 1px solid var(--g2); background: var(--g1); border-radius: 0 0 18px 18px; flex-wrap: wrap; }
+.pay-modal-secondary { color: var(--g6); font-weight: 600; font-size: 12px; cursor: pointer; padding: 6px 8px; background: transparent; border: none; font-family: inherit; }
+.pay-modal-secondary:hover { color: var(--in-d); text-decoration: underline; }
+.pay-modal-pay { padding: 11px 24px; font-size: 14px; font-weight: 700; min-height: 44px; }
+.pay-modal-foot { margin: 0; padding: 12px 24px 18px; font-size: 11px; color: var(--g6); text-align: center; line-height: 1.5; }
+.payblock-error { color: var(--rd, #B91C1C); font-weight: 600; padding: 8px 0; }

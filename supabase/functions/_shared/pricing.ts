@@ -33,7 +33,34 @@ export type PricingResult = {
   tax_rate_percent: number;
   tax_amount_cents: number;
   total_with_tax_cents: number;
+  has_active_discounts: boolean;
 } | { ok: false; error: string; code?: string };
+
+// Returns true if there is at least one currently-active, non-expired
+// discount code that could be applied to this product. Used by the studio
+// form to decide whether to show the discount input at all.
+export async function hasUsableDiscounts(productId: string, currency: Currency): Promise<boolean> {
+  const sb = adminClient();
+  const nowIso = new Date().toISOString();
+  // Filter what we can in SQL; the applies_to_product_ids array and the
+  // redemption cap need a post-fetch check.
+  const { data, error } = await sb.from('discount_codes')
+    .select('id, applies_to_all, applies_to_product_ids, max_redemptions, redemption_count, kind, currency')
+    .eq('active', true)
+    .or(`valid_until.is.null,valid_until.gte.${nowIso}`)
+    .or(`valid_from.is.null,valid_from.lte.${nowIso}`);
+  if (error) return false;
+  if (!data || !data.length) return false;
+  return data.some((c) => {
+    if (c.max_redemptions && c.redemption_count >= c.max_redemptions) return false;
+    if (!c.applies_to_all) {
+      const ids = (c.applies_to_product_ids as string[] | null) || [];
+      if (!ids.includes(productId)) return false;
+    }
+    if (c.kind === 'fixed_amount' && c.currency !== currency) return false;
+    return true;
+  });
+}
 
 export async function resolvePricing(args: {
   plan: Plan;
@@ -101,6 +128,7 @@ export async function resolvePricing(args: {
   const taxRate = currency === 'AUD' ? 10 : 0;
   const taxAmount = Math.round(finalAmount * (taxRate / 100));
   const totalWithTax = finalAmount + taxAmount;
+  const hasActiveDiscounts = await hasUsableDiscounts(product.id, currency);
 
   return {
     ok: true,
@@ -118,5 +146,6 @@ export async function resolvePricing(args: {
     tax_rate_percent: taxRate,
     tax_amount_cents: taxAmount,
     total_with_tax_cents: totalWithTax,
+    has_active_discounts: hasActiveDiscounts,
   };
 }

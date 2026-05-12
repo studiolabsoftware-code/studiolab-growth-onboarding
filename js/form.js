@@ -753,10 +753,13 @@
     if (el) el.textContent = v;
   }
 
-  // ── Payment block (final step) ────────────────────────────────────────────
-  // Renders the payment summary, discount-code field, Pay & Save buttons,
-  // and a "Save draft, pay later" link above the original submit button.
-  // The original button is hidden but kept in DOM so existing prev-nav and
+  // ── Payment UI (final step) ───────────────────────────────────────────────
+  // A sticky pay bar at the top of the final-step panel shows the total and
+  // a single Pay CTA. The body underneath is purely a review of what the
+  // studio is buying. Clicking Pay opens an overlay modal with the line
+  // items, an optional discount field (shown only when at least one active
+  // code exists in the catalog), and the Pay / Save-draft actions. The
+  // legacy submit button is hidden but kept in DOM so existing prev-nav and
   // step-pill wiring stay intact.
 
   let pricingState = { discountCode: '', pricing: null, fetching: false };
@@ -767,55 +770,121 @@
 
   function ensurePaymentBlock() {
     const p = paymentPanel();
-    if (!p || p.querySelector('#payblock')) return;
+    if (!p) return;
 
-    const submitErr = p.querySelector('#submitErr');
-    const fnav = p.querySelector('.fnav');
-    const wrap = document.createElement('div');
-    wrap.id = 'payblock';
-    wrap.className = 'payblock';
-    wrap.innerHTML = ''
-      + '<div class="payblock-hdr">Your setup fee</div>'
-      + '<div class="payblock-rows" id="payblock-rows">'
-      +   '<div class="payblock-row"><span class="payblock-k">Subtotal</span><span class="payblock-v" id="pay-subtotal">—</span></div>'
-      +   '<div class="payblock-row" id="pay-discount-row" hidden><span class="payblock-k" id="pay-discount-k">Discount</span><span class="payblock-v" id="pay-discount">—</span></div>'
-      +   '<div class="payblock-row" id="pay-tax-row" hidden><span class="payblock-k" id="pay-tax-k">GST (10%)</span><span class="payblock-v" id="pay-tax">—</span></div>'
-      +   '<div class="payblock-row payblock-total"><span class="payblock-k">Total to pay today</span><span class="payblock-v" id="pay-total">—</span></div>'
-      + '</div>'
-      + '<div class="payblock-discount">'
-      +   '<label for="pay-code">Have a discount code?</label>'
-      +   '<div class="payblock-discount-row">'
-      +     '<input type="text" id="pay-code" autocomplete="off" spellcheck="false" placeholder="Enter code">'
-      +     '<button type="button" class="btn btn-g payblock-apply" id="pay-code-apply">Apply</button>'
-      +   '</div>'
-      +   '<span class="payblock-discount-msg" id="pay-code-msg" aria-live="polite"></span>'
-      + '</div>'
-      + '<div class="payblock-actions">'
-      +   '<button type="button" class="btn btn-ok payblock-pay" id="payBtn">Pay &amp; submit</button>'
-      +   '<button type="button" class="btn-link payblock-later" id="payLaterBtn">Save draft, pay later →</button>'
-      + '</div>'
-      + '<p class="payblock-foot">You\'ll be redirected to Stripe to complete payment securely. Your details are saved either way.</p>';
+    if (!p.querySelector('#payBar')) {
+      const bar = document.createElement('div');
+      bar.id = 'payBar';
+      bar.className = 'paybar';
+      bar.innerHTML = ''
+        + '<div class="paybar-info">'
+        +   '<div class="paybar-label">Setup fee</div>'
+        +   '<div class="paybar-amt" id="paybar-amt">—</div>'
+        +   '<div class="paybar-sub" id="paybar-sub"></div>'
+        + '</div>'
+        + '<div class="paybar-actions">'
+        +   '<button type="button" class="btn btn-ok paybar-pay" id="payBtn">Pay now</button>'
+        +   '<button type="button" class="btn-link paybar-later" id="payLaterBtn">Save draft, pay later</button>'
+        + '</div>';
+      const reviewHeading = p.querySelector('.sh-title');
+      if (reviewHeading && reviewHeading.parentNode) {
+        reviewHeading.parentNode.insertBefore(bar, reviewHeading.nextSibling);
+      } else {
+        p.insertBefore(bar, p.firstChild);
+      }
+    }
 
-    // Insert above submit-err so error styling sits between summary and the
-    // legacy nav row.
-    if (submitErr && submitErr.parentNode) submitErr.parentNode.insertBefore(wrap, submitErr);
-    else p.insertBefore(wrap, fnav);
+    if (!document.getElementById('payModal')) {
+      const modal = document.createElement('div');
+      modal.id = 'payModal';
+      modal.className = 'pay-modal';
+      modal.hidden = true;
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-labelledby', 'payModalTitle');
+      modal.innerHTML = ''
+        + '<div class="pay-modal-backdrop" data-pay-close></div>'
+        + '<div class="pay-modal-card">'
+        +   '<header class="pay-modal-hdr">'
+        +     '<div class="pay-modal-eyebrow">Complete your payment</div>'
+        +     '<h2 id="payModalTitle" class="pay-modal-title">Your setup fee</h2>'
+        +     '<button type="button" class="pay-modal-close" data-pay-close aria-label="Close">×</button>'
+        +   '</header>'
+        +   '<div class="pay-modal-body">'
+        +     '<div class="pay-modal-product">'
+        +       '<div class="pay-modal-product-name" id="pay-prod-name">—</div>'
+        +       '<div class="pay-modal-product-desc" id="pay-prod-desc"></div>'
+        +     '</div>'
+        +     '<div class="pay-modal-rows" id="payblock-rows">'
+        +       '<div class="pay-modal-row"><span class="pay-modal-k">Subtotal</span><span class="pay-modal-v" id="pay-subtotal">—</span></div>'
+        +       '<div class="pay-modal-row" id="pay-discount-row" hidden><span class="pay-modal-k" id="pay-discount-k">Discount</span><span class="pay-modal-v" id="pay-discount">—</span></div>'
+        +       '<div class="pay-modal-row" id="pay-tax-row" hidden><span class="pay-modal-k" id="pay-tax-k">GST</span><span class="pay-modal-v" id="pay-tax">—</span></div>'
+        +       '<div class="pay-modal-row pay-modal-total"><span class="pay-modal-k">Total today</span><span class="pay-modal-v" id="pay-total">—</span></div>'
+        +     '</div>'
+        +     '<div class="pay-modal-discount" id="pay-discount-block" hidden>'
+        +       '<label for="pay-code">Have a discount code?</label>'
+        +       '<div class="pay-modal-discount-row">'
+        +         '<input type="text" id="pay-code" autocomplete="off" spellcheck="false" placeholder="Enter code">'
+        +         '<button type="button" class="btn btn-g pay-modal-apply" id="pay-code-apply">Apply</button>'
+        +       '</div>'
+        +       '<span class="pay-modal-discount-msg" id="pay-code-msg" aria-live="polite"></span>'
+        +     '</div>'
+        +   '</div>'
+        +   '<footer class="pay-modal-ftr">'
+        +     '<button type="button" class="btn-link pay-modal-secondary" id="payModalLaterBtn">Save draft, pay later</button>'
+        +     '<button type="button" class="btn btn-ok pay-modal-pay" id="payModalPayBtn">Pay with Stripe</button>'
+        +   '</footer>'
+        +   '<p class="pay-modal-foot">You will be redirected to Stripe to complete payment securely. Your details are saved either way.</p>'
+        + '</div>';
+      document.body.appendChild(modal);
 
-    // Hide the legacy submit button — payblock has its own. Keep it in DOM
+      modal.querySelector('#pay-code-apply').addEventListener('click', applyDiscount);
+      modal.querySelector('#pay-code').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); applyDiscount(); }
+      });
+      modal.querySelector('#payModalPayBtn').addEventListener('click', (e) => handlePayAndSubmit(e.currentTarget));
+      modal.querySelector('#payModalLaterBtn').addEventListener('click', (e) => { closePayModal(); handleSaveLater(e.currentTarget); });
+      modal.addEventListener('click', (e) => { if (e.target && e.target.matches('[data-pay-close]')) closePayModal(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closePayModal(); });
+    }
+
+    // Hide the legacy submit button — paybar has its own. Keep it in DOM
     // so prev-nav/step-pill logic that references it doesn't break.
     const legacy = p.querySelector('#submitBtn');
     if (legacy) legacy.style.display = 'none';
     const sctr = p.querySelector('.sctr');
-    // The Pay button replaces the rightmost CTA, so the step counter looks
-    // off centred — keep it where it is, just pull the nav row up a bit.
+    if (sctr) sctr.style.display = 'none';
 
-    // Wire interactions.
-    p.querySelector('#pay-code-apply').addEventListener('click', applyDiscount);
-    p.querySelector('#pay-code').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); applyDiscount(); }
-    });
-    p.querySelector('#payBtn').addEventListener('click', (e) => handlePayAndSubmit(e.currentTarget));
-    p.querySelector('#payLaterBtn').addEventListener('click', (e) => handleSaveLater(e.currentTarget));
+    const payBtn = p.querySelector('#payBtn');
+    const payLater = p.querySelector('#payLaterBtn');
+    if (payBtn && !payBtn.dataset.bound) {
+      payBtn.dataset.bound = '1';
+      payBtn.addEventListener('click', openPayModal);
+    }
+    if (payLater && !payLater.dataset.bound) {
+      payLater.dataset.bound = '1';
+      payLater.addEventListener('click', (e) => handleSaveLater(e.currentTarget));
+    }
+  }
+
+  function openPayModal() {
+    const modal = document.getElementById('payModal');
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.classList.add('pay-modal-open');
+    refreshPricing();
+    // Focus the primary action so Enter on keyboard fires Pay.
+    setTimeout(() => {
+      const pay = document.getElementById('payModalPayBtn');
+      if (pay) pay.focus();
+    }, 30);
+  }
+
+  function closePayModal() {
+    const modal = document.getElementById('payModal');
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.classList.remove('pay-modal-open');
   }
 
   function formatMoney(cents, currency) {
@@ -864,6 +933,16 @@
     const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     const setRow = (id, show) => { const el = document.getElementById(id); if (el) el.hidden = !show; };
 
+    // Top sticky bar: headline total only.
+    setT('paybar-amt', formatMoney(p.total_with_tax_cents, p.currency));
+    const sub = p.currency === 'AUD' && p.tax_amount_cents
+      ? `Includes ${formatMoney(p.tax_amount_cents, p.currency)} GST`
+      : `${p.currency} · one-off setup fee`;
+    setT('paybar-sub', sub);
+
+    // Modal: product, line items, total.
+    setT('pay-prod-name', p.product_name || '');
+    setT('pay-prod-desc', p.product_description || '');
     setT('pay-subtotal', formatMoney(p.list_amount_cents, p.currency));
     if (p.discount_amount_cents && p.discount_amount_cents > 0) {
       setRow('pay-discount-row', true);
@@ -881,7 +960,11 @@
     }
     setT('pay-total', formatMoney(p.total_with_tax_cents, p.currency));
 
-    // Sync the discount input value with the applied code.
+    // Discount block only renders if the catalog has at least one usable
+    // active code. Keeps the modal calm when no campaigns are running.
+    const discountBlock = document.getElementById('pay-discount-block');
+    if (discountBlock) discountBlock.hidden = !p.has_active_discounts;
+
     const codeIn = document.getElementById('pay-code');
     if (codeIn && pricingState.discountCode && codeIn.value.trim().toUpperCase() !== pricingState.discountCode) {
       codeIn.value = pricingState.discountCode;
