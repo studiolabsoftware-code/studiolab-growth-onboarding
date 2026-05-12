@@ -24,8 +24,15 @@
   }
 
   async function isAllowedAdmin(email) {
-    const { data } = await sb.from('admin_users').select('email, is_active').eq('email', email).eq('is_active', true).maybeSingle();
-    return !!data;
+    // Use the public RPC (security definer) so anon callers can check the
+    // allowlist without needing direct read access to admin_users.
+    const { data, error } = await sb.rpc('is_admin_email', { p_email: email });
+    if (error) {
+      console.warn('is_admin_email rpc failed, falling back to direct query:', error);
+      const { data: row } = await sb.from('admin_users').select('email').ilike('email', email).eq('is_active', true).maybeSingle();
+      return !!row;
+    }
+    return data === true;
   }
 
   async function handleSession() {
