@@ -1,0 +1,94 @@
+// StudioLAB Growth email templates. Inline-styled HTML, dark indigo header,
+// magenta SL mark, white body card, indigo CTA.
+
+const COL = {
+  in_d: '#13102E',
+  in:   '#4A3F8A',
+  mg:   '#E8197F',
+  g1:   '#F2F3F7',
+  g2:   '#DFE0EC',
+  g6:   '#4A4C65',
+  g8:   '#13102E',
+};
+
+function layout(opts: { previewText: string; body: string }): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:${COL.g1};font-family:'Inter',Arial,sans-serif;color:${COL.g8};">
+<div style="display:none;max-height:0;overflow:hidden;">${escape(opts.previewText)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COL.g1};padding:32px 16px;">
+  <tr><td align="center">
+    <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+      <tr><td style="background:${COL.in_d};padding:24px 32px;border-radius:12px 12px 0 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="width:34px;height:34px;background:${COL.mg};border-radius:8px;text-align:center;color:#fff;font-weight:800;font-size:14px;">SL</td>
+          <td style="padding-left:12px;color:#fff;font-weight:700;font-size:16px;letter-spacing:-0.3px;">StudioLAB <span style="color:${COL.mg};">Growth</span></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="background:#fff;padding:32px;border-radius:0 0 12px 12px;font-size:14px;line-height:1.6;color:${COL.g8};">
+        ${opts.body}
+      </td></tr>
+      <tr><td style="padding:20px 8px;text-align:center;color:${COL.g6};font-size:11px;">
+        StudioLAB Growth, sent automatically from your onboarding system.<br>
+        If you did not expect this email, please ignore it.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+}
+
+function cta(label: string, url: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr>
+    <td style="background:${COL.in};border-radius:999px;">
+      <a href="${url}" style="display:inline-block;padding:12px 24px;color:#fff;text-decoration:none;font-weight:600;font-size:14px;">${escape(label)}</a>
+    </td></tr></table>`;
+}
+
+export function submissionConfirmation(opts: { studioName: string; ref: string }): { subject: string; html: string } {
+  const subject = `We have your StudioLAB Growth details, ${opts.studioName}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Thanks, we have everything we need</h1>
+    <p style="margin:0 0 14px;">Hi from the StudioLAB Growth team. Your onboarding details have come through and we are getting started.</p>
+    <p style="margin:0 0 14px;">A team member will review what you sent and reach out within one business day to confirm next steps. If anything is missing, we will send you a quick link to add it without filling out the whole form again.</p>
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
+    <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
+    <p style="margin:0;">Speak soon,<br>The StudioLAB Growth team</p>`;
+  return { subject, html: layout({ previewText: 'We have your StudioLAB Growth onboarding details.', body }) };
+}
+
+export function adminNewSubmission(opts: { studioName: string; plan: string; setup: string; adminUrl: string }): { subject: string; html: string } {
+  const subject = `New Growth onboarding: ${opts.studioName} (${opts.plan})`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">New onboarding submission</h1>
+    <p style="margin:0 0 6px;"><strong>Studio:</strong> ${escape(opts.studioName)}</p>
+    <p style="margin:0 0 6px;"><strong>Plan:</strong> ${escape(opts.plan)}</p>
+    <p style="margin:0 0 18px;"><strong>Setup:</strong> ${escape(opts.setup)}</p>
+    ${cta('Open in dashboard', opts.adminUrl)}`;
+  return { subject, html: layout({ previewText: `New submission from ${opts.studioName}`, body }) };
+}
+
+export function changeRequestEmail(opts: { studioName: string; updateUrl: string; message: string; expiresAt: string }): { subject: string; html: string } {
+  const subject = `A quick update needed for your StudioLAB Growth setup`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Hi ${escape(opts.studioName)},</h1>
+    <p style="margin:0 0 14px;">Our team is reviewing your onboarding details and we need a small update before we keep going.</p>
+    ${opts.message ? `<div style="background:${COL.g1};border:1px solid ${COL.g2};border-radius:10px;padding:14px 16px;margin:0 0 18px;font-size:13px;color:${COL.g8};"><strong>From our team:</strong><br>${escape(opts.message)}</div>` : ''}
+    ${cta('Open the update form', opts.updateUrl)}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">This link is valid until ${escape(opts.expiresAt)} and can only be used once.</p>`;
+  return { subject, html: layout({ previewText: 'A quick update needed before we continue your setup.', body }) };
+}
+
+export function changeCompletedAdmin(opts: { studioName: string; adminUrl: string; fields: string[] }): { subject: string; html: string } {
+  const subject = `${opts.studioName} has completed their change request`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Change request completed</h1>
+    <p style="margin:0 0 14px;"><strong>${escape(opts.studioName)}</strong> has submitted the requested updates.</p>
+    <p style="margin:0 0 18px;"><strong>Fields updated:</strong> ${opts.fields.map(escape).join(', ')}</p>
+    ${cta('Review changes', opts.adminUrl)}`;
+  return { subject, html: layout({ previewText: 'A studio has completed their change request.', body }) };
+}
+
+function escape(s: string): string {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
+}

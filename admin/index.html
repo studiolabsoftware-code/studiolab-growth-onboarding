@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>StudioLAB Growth: Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/form.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin-body">
+
+<a class="sr-only" href="#dashboardView">Skip to main content</a>
+<h1 class="sr-only">StudioLAB Growth admin dashboard</h1>
+
+<!-- ── Top bar ─────────────────────────────────────────────────────────── -->
+<header class="adm-hdr">
+  <div class="adm-hdr-inner">
+    <div class="logo-mark" aria-hidden="true">SL</div>
+    <div class="logo-text" aria-hidden="true">StudioLAB <span>Growth</span></div>
+    <div class="hdr-div" aria-hidden="true"></div>
+    <div class="hdr-sub" aria-hidden="true">Admin</div>
+    <div class="adm-spacer"></div>
+    <div class="adm-user" id="admUser" style="display:none">
+      <span id="admUserEmail"></span>
+      <button type="button" class="btn-link" id="admSignOut">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<!-- ── Login view ──────────────────────────────────────────────────────── -->
+<section class="adm-login" id="loginView" aria-labelledby="loginHeading">
+  <div class="adm-login-card">
+    <h2 id="loginHeading" class="adm-login-title">Admin sign in</h2>
+    <p class="adm-login-desc">Enter your admin email. We will send you a one-time link to sign in.</p>
+
+    <form id="loginStep1" novalidate>
+      <div class="f">
+        <label for="loginEmail">Email address</label>
+        <input type="email" id="loginEmail" placeholder="you@studiolabgrowth.com" autocomplete="email" aria-describedby="loginEmailErr" required>
+        <span class="field-err" id="loginEmailErr">Please enter a valid admin email.</span>
+      </div>
+      <button type="submit" class="btn btn-p" id="loginSend">Send sign-in link</button>
+    </form>
+
+    <div id="loginStep2" style="display:none">
+      <p class="adm-login-sent" role="status">Check your email for the sign-in link. You can close this tab once you have clicked it.</p>
+      <button type="button" class="btn-link" id="loginRetry">Use a different email</button>
+    </div>
+
+    <div class="submit-err" id="loginErr" role="alert">We could not send the link. Please check the email and try again.</div>
+  </div>
+</section>
+
+<!-- ── Dashboard view ──────────────────────────────────────────────────── -->
+<main class="adm-main" id="dashboardView" style="display:none">
+
+  <!-- List screen -->
+  <div id="listScreen">
+    <div class="adm-toolbar">
+      <div class="adm-search" role="search">
+        <label for="searchInput" class="sr-only">Search submissions</label>
+        <input type="search" id="searchInput" placeholder="Search studios, contacts, emails...">
+      </div>
+      <div class="adm-pills" id="statusPills" role="group" aria-label="Filter by status">
+        <button type="button" class="pill active" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" class="pill" data-filter="submitted" aria-pressed="false">Submitted</button>
+        <button type="button" class="pill" data-filter="in_review" aria-pressed="false">In review</button>
+        <button type="button" class="pill" data-filter="changes_requested" aria-pressed="false">Changes requested</button>
+        <button type="button" class="pill" data-filter="setup_in_progress" aria-pressed="false">Setup in progress</button>
+        <button type="button" class="pill" data-filter="complete" aria-pressed="false">Complete</button>
+      </div>
+    </div>
+
+    <div class="adm-tablewrap">
+      <table class="adm-table">
+        <caption class="sr-only">Submissions list. Press Enter or Space on a row to open it.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Studio</th>
+            <th scope="col">Plan</th>
+            <th scope="col">Setup</th>
+            <th scope="col">Status</th>
+            <th scope="col">Assigned</th>
+            <th scope="col">Submitted</th>
+            <th scope="col"><span class="sr-only">Open</span></th>
+          </tr>
+        </thead>
+        <tbody id="subsBody">
+          <tr><td colspan="7" class="adm-empty">Loading submissions...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Detail screen -->
+  <div id="detailScreen" style="display:none"></div>
+</main>
+
+<!-- Change-request modal -->
+<div class="adm-modal" id="crModal" hidden>
+  <div class="adm-modal-backdrop" data-action="close-modal"></div>
+  <div class="adm-modal-card" role="dialog" aria-modal="true" aria-labelledby="crTitle">
+    <div class="adm-modal-hdr">
+      <h2 id="crTitle" class="adm-modal-title">Request changes</h2>
+      <button type="button" class="adm-modal-close" data-action="close-modal" aria-label="Close dialog"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <div class="adm-modal-body">
+      <div class="f">
+        <span class="f-q-label" id="crFieldsLabel">Select the fields you want the studio to update</span>
+        <div class="adm-field-grid" id="crFields" role="group" aria-labelledby="crFieldsLabel" aria-describedby="crFieldsErr"></div>
+        <span class="field-err" id="crFieldsErr">Please select at least one field.</span>
+      </div>
+      <div class="f">
+        <label for="crMessage">Message to the studio <span class="hint">(optional)</span></label>
+        <textarea id="crMessage" rows="4" placeholder="Hi Sarah, could you confirm the address and primary colour? Thanks."></textarea>
+      </div>
+      <div class="f">
+        <label for="crTtl">Link valid for</label>
+        <select id="crTtl">
+          <option value="24">24 hours</option>
+          <option value="72" selected>72 hours</option>
+          <option value="168">7 days</option>
+        </select>
+      </div>
+      <div class="submit-err" id="crErr" role="alert">Could not send. Please try again.</div>
+    </div>
+    <div class="adm-modal-ftr">
+      <button type="button" class="btn btn-g" data-action="close-modal">Cancel</button>
+      <button type="button" class="btn btn-p" id="crSend">Send to studio</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/supabase-config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/change-request.js"></script>
+</body>
+</html>

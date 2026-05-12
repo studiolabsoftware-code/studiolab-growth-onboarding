@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>StudioLAB Growth: Update Your Information</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/form.css">
+<style>
+  .up-msg { background: var(--bl-l); border: 1px solid #BAE6FD; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; font-size: 13px; color: var(--g8); line-height: 1.55; }
+  .up-msg strong { color: var(--in-d); }
+  .up-state { text-align: center; padding: 60px 24px; font-size: 14px; color: var(--g6); }
+  .up-state.bad { color: var(--rd); }
+  .up-state-title { font-size: 18px; font-weight: 700; color: var(--in-d); margin-bottom: 8px; }
+  .up-saved-ico { width: 56px; height: 56px; border-radius: 50%; background: var(--gr); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 16px; }
+</style>
+</head>
+<body>
+
+<a class="sr-only" href="#up-form">Skip to update form</a>
+<h1 class="sr-only">Update your StudioLAB Growth information</h1>
+
+<header class="hdr">
+  <div class="hdr-inner">
+    <div class="logo-mark" aria-hidden="true">SL</div>
+    <div class="logo-text" aria-hidden="true">StudioLAB <span>Growth</span></div>
+    <div class="hdr-div" aria-hidden="true"></div>
+    <div class="hdr-sub" aria-hidden="true">Update Your Information</div>
+  </div>
+</header>
+
+<main class="main">
+
+  <div id="up-loading" class="up-state" role="status" aria-live="polite">
+    Checking your link...
+  </div>
+
+  <div id="up-invalid" class="up-state bad" style="display:none" role="alert">
+    <div class="up-state-title">This link is no longer valid</div>
+    <p>It may have expired or already been used. If you still need to update your information, please reply to the email you received and we will send a new link.</p>
+  </div>
+
+  <form id="up-form" style="display:none" novalidate>
+    <div class="sh">
+      <div class="sh-tag">Quick update</div>
+      <h2 class="sh-title">A few details to confirm</h2>
+      <div class="sh-desc">Update the fields below and save. The rest of your information stays as is.</div>
+    </div>
+
+    <div class="up-msg" id="up-admin-msg"></div>
+
+    <div id="up-fields"></div>
+
+    <div class="submit-err" id="up-err" role="alert">Something went wrong. Please try again, or reply to your StudioLAB Growth email if it keeps failing.</div>
+
+    <div class="fnav">
+      <div class="sctr">Your StudioLAB Growth account</div>
+      <button type="submit" class="btn btn-ok" id="up-save">Save changes ✓</button>
+    </div>
+  </form>
+
+  <div id="up-saved" class="up-state" style="display:none" role="status" aria-live="polite" tabindex="-1">
+    <div class="up-saved-ico" aria-hidden="true">✓</div>
+    <div class="up-state-title">Thanks, all updated</div>
+    <p>We have received your changes. Your StudioLAB Growth account will be updated and our team will continue from here.</p>
+  </div>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/update.js"></script>
+</body>
+</html>
