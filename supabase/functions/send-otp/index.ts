@@ -19,7 +19,7 @@ function isValidEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
-const LOGO_URL = 'https://app.studiolabgrowth.com/assets/growth-logo-email.png';
+const LOGO_URL = 'https://cdn.jsdelivr.net/gh/studiolabsoftware-code/studiolab-growth-onboarding@main/assets/growth-logo-email.png';
 
 function otpEmail(code: string) {
   const subject = `Your StudioLAB Growth code: ${code}`;

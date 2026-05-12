@@ -1,7 +1,9 @@
 // StudioLAB Growth email templates. Inline-styled HTML, dark indigo header,
 // brand logo, white body card, indigo CTA.
 
-const LOGO_URL = 'https://app.studiolabgrowth.com/assets/growth-logo-email.png';
+// Hosted via jsdelivr CDN (mirrors the public repo). HTTPS guaranteed, fast,
+// and independent of the app subdomain's cert state.
+const LOGO_URL = 'https://cdn.jsdelivr.net/gh/studiolabsoftware-code/studiolab-growth-onboarding@main/assets/growth-logo-email.png';
 
 const COL = {
   in_d: '#13102E',
