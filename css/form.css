@@ -428,3 +428,9 @@ select {
 .save-ind.saved { color: var(--ok, #047857); }
 .save-ind.saving { color: var(--g4); }
 .save-ind.error { color: var(--rd); }
+
+.auth-fineprint { font-size: 11px; color: var(--g4); line-height: 1.6; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--g2); }
+.auth-card { padding: 38px 34px; }
+.auth-icon { background: linear-gradient(135deg, var(--in-l), var(--mg-l)); font-size: 24px; }
+.auth-title { font-size: 24px; }
+.auth-desc strong { color: var(--in-d); font-weight: 700; }

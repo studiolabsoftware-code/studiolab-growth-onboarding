@@ -828,7 +828,15 @@
     setAuthError('authCodeErr', '');
   }
 
+  function applyGatePlanName() {
+    const el = document.getElementById('authPlanName');
+    if (!el) return;
+    const map = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
+    el.textContent = map[PLAN] || 'Growth';
+  }
+
   function bindAuthGate() {
+    applyGatePlanName();
     const send = document.getElementById('authSendBtn');
     const verify = document.getElementById('authVerifyBtn');
     const resend = document.getElementById('authResendBtn');

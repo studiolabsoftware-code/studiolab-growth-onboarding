@@ -31,27 +31,28 @@
 
 <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
   <div class="auth-card">
-    <div class="auth-icon" aria-hidden="true">✉️</div>
-    <h2 class="auth-title" id="authTitle">Let's get started</h2>
-    <p class="auth-desc">Enter your email to begin or pick up where you left off. We will send you a 6-digit code to confirm it is yours, then auto-save your progress so you can return any time.</p>
+    <div class="auth-icon" aria-hidden="true">👋</div>
+    <h2 class="auth-title" id="authTitle">Welcome to StudioLAB Growth</h2>
+    <p class="auth-desc">Glad you are here. We are about to set up your <strong id="authPlanName">Growth</strong> account so it can start working for you. Pop in your email below and we will send you a 6-digit code to make sure it is yours.</p>
 
     <div class="auth-step" id="authStepEmail">
       <div class="f">
-        <label for="authEmail">Email address</label>
+        <label for="authEmail">Your email address</label>
         <input type="email" id="authEmail" placeholder="you@yourstudio.com" autocomplete="email" required>
         <span class="field-err" id="authEmailErr"></span>
       </div>
-      <button type="button" class="btn btn-p auth-btn" id="authSendBtn">Send code</button>
+      <button type="button" class="btn btn-p auth-btn" id="authSendBtn">Send my code</button>
+      <p class="auth-fineprint">From here your progress saves automatically. Step away and come back whenever suits, on any device. We will send the same code path to pick up exactly where you left off.</p>
     </div>
 
     <div class="auth-step" id="authStepCode" hidden>
-      <p class="auth-sent">Code sent to <strong id="authSentEmail"></strong>. Check your inbox, including spam.</p>
+      <p class="auth-sent">Your code is on its way to <strong id="authSentEmail"></strong>. Pop into your inbox in a moment. If it is taking longer than a minute, check your spam folder just in case.</p>
       <div class="f">
         <label for="authCode">6-digit code</label>
         <input type="text" id="authCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456">
         <span class="field-err" id="authCodeErr"></span>
       </div>
-      <button type="button" class="btn btn-p auth-btn" id="authVerifyBtn">Verify and continue</button>
+      <button type="button" class="btn btn-p auth-btn" id="authVerifyBtn">Verify and start</button>
       <button type="button" class="auth-resend" id="authResendBtn">Use a different email or send a new code</button>
     </div>
   </div>
