@@ -259,11 +259,23 @@
       });
     }
 
-    $('admSignOut').addEventListener('click', async () => {
-      try { await sb.auth.signOut(); } catch (e) { console.warn('signOut failed:', e); }
+    $('admSignOut').addEventListener('click', () => {
+      // Optimistic sign-out. Clear the UI and local Supabase auth tokens
+      // synchronously so the studio gets immediate feedback even if the
+      // network call hangs. The server-side revoke fires in the background.
       window.AdminAuth.currentUser = null;
       window.AdminAuth.profile = null;
+      try {
+        Object.keys(localStorage).forEach((k) => {
+          if (k.startsWith('sb-') && k.includes('auth-token')) localStorage.removeItem(k);
+        });
+      } catch (_) { /* ignore */ }
       showLogin();
+      // Fire and forget — never let a slow server keep the admin signed in.
+      try {
+        const p = sb.auth.signOut();
+        if (p && typeof p.catch === 'function') p.catch((e) => console.warn('signOut background failed:', e));
+      } catch (e) { console.warn('signOut threw:', e); }
     });
 
     const navEl = $('admNav');
