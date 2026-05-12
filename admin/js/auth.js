@@ -51,6 +51,8 @@
     if (navEl) navEl.style.display = '';
     const usersTab = $('admNavUsers');
     if (usersTab) usersTab.style.display = role === 'owner' ? '' : 'none';
+    const settingsTab = $('admNavSettings');
+    if (settingsTab) settingsTab.style.display = role === 'owner' ? '' : 'none';
 
     document.body.classList.remove('role-owner', 'role-admin', 'role-va');
     document.body.classList.add('role-' + role);
@@ -60,15 +62,21 @@
     const list = $('listScreen');
     const detail = $('detailScreen');
     const users = $('usersScreen');
+    const settings = $('settingsScreen');
+    const catalog = $('catalogScreen');
+    const hide = (el) => { if (el) el.style.display = 'none'; };
+    hide(list); hide(detail); hide(users); hide(settings); hide(catalog);
     if (name === 'users') {
-      if (list) list.style.display = 'none';
-      if (detail) detail.style.display = 'none';
       if (users) users.style.display = '';
       if (window.AdminUsers && window.AdminUsers.show) window.AdminUsers.show();
+    } else if (name === 'settings') {
+      if (settings) settings.style.display = '';
+      if (window.AdminSettings && window.AdminSettings.show) window.AdminSettings.show();
+    } else if (name === 'catalog') {
+      if (catalog) catalog.style.display = '';
+      if (window.AdminCatalog && window.AdminCatalog.show) window.AdminCatalog.show();
     } else {
-      if (users) users.style.display = 'none';
       if (list) list.style.display = '';
-      if (detail) detail.style.display = 'none';
     }
     document.querySelectorAll('.adm-nav-link').forEach((b) => {
       b.classList.toggle('active', b.dataset.section === name);

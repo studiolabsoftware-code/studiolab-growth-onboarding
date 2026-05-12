@@ -27,7 +27,9 @@
     <div class="hdr-sub" aria-hidden="true">Admin</div>
     <nav class="adm-nav" id="admNav" style="display:none" aria-label="Admin sections">
       <button type="button" class="adm-nav-link active" data-section="submissions">Submissions</button>
+      <button type="button" class="adm-nav-link" data-section="catalog" id="admNavCatalog">Catalog</button>
       <button type="button" class="adm-nav-link" data-section="users" id="admNavUsers" style="display:none">Users</button>
+      <button type="button" class="adm-nav-link" data-section="settings" id="admNavSettings" style="display:none">Settings</button>
     </nav>
     <div class="adm-spacer"></div>
     <div class="adm-user" id="admUser" style="display:none">
@@ -104,6 +106,138 @@
 
   <!-- Detail screen -->
   <div id="detailScreen" style="display:none"></div>
+
+  <!-- Catalog screen (admin/owner/va) -->
+  <div id="catalogScreen" style="display:none">
+    <div class="users-hdr">
+      <div>
+        <h2 class="users-title">Catalog</h2>
+        <p class="users-desc">Set the list prices each plan charges at checkout. Changes take effect immediately for new checkouts; existing submissions keep the price snapshotted when their session was created.</p>
+      </div>
+      <div class="cat-mode-pill" id="catModePill" aria-label="Stripe mode">Test mode</div>
+    </div>
+
+    <div class="cat-tabs" role="tablist">
+      <button type="button" class="cat-tab active" data-tab="products" role="tab" aria-selected="true">Products</button>
+      <button type="button" class="cat-tab" data-tab="codes" role="tab" aria-selected="false">Discount codes</button>
+    </div>
+
+    <div class="cat-panel" id="catProductsPanel">
+      <div class="cat-matrix" id="catMatrix">
+        <div class="adm-empty" style="padding:40px 0;">Loading catalog…</div>
+      </div>
+      <p class="cat-foot-hint">Stripe sync writes the name and description to Stripe Products for reporting. Prices are not stored on Stripe — every checkout reads the live amount from this catalog.</p>
+    </div>
+
+    <div class="cat-panel" id="catCodesPanel" style="display:none">
+      <div class="cat-codes-hdr">
+        <div>
+          <h3 class="cat-codes-title">Discount codes</h3>
+          <p class="cat-codes-desc">Codes are validated server-side at checkout. Studios can enter codes on the final step of the onboarding form.</p>
+        </div>
+        <button type="button" class="btn btn-p" id="catCodeNewBtn">+ New code</button>
+      </div>
+      <div class="users-tablewrap">
+        <table class="adm-table cat-codes-table">
+          <thead>
+            <tr><th>Code</th><th>Discount</th><th>Applies to</th><th>Window</th><th>Used</th><th>Status</th><th aria-label="Actions"></th></tr>
+          </thead>
+          <tbody id="catCodesTbody"><tr><td colspan="7" class="adm-empty">Loading codes…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings screen (owner only) -->
+  <div id="settingsScreen" style="display:none">
+    <div class="users-hdr">
+      <div>
+        <h2 class="users-title">Settings</h2>
+        <p class="users-desc">Owner-only controls for Stripe payments and global defaults. Secret keys live in Supabase Edge Function secrets — not in this page or the database.</p>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="set-section-hdr">
+        <h3 class="set-section-title">Stripe connection</h3>
+        <div class="set-mode-toggle" role="group" aria-label="Stripe mode">
+          <button type="button" class="set-mode-btn" data-mode="test" aria-pressed="true">Test mode</button>
+          <button type="button" class="set-mode-btn" data-mode="live" aria-pressed="false">Live mode</button>
+        </div>
+      </div>
+
+      <div class="set-section-body">
+        <div class="set-status" id="setStatus">
+          <div class="set-status-dot" data-state="unknown" aria-hidden="true"></div>
+          <div class="set-status-text">
+            <div class="set-status-headline" id="setStatusHeadline">Not yet tested</div>
+            <div class="set-status-detail" id="setStatusDetail">Press Test connection to verify the current mode.</div>
+          </div>
+          <button type="button" class="btn btn-p" id="setTestBtn">Test connection</button>
+        </div>
+
+        <dl class="set-fact-grid" id="setFacts" aria-live="polite"></dl>
+
+        <div class="set-field">
+          <label for="setPublishable">Publishable key for current mode</label>
+          <input type="text" id="setPublishable" placeholder="pk_test_… or pk_live_…" autocomplete="off" spellcheck="false">
+          <p class="set-hint">Publishable keys are safe to store and are loaded by the studio-facing checkout. Live and test keys are stored separately and swap automatically with the mode toggle.</p>
+        </div>
+
+        <div class="set-field">
+          <label>Webhook endpoint URL</label>
+          <div class="set-copy-row">
+            <input type="text" id="setWebhookUrl" readonly>
+            <button type="button" class="copy-btn" id="setWebhookCopy"><span class="copy-btn-ico">⧉</span> Copy</button>
+          </div>
+          <p class="set-hint">Paste this into your Stripe dashboard under Developers → Webhooks when you create the endpoint. The signing secret it generates (whsec_…) goes into Supabase Edge Function secrets, not here.</p>
+        </div>
+
+        <div class="set-secrets-note">
+          <h4>Where the secret keys live</h4>
+          <p>Add these in the Supabase dashboard under <em>Edge Functions → Secrets</em> (or via <code>supabase secrets set</code>). The frontend never reads them.</p>
+          <ul>
+            <li><code>STRIPE_SECRET_KEY_TEST</code> — your <code>sk_test_…</code> key</li>
+            <li><code>STRIPE_SECRET_KEY_LIVE</code> — your <code>sk_live_…</code> key</li>
+            <li><code>STRIPE_WEBHOOK_SECRET_TEST</code> — the <code>whsec_…</code> from your test webhook endpoint</li>
+            <li><code>STRIPE_WEBHOOK_SECRET_LIVE</code> — the <code>whsec_…</code> from your live webhook endpoint</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="set-section-hdr">
+        <h3 class="set-section-title">Global payment defaults</h3>
+      </div>
+      <div class="set-section-body">
+        <div class="set-field">
+          <label for="setDefaultMode">Default payment mode for new checkouts</label>
+          <select id="setDefaultMode">
+            <option value="immediate">Capture immediately — charge the card at checkout</option>
+            <option value="hold">Authorise and hold — capture later, 7-day window</option>
+            <option value="save_card">Save card only — charge off-session when setup begins</option>
+          </select>
+          <p class="set-hint">Affects only new checkout sessions. Already-paid, authorised, or saved-card submissions are unaffected. Each submission can also override this on its detail view.</p>
+        </div>
+
+        <div class="set-field">
+          <label for="setCaptureStage">Auto-capture stage</label>
+          <select id="setCaptureStage">
+            <option value="setup_in_progress">Setup in progress</option>
+            <option value="in_review">In review</option>
+            <option value="complete">Complete</option>
+          </select>
+          <p class="set-hint">When a submission moves to this stage, hold-mode authorisations are captured and save-card submissions are charged automatically. Manual buttons remain available on each submission.</p>
+        </div>
+
+        <div class="set-actions">
+          <button type="button" class="btn btn-p" id="setSaveBtn">Save settings</button>
+          <span class="set-save-msg" id="setSaveMsg"></span>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Users screen (owner only) -->
   <div id="usersScreen" style="display:none">
@@ -196,12 +330,31 @@
   </div>
 </div>
 
+<!-- Reusable confirm / alert modal -->
+<div class="adm-modal" id="admConfirmModal" hidden>
+  <div class="adm-modal-backdrop" data-mod-backdrop></div>
+  <div class="adm-modal-card" role="dialog" aria-modal="true" aria-labelledby="admConfirmTitle">
+    <div class="adm-modal-hdr">
+      <h2 id="admConfirmTitle" class="adm-modal-title" data-mod-title>Are you sure?</h2>
+      <button type="button" class="adm-modal-close" data-mod-close aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <div class="adm-modal-body" data-mod-body></div>
+    <div class="adm-modal-ftr">
+      <button type="button" class="btn btn-g" data-mod-cancel>Cancel</button>
+      <button type="button" class="btn btn-p" data-mod-confirm>Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/supabase-config.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/modal.js"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/detail.js"></script>
 <script src="js/change-request.js"></script>
 <script src="js/users.js"></script>
+<script src="js/catalog.js"></script>
+<script src="js/settings.js"></script>
 </body>
 </html>
