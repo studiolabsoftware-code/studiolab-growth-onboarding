@@ -133,13 +133,39 @@
     }
   }
 
+  // Decode a JWT payload without verifying its signature. We only use this
+  // to read the email claim for the UI greeting. PostgREST + RLS still
+  // verify the token cryptographically on every request.
+  function decodeJwt(token) {
+    try {
+      const payload = token.split('.')[1];
+      const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+      return JSON.parse(decodeURIComponent(escape(json)));
+    } catch (_) { return null; }
+  }
+
+  function readAdminJwt() {
+    try {
+      const t = localStorage.getItem(window.ADMIN_JWT_KEY);
+      if (!t) return null;
+      const payload = decodeJwt(t);
+      if (!payload || !payload.exp) return null;
+      if (payload.exp * 1000 < Date.now()) {
+        try { localStorage.removeItem(window.ADMIN_JWT_KEY); } catch (_) {}
+        return null;
+      }
+      return { token: t, payload };
+    } catch (_) { return null; }
+  }
+
   async function handleSession() {
     if (!sb) { showLogin(); return; }
-    const { data } = await sb.auth.getSession();
-    const session = data?.session;
-    if (!session?.user) { showLogin(); return; }
-    window.AdminAuth.currentUser = session.user.email;
-    showDashboard(session.user.email);
+    const info = readAdminJwt();
+    if (!info) { showLogin(); return; }
+    const email = info.payload.email || info.payload.user_metadata?.email || '';
+    if (!email) { showLogin(); return; }
+    window.AdminAuth.currentUser = email;
+    showDashboard(email);
   }
 
   async function sendOtp() {
@@ -204,41 +230,24 @@
         return;
       }
 
-      // Hydrate the Supabase Auth session. We can't await setSession (its
-      // background validation can hang for a long time on Supabase's
-      // gateway), but we also can't skip awaiting it then call queries —
-      // the in-memory client wasn't initialised with this session and won't
-      // attach the JWT to its requests. The reliable path is: kick off the
-      // setSession so the tokens persist to localStorage, then force a hard
-      // reload so the next page boot picks up the session cleanly through
-      // supabase-js's own auto-restore.
-      const { access_token, refresh_token } = r.data;
+      // Store the JWT under our own key. The supabase-js client (initialised
+      // on the next page load via supabase-config.js) will pick it up and
+      // attach it as a global Authorization header to every request.
       try {
-        const sp = sb.auth.setSession({ access_token, refresh_token });
-        if (sp && typeof sp.catch === 'function') sp.catch((e) => console.warn('setSession deferred:', e));
-      } catch (e) { console.warn('setSession threw:', e); }
-
-      // Persist tokens to storage synchronously as a belt-and-braces backup
-      // — supabase-js usually does this inside setSession, but if its
-      // implementation defers the write until after a network call, the
-      // reload below would miss it.
-      try {
-        const projectRef = (new URL(SB_URL || '')).host.split('.')[0];
-        const key = `sb-${projectRef}-auth-token`;
-        localStorage.setItem(key, JSON.stringify({
-          access_token,
-          refresh_token,
-          expires_at: r.data.expires_in ? Math.floor(Date.now() / 1000) + r.data.expires_in : undefined,
-          token_type: 'bearer',
-        }));
-      } catch (e) { console.warn('manual token persist failed:', e); }
+        localStorage.setItem(window.ADMIN_JWT_KEY, r.data.access_token);
+      } catch (e) {
+        console.error('Could not store admin JWT:', e);
+        setErr('loginCodeErr', 'Your browser blocked storing the sign-in token. Please allow site data and try again.');
+        return;
+      }
 
       window.AdminAuth.currentUser = pendingEmail;
-      // Brief UI cue, then reload so the supabase-js client boots with the
-      // session attached. Every authenticated query downstream then works.
       const codeForm = $('loginVerify');
       if (codeForm) codeForm.innerHTML = '<span class="spinner"></span> Signing you in…';
-      setTimeout(() => window.location.reload(), 150);
+      // Force a clean reload so the supabase client is constructed with the
+      // Authorization header already in place. Every downstream query then
+      // includes the JWT without depending on supabase-js's session manager.
+      setTimeout(() => window.location.reload(), 100);
     } finally {
       // Only release locks if the session never landed (we're still on the
       // login screen). Otherwise leave them locked so the just-used code is
@@ -275,22 +284,17 @@
     }
 
     $('admSignOut').addEventListener('click', () => {
-      // Optimistic sign-out. Clear the UI and local Supabase auth tokens
-      // synchronously so the studio gets immediate feedback even if the
-      // network call hangs. The server-side revoke fires in the background.
-      window.AdminAuth.currentUser = null;
-      window.AdminAuth.profile = null;
+      // Clear our admin JWT (and any leftover supabase-js auth tokens from
+      // older builds), then reload. The fresh page boot has no admin JWT
+      // attached, so the client comes up unauthenticated and lands on
+      // the login screen via handleSession.
+      try { localStorage.removeItem(window.ADMIN_JWT_KEY); } catch (_) {}
       try {
         Object.keys(localStorage).forEach((k) => {
           if (k.startsWith('sb-') && k.includes('auth-token')) localStorage.removeItem(k);
         });
-      } catch (_) { /* ignore */ }
-      showLogin();
-      // Fire and forget — never let a slow server keep the admin signed in.
-      try {
-        const p = sb.auth.signOut();
-        if (p && typeof p.catch === 'function') p.catch((e) => console.warn('signOut background failed:', e));
-      } catch (e) { console.warn('signOut threw:', e); }
+      } catch (_) {}
+      window.location.reload();
     });
 
     const navEl = $('admNav');
@@ -302,7 +306,8 @@
       });
     }
 
-    if (sb) sb.auth.onAuthStateChange(() => handleSession());
+    // No supabase-js auth-state subscription. Our session lives in
+    // localStorage and is read on every page boot via handleSession.
     handleSession();
   }
 

@@ -9,6 +9,13 @@ window.SUPABASE_CONFIG = {
   updatePagePath: '/update.html',
 };
 
+// Admin auth bypasses supabase-js's session machinery entirely: the JWT
+// from verify-admin-otp is stored under the `sl-admin-jwt` key and attached
+// as a global Authorization header on every supabase-js request. This is
+// reliable even when supabase-js's own session-validation path is degraded
+// (which we have seen hang for minutes on this project's Auth gateway).
+window.ADMIN_JWT_KEY = 'sl-admin-jwt';
+
 // Initialise the global supabase client once the SDK loads.
 window.initSupabase = function () {
   if (!window.supabase || !window.supabase.createClient) {
@@ -16,16 +23,23 @@ window.initSupabase = function () {
     return null;
   }
   if (!window._sbClient) {
+    let adminJwt = null;
+    try { adminJwt = localStorage.getItem(window.ADMIN_JWT_KEY); } catch (_) { /* ignore */ }
+    const options = {
+      auth: {
+        // We manage the admin token ourselves; keep supabase-js out of it.
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    };
+    if (adminJwt) {
+      options.global = { headers: { Authorization: 'Bearer ' + adminJwt } };
+    }
     window._sbClient = window.supabase.createClient(
       window.SUPABASE_CONFIG.url,
       window.SUPABASE_CONFIG.anonKey,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: false,
-        },
-      }
+      options,
     );
   }
   return window._sbClient;
