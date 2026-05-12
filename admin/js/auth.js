@@ -107,14 +107,30 @@
   }
 
   async function callFn(name, body) {
-    const resp = await fetch(FN_BASE + name, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {}),
-    });
-    let data = null;
-    try { data = await resp.json(); } catch (_) {}
-    return { ok: resp.ok, status: resp.status, data: data || {} };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const resp = await fetch(FN_BASE + name, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {}),
+        signal: controller.signal,
+      });
+      let data = null;
+      try { data = await resp.json(); } catch (_) {}
+      return { ok: resp.ok, status: resp.status, data: data || {} };
+    } catch (err) {
+      const aborted = err && err.name === 'AbortError';
+      return {
+        ok: false,
+        status: 0,
+        data: { ok: false, error: aborted
+          ? 'The server took too long to respond. Try again in a moment.'
+          : (err && err.message) || 'Network error. Please try again.' },
+      };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async function handleSession() {
