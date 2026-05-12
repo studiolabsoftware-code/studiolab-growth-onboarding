@@ -483,6 +483,41 @@
   }
 
   // ── Validation ────────────────────────────────────────────────────────────
+  // ── Auto-fill / smart defaults ────────────────────────────────────────────
+  // When a studio enters their first name + studio name we propose a sensible
+  // "From name" and email sign-off. Once they've entered their contact email
+  // we propose the same address as their reply-to. All proposals are visibly
+  // editable; the first manual edit on a target field locks it (marked with
+  // data-user-edited) so we don't keep overwriting their intent.
+
+  const AUTOFILL_SOURCES = new Set(['firstName', 'studioName', 'contactEmail']);
+  const AUTOFILL_TARGETS = new Set(['fromName', 'signOff', 'replyEmail']);
+
+  function setIfAuto(targetId, value) {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    if (el.dataset.userEdited === '1') return;
+    if (el.value && el.dataset.autofill !== '1') return; // existing value not authored by us
+    if (el.value === value) return;
+    el.value = value;
+    el.dataset.autofill = '1';
+    clearFieldErr(el);
+  }
+
+  function refreshAutoFill() {
+    const first = (val('firstName') || '').trim();
+    const studio = (val('studioName') || '').trim();
+    const email = (val('contactEmail') || '').trim();
+
+    if (first && studio) {
+      setIfAuto('fromName', `${first} at ${studio}`);
+      setIfAuto('signOff', `Cheers,\n${first}`);
+    } else if (first) {
+      setIfAuto('signOff', `Cheers,\n${first}`);
+    }
+    if (email) setIfAuto('replyEmail', email);
+  }
+
   function setFieldErr(input, on) {
     const wrap = input.closest('.f');
     if (!wrap) return;
@@ -1290,6 +1325,10 @@
       ce.readOnly = true;
       ce.style.background = 'var(--g1)';
     }
+    // Hydrating a draft programmatically doesn't fire input events, so trigger
+    // the autofill chain manually to populate from-name / sign-off / reply-to
+    // if those were left blank.
+    refreshAutoFill();
     // Restore setup type if present
     if (sub.setup_type) selectSetup(sub.setup_type);
     // Restore yn states
@@ -1415,6 +1454,13 @@
     document.addEventListener('input', (e) => {
       const t = e.target;
       if (t.matches && t.matches('input, select, textarea')) clearFieldErr(t);
+      // Mark a target field as user-edited the first time the studio types
+      // in it directly. Auto-fill stops touching it from that point on.
+      if (t && t.id && AUTOFILL_TARGETS.has(t.id) && !t.dataset.autofill) {
+        t.dataset.userEdited = '1';
+      }
+      // Source fields drive derived defaults on every keystroke. Cheap.
+      if (t && t.id && AUTOFILL_SOURCES.has(t.id)) refreshAutoFill();
     });
 
     document.addEventListener('keydown', (e) => {
