@@ -278,49 +278,66 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🖼️</div>Studio logo</div>
-      <div class="co co-blue"><strong>PNG or SVG with transparent background preferred.</strong> Minimum 400px wide. Used in all email headers.</div>
-      <label class="fu" id="logoZone">
-        <input type="file" id="logoFile" accept=".png,.svg,.jpg,.jpeg">
-        <div class="fu-ico" aria-hidden="true">🖼️</div>
-        <div class="fu-txt">Click to upload studio logo</div>
-        <div class="fu-hint">PNG, SVG or JPG, transparent background, min 400px wide</div>
-        <div class="fu-name" id="logoFn"></div>
-        <div class="fu-spin" id="logoSpin">Uploading...</div>
-      </label>
+      <div class="logo-zone" id="logoZone" tabindex="0" role="button" aria-label="Upload your studio logo. Drag a file here or press to browse.">
+        <input type="file" id="logoFile" accept="image/png,image/jpeg,image/gif" hidden>
+        <div class="logo-zone-empty" id="logoEmpty">
+          <div class="logo-zone-ico" aria-hidden="true">＋</div>
+          <div class="logo-zone-title">Drop your logo here, or click to browse</div>
+          <div class="logo-zone-hint">PNG with transparent background recommended. JPG or GIF also fine. Proposed size 350 × 180 px, max 2.5 MB.</div>
+        </div>
+        <div class="logo-zone-preview" id="logoPreview" hidden>
+          <div class="logo-zone-img-wrap"><img class="logo-zone-img" id="logoPreviewImg" alt=""></div>
+          <div class="logo-zone-meta">
+            <div class="logo-zone-name" id="logoFn"></div>
+            <div class="logo-zone-size" id="logoSize"></div>
+          </div>
+          <button type="button" class="logo-zone-replace" id="logoReplace">Replace</button>
+        </div>
+        <div class="logo-zone-spin" id="logoSpin" hidden><span class="spinner"></span> Uploading…</div>
+      </div>
+      <div class="logo-zone-err" id="logoErr" hidden></div>
     </div>
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🎨</div>Brand colours</div>
-      <div class="co co-blue">These are applied to email template headers, buttons, and accents. If you're unsure of your hex code, send us a screenshot and we'll match it.</div>
-      <div class="fr">
-        <div class="f">
-          <label for="col1t">Primary colour <span class="req">*</span> <span class="hint">(main brand colour)</span></label>
-          <div class="cf">
+      <div class="brand-cols">
+        <div class="brand-col">
+          <label for="col1t">Primary <span class="req">*</span></label>
+          <div class="cf cf-tight">
             <input type="color" id="col1p" value="#E8197F" aria-label="Primary colour picker">
             <input type="text" id="col1t" placeholder="#E8197F" maxlength="7" data-required>
           </div>
           <span class="field-err">Please choose a primary colour.</span>
         </div>
-        <div class="f">
-          <label for="col2t">Secondary colour <span class="hint">(accent, optional)</span></label>
-          <div class="cf">
+        <div class="brand-col">
+          <label for="col2t">Secondary <span class="hint">optional</span></label>
+          <div class="cf cf-tight">
             <input type="color" id="col2p" value="#4A3F8A" aria-label="Secondary colour picker">
             <input type="text" id="col2t" placeholder="#4A3F8A" maxlength="7">
           </div>
         </div>
       </div>
+      <div class="brand-cols-hint">Applied to email headers, buttons, and accents. Send a screenshot if you are unsure of your hex.</div>
     </div>
 
     <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">✍️</div>Email copy and voice</div>
-      <div class="fr x1">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">✍️</div>Email sign-off</div>
+      <div class="sig-rows">
         <div class="f">
-          <label for="signOff">Email sign-off <span class="req">*</span></label>
-          <input type="text" id="signOff" data-required placeholder="e.g. Sarah Johnson, Dance Academy Melbourne">
-          <span class="field-note">Appears at the bottom of every email. Typically name plus studio name.</span>
-          <span class="field-err">Please enter an email sign-off.</span>
+          <label for="signOffLine1">Line 1 <span class="hint">your name</span> <span class="req">*</span></label>
+          <input type="text" id="signOffLine1" data-required placeholder="e.g. Sarah Johnson" autocomplete="off">
+          <span class="field-err">Please enter at least a name.</span>
+        </div>
+        <div class="f">
+          <label for="signOffLine2">Line 2 <span class="hint">studio name</span></label>
+          <input type="text" id="signOffLine2" placeholder="e.g. Dance Academy Melbourne" autocomplete="off">
         </div>
       </div>
+      <div class="sig-preview">
+        <div class="sig-preview-label">Preview</div>
+        <div class="sig-preview-body" id="signOffPreview">—</div>
+      </div>
+      <input type="hidden" id="signOff">
     </div>
 
     <div class="fnav">

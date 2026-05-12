@@ -557,3 +557,42 @@ body.pay-modal-open { overflow: hidden; }
 .pay-modal-pay { padding: 11px 24px; font-size: 14px; font-weight: 700; min-height: 44px; }
 .pay-modal-foot { margin: 0; padding: 12px 24px 18px; font-size: 11px; color: var(--g6); text-align: center; line-height: 1.5; }
 .payblock-error { color: var(--rd, #B91C1C); font-weight: 600; padding: 8px 0; }
+
+/* ── Brand step: dropzone, tight colour pickers, signature preview ─── */
+
+/* Logo dropzone — bigger target, drag-and-drop friendly, with preview state */
+.logo-zone { position: relative; display: flex; align-items: center; justify-content: center; min-height: 160px; padding: 18px 22px; border: 2px dashed var(--g2); border-radius: 14px; background: var(--g1); cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.logo-zone:hover { border-color: var(--in); background: var(--in-l); }
+.logo-zone:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+.logo-zone-drag { border-color: var(--mg); background: var(--mg-l); border-style: solid; }
+.logo-zone-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+.logo-zone-ico { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 1px solid var(--g2); display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--in); font-weight: 700; margin-bottom: 4px; }
+.logo-zone-title { font-size: 14px; font-weight: 700; color: var(--in-d); }
+.logo-zone-hint { font-size: 11px; color: var(--g6); line-height: 1.5; max-width: 360px; }
+
+.logo-zone-preview { display: flex; align-items: center; gap: 14px; width: 100%; }
+.logo-zone-img-wrap { flex: 0 0 auto; width: 100px; height: 60px; padding: 6px; background: #fff; border: 1px solid var(--g2); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.logo-zone-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.logo-zone-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.logo-zone-name { font-size: 13px; font-weight: 600; color: var(--in-d); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logo-zone-size { font-size: 11px; color: var(--g6); }
+.logo-zone-replace { background: #fff; border: 1px solid var(--g2); border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--in); cursor: pointer; font-family: inherit; transition: border-color 0.15s, color 0.15s; }
+.logo-zone-replace:hover { border-color: var(--in); color: var(--in-d); }
+.logo-zone-spin { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--g6); }
+.logo-zone-err { margin-top: 8px; color: var(--rd, #B91C1C); font-size: 12px; font-weight: 600; }
+
+/* Brand colour pickers — tighter and side-by-side */
+.brand-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .brand-cols { grid-template-columns: 1fr; } }
+.brand-col label { font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.6px; }
+.cf-tight { gap: 6px; }
+.cf-tight input[type=color] { width: 36px; height: 32px; padding: 1px 2px; border-radius: 8px; }
+.cf-tight input[type=text] { padding: 6px 10px; font-size: 12px; }
+.brand-cols-hint { margin-top: 10px; font-size: 11px; color: var(--g6); line-height: 1.5; }
+
+/* Two-line signature with live preview */
+.sig-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .sig-rows { grid-template-columns: 1fr; } }
+.sig-preview { margin-top: 14px; padding: 12px 14px; background: var(--g1); border: 1px solid var(--g2); border-radius: 10px; }
+.sig-preview-label { font-size: 10px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+.sig-preview-body { font-size: 13px; color: var(--in-d); white-space: pre-line; line-height: 1.5; min-height: 38px; }

@@ -490,8 +490,8 @@
   // editable; the first manual edit on a target field locks it (marked with
   // data-user-edited) so we don't keep overwriting their intent.
 
-  const AUTOFILL_SOURCES = new Set(['firstName', 'studioName', 'contactEmail']);
-  const AUTOFILL_TARGETS = new Set(['fromName', 'signOff', 'replyEmail']);
+  const AUTOFILL_SOURCES = new Set(['firstName', 'lastName', 'studioName', 'contactEmail', 'signOffLine1', 'signOffLine2']);
+  const AUTOFILL_TARGETS = new Set(['fromName', 'signOffLine1', 'signOffLine2', 'replyEmail']);
 
   function setIfAuto(targetId, value) {
     const el = document.getElementById(targetId);
@@ -504,18 +504,29 @@
     clearFieldErr(el);
   }
 
+  function syncSignOff() {
+    // Combine the two signature lines into the hidden #signOff field that
+    // buildPayload reads. Also refresh the visible preview.
+    const l1 = (val('signOffLine1') || '').trim();
+    const l2 = (val('signOffLine2') || '').trim();
+    const combined = [l1, l2].filter(Boolean).join('\n');
+    const hidden = document.getElementById('signOff');
+    if (hidden) hidden.value = combined;
+    const preview = document.getElementById('signOffPreview');
+    if (preview) preview.textContent = combined || '—';
+  }
+
   function refreshAutoFill() {
     const first = (val('firstName') || '').trim();
+    const last = (val('lastName') || '').trim();
     const studio = (val('studioName') || '').trim();
     const email = (val('contactEmail') || '').trim();
 
-    if (first && studio) {
-      setIfAuto('fromName', `${first} at ${studio}`);
-      setIfAuto('signOff', `Cheers,\n${first}`);
-    } else if (first) {
-      setIfAuto('signOff', `Cheers,\n${first}`);
-    }
+    if (first && studio) setIfAuto('fromName', `${first} at ${studio}`);
+    if (first) setIfAuto('signOffLine1', last ? `${first} ${last}` : first);
+    if (studio) setIfAuto('signOffLine2', studio);
     if (email) setIfAuto('replyEmail', email);
+    syncSignOff();
   }
 
   function setFieldErr(input, on) {
@@ -577,25 +588,125 @@
   }
 
   // ── Logo upload ───────────────────────────────────────────────────────────
-  async function handleLogoChange(input) {
-    const file = input.files && input.files[0];
-    if (!file) return;
-    const fn = document.getElementById('logoFn');
-    const spin = document.getElementById('logoSpin');
-    if (fn) fn.classList.remove('vis');
-    if (spin) spin.classList.add('vis');
-    state.uploading = true;
+  // ── Logo upload ───────────────────────────────────────────────────────────
+  // GHL's sub-account business logo is the canonical target: PNG (transparent
+  // background recommended), JPG, or GIF, proposed 350x180 px, max 2.5 MB.
+  // SVG is rejected because GHL's email builder doesn't accept it. Files
+  // above 2.5 MB are auto-scaled and re-encoded client-side so the upload
+  // succeeds without bouncing back to the studio.
 
-    if (!sb) {
-      state.logoUrl = null;
-      state.uploading = false;
-      if (spin) spin.classList.remove('vis');
-      if (fn) { fn.textContent = file.name + ' (upload pending Supabase config)'; fn.classList.add('vis'); }
+  const LOGO_MAX_BYTES = 2.5 * 1024 * 1024;
+  const LOGO_TARGET_WIDTH = 1400; // 4x recommended width — high-DPI safe, file stays small
+  const LOGO_ACCEPTED_MIME = new Set(['image/png', 'image/jpeg', 'image/gif']);
+
+  function bytesToHuman(n) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+    return `${(n / 1024 / 1024).toFixed(2)} MB`;
+  }
+
+  function readFileAsImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { resolve({ img, url }); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read image.')); };
+      img.src = url;
+    });
+  }
+
+  async function compressIfNeeded(file) {
+    if (file.size <= LOGO_MAX_BYTES && file.type !== 'image/gif') {
+      // Under cap, return as-is. GIFs are always passed through (animation
+      // would be lost via canvas re-encode).
+      return file;
+    }
+    if (file.type === 'image/gif') return file; // never re-encode GIFs
+    const { img, url } = await readFileAsImage(file);
+    try {
+      const ratio = Math.min(1, LOGO_TARGET_WIDTH / img.naturalWidth);
+      const w = Math.round(img.naturalWidth * ratio);
+      const h = Math.round(img.naturalHeight * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      // Always emit PNG so transparency is preserved.
+      const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+      if (!blob) return file;
+      // If PNG is still too big (rare on photo-heavy logos), bail back to the
+      // original — admin can advise on a smaller source.
+      if (blob.size > LOGO_MAX_BYTES) return file;
+      return new File([blob], (file.name.replace(/\.[^.]+$/, '') || 'logo') + '.png', { type: 'image/png' });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function setLogoError(msg) {
+    const err = document.getElementById('logoErr');
+    if (!err) return;
+    if (msg) { err.textContent = msg; err.hidden = false; }
+    else { err.textContent = ''; err.hidden = true; }
+  }
+
+  function showLogoPreview(file, objectUrl) {
+    const empty = document.getElementById('logoEmpty');
+    const prev = document.getElementById('logoPreview');
+    const img = document.getElementById('logoPreviewImg');
+    const fn = document.getElementById('logoFn');
+    const sz = document.getElementById('logoSize');
+    if (empty) empty.hidden = true;
+    if (prev) prev.hidden = false;
+    if (img) img.src = objectUrl;
+    if (fn) fn.textContent = file.name;
+    if (sz) sz.textContent = bytesToHuman(file.size);
+  }
+
+  function resetLogoView() {
+    const empty = document.getElementById('logoEmpty');
+    const prev = document.getElementById('logoPreview');
+    if (empty) empty.hidden = false;
+    if (prev) prev.hidden = true;
+    const input = document.getElementById('logoFile');
+    if (input) input.value = '';
+    state.logoUrl = null;
+    setLogoError('');
+  }
+
+  async function handleLogoFile(rawFile) {
+    if (!rawFile) return;
+    setLogoError('');
+
+    // Reject SVG explicitly (GHL email builder won't accept it).
+    if (rawFile.type === 'image/svg+xml' || /\.svg$/i.test(rawFile.name)) {
+      setLogoError('SVG files are not supported. Please upload a PNG, JPG, or GIF.');
+      return;
+    }
+    if (!LOGO_ACCEPTED_MIME.has(rawFile.type)) {
+      setLogoError('Please upload a PNG, JPG, or GIF.');
       return;
     }
 
+    const spin = document.getElementById('logoSpin');
+    if (spin) spin.hidden = false;
+    state.uploading = true;
+
     try {
-      const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+      const file = await compressIfNeeded(rawFile);
+      if (file.size > LOGO_MAX_BYTES) {
+        setLogoError(`That file is ${bytesToHuman(file.size)}. We could not get it under 2.5 MB automatically. Please try a smaller source image.`);
+        return;
+      }
+
+      if (!sb) {
+        state.logoUrl = null;
+        showLogoPreview(file, URL.createObjectURL(file));
+        setLogoError('Upload pending: Supabase is not configured.');
+        return;
+      }
+
+      const ext = file.type === 'image/png' ? 'png' : file.type === 'image/jpeg' ? 'jpg' : 'gif';
       const path = crypto.randomUUID() + '.' + ext;
       const bucket = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.logoBucket) || 'logos';
       const { error } = await sb.storage.from(bucket).upload(path, file, {
@@ -605,14 +716,63 @@
       });
       if (error) throw error;
       state.logoUrl = bucket + '/' + path;
-      if (fn) { fn.textContent = file.name + ' uploaded'; fn.classList.add('vis'); }
+      showLogoPreview(file, URL.createObjectURL(file));
     } catch (err) {
       console.error('Logo upload failed:', err);
       state.logoUrl = null;
-      if (fn) { fn.textContent = 'Upload failed, please try again.'; fn.classList.add('vis'); }
+      setLogoError('Upload failed. Please try again, or use a smaller file.');
     } finally {
       state.uploading = false;
-      if (spin) spin.classList.remove('vis');
+      if (spin) spin.hidden = true;
+    }
+  }
+
+  function handleLogoChange(input) {
+    return handleLogoFile(input.files && input.files[0]);
+  }
+
+  function bindLogoZone() {
+    const zone = document.getElementById('logoZone');
+    const input = document.getElementById('logoFile');
+    const replaceBtn = document.getElementById('logoReplace');
+    if (!zone || !input || zone.dataset.bound === '1') return;
+    zone.dataset.bound = '1';
+
+    // Click on the zone (anywhere except the Replace button) opens the picker.
+    zone.addEventListener('click', (e) => {
+      if (e.target && e.target.closest && e.target.closest('#logoReplace')) return;
+      if (e.target && e.target.tagName === 'INPUT') return;
+      input.click();
+    });
+    zone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+
+    // Drag and drop.
+    ['dragenter','dragover'].forEach((evt) => {
+      zone.addEventListener(evt, (e) => {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.add('logo-zone-drag');
+      });
+    });
+    ['dragleave','drop'].forEach((evt) => {
+      zone.addEventListener(evt, (e) => {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.remove('logo-zone-drag');
+      });
+    });
+    zone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) handleLogoFile(file);
+    });
+
+    if (replaceBtn) {
+      replaceBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resetLogoView();
+        input.click();
+      });
     }
   }
 
@@ -1396,11 +1556,18 @@
     [
       'studioName','legalName','country','timezone','studioType','address','website',
       'firstName','lastName','contactPhone','contactRole',
-      'col1t','col2t','signOff','fromName','replyEmail','emailDomain',
+      'col1t','col2t','fromName','replyEmail','emailDomain',
       'smsType','portNum',
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
     ].forEach((id) => setVal(id, sub[idToColumn(id)]));
+    // Two-line signature: split the legacy single-string column on newline so
+    // older drafts hydrate cleanly into the new UI.
+    if (sub.sign_off) {
+      const lines = String(sub.sign_off).split(/\r?\n/);
+      setVal('signOffLine1', lines[0] || '');
+      setVal('signOffLine2', lines.slice(1).join(' ').trim());
+    }
     // Lock the contact email display if it exists in the form (it does in Step 2)
     const ce = document.getElementById('contactEmail');
     if (ce && sub.contact_email) {
@@ -1412,6 +1579,7 @@
     // the autofill chain manually to populate from-name / sign-off / reply-to
     // if those were left blank.
     refreshAutoFill();
+    syncSignOff();
     // Restore setup type if present
     if (sub.setup_type) selectSetup(sub.setup_type);
     // Restore yn states
@@ -1430,7 +1598,16 @@
         if (lbl) lbl.classList.toggle('chk', cb.checked);
       });
     }
-    if (sub.logo_url) state.logoUrl = sub.logo_url;
+    if (sub.logo_url) {
+      state.logoUrl = sub.logo_url;
+      const empty = document.getElementById('logoEmpty');
+      if (empty) {
+        const title = empty.querySelector('.logo-zone-title');
+        const hint = empty.querySelector('.logo-zone-hint');
+        if (title) title.textContent = 'Logo on file';
+        if (hint) hint.textContent = 'Drop or click to upload a replacement. PNG recommended, max 2.5 MB.';
+      }
+    }
     applyCountryToTimezone();
   }
 
@@ -1544,6 +1721,8 @@
       }
       // Source fields drive derived defaults on every keystroke. Cheap.
       if (t && t.id && AUTOFILL_SOURCES.has(t.id)) refreshAutoFill();
+      // Sign-off preview reflects either line edit.
+      if (t && (t.id === 'signOffLine1' || t.id === 'signOffLine2')) syncSignOff();
     });
 
     document.addEventListener('keydown', (e) => {
@@ -1561,6 +1740,7 @@
     applyRegionDefaults();
     bindEvents();
     bindAuthGate();
+    bindLogoZone();
     // Plan is locked by the URL the form is served from. No selectPlan call here.
     selectSetup('dfy');
     const c1 = document.getElementById('col1t');
