@@ -77,11 +77,19 @@
 .det-section { background: #fff; border: 1px solid var(--g2); border-radius: 12px; margin-bottom: 14px; }
 .det-section-hdr { padding: 12px 18px; border-bottom: 1px solid var(--g2); font-size: 13px; font-weight: 700; color: var(--in-d); display: flex; align-items: center; gap: 8px; }
 .det-section-body { padding: 16px 18px; font-size: 13px; }
-.det-row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--g2); }
+.det-row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--g2); align-items: start; }
 .det-row:last-child { border-bottom: none; }
-.det-row dt { color: var(--g6); font-weight: 500; }
-.det-row dd { color: var(--in-d); word-break: break-word; }
+.det-row dt { color: var(--g6); font-weight: 500; padding-top: 3px; }
+.det-row dd { color: var(--in-d); word-break: break-word; display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.det-row dd .det-val { flex: 1; min-width: 0; }
 .det-row dd.empty { color: var(--g4); font-style: italic; }
+
+/* Copy-to-clipboard button next to each value */
+.copy-btn { flex: 0 0 auto; background: var(--g1); border: 1px solid var(--g2); border-radius: 6px; padding: 0 8px; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--g6); transition: background 0.15s, border-color 0.15s, color 0.15s; line-height: 1; font-family: inherit; display: inline-flex; align-items: center; gap: 4px; height: 26px; white-space: nowrap; }
+.copy-btn:hover { background: var(--in-l); border-color: var(--in); color: var(--in); }
+.copy-btn:focus-visible { outline: none; border-color: var(--in); box-shadow: 0 0 0 3px rgba(74, 63, 138, 0.28); }
+.copy-btn.copied { background: var(--gr-l); border-color: #A7F3D0; color: var(--gr); }
+.copy-btn-ico { font-size: 11px; line-height: 1; }
 .det-plan-notice { background: var(--g1); padding: 14px 18px; color: var(--g6); font-size: 12px; border-radius: 0 0 12px 12px; }
 
 .det-side .det-section { margin-bottom: 14px; }

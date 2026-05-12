@@ -8,10 +8,17 @@
 
   const ESC = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const empty = '<span class="empty">Not provided</span>';
+  // Each formatter returns the rendered HTML plus the raw clipboard string.
+  // section() rows can be [label, rendered, copyableString] or [label, value]
+  // where the formatter handles the copy string automatically.
   const fmtVal = (v) => (v === null || v === undefined || v === '') ? empty : ESC(v);
   const fmtBool = (v) => v === true ? 'Yes' : v === false ? 'No' : empty;
   const fmtList = (v) => Array.isArray(v) && v.length ? ESC(v.join(', ')) : empty;
   const fmtDate = (v) => v ? new Date(v).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : empty;
+  // Raw helpers: what should land in the clipboard for each value type.
+  const rawVal  = (v) => (v === null || v === undefined || v === '') ? '' : String(v);
+  const rawBool = (v) => v === true ? 'Yes' : v === false ? 'No' : '';
+  const rawList = (v) => Array.isArray(v) && v.length ? v.join(', ') : '';
 
   let current = null;
 
@@ -134,7 +141,7 @@
             ['Events', fmtVal(sub.kb_events)],
             ['FAQs', Array.isArray(sub.kb_faqs) && sub.kb_faqs.length
               ? `${sub.kb_faqs.length} Q&amp;A pairs`
-              : empty],
+              : empty, ''],
             ['Restricted topics', fmtVal(sub.kb_restricted)],
             ['AI tone', fmtVal(sub.kb_tone)],
             ['Voice agent hours', fmtVal(sub.voice_hours)],
@@ -197,10 +204,61 @@
         <div class="det-section-hdr">${title}</div>
         <div class="det-section-body">
           <dl>
-            ${rows.map(([k, v]) => `<div class="det-row"><dt>${ESC(k)}</dt><dd>${v}</dd></div>`).join('')}
+            ${rows.map(renderRow).join('')}
           </dl>
         </div>
       </div>`;
+  }
+
+  // Each row is [label, renderedHtml, copyText?]. If copyText is omitted we
+  // derive it from the renderedHtml by stripping tags. Empty/Not-provided
+  // values get no copy button.
+  function renderRow(row) {
+    const [k, v, explicitCopy] = row;
+    let copy;
+    if (explicitCopy !== undefined) {
+      copy = explicitCopy;
+    } else if (typeof v === 'string') {
+      // Strip HTML, decode entities, trim. Empty placeholder -> empty.
+      const stripped = v.replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+        .trim();
+      copy = (stripped && stripped !== 'Not provided') ? stripped : '';
+    } else {
+      copy = '';
+    }
+    const btn = copy
+      ? `<button type="button" class="copy-btn" data-copy="${ESC(copy)}" aria-label="Copy ${ESC(k)}"><span class="copy-btn-ico" aria-hidden="true">⧉</span>Copy</button>`
+      : '';
+    return `<div class="det-row"><dt>${ESC(k)}</dt><dd><span class="det-val">${v}</span>${btn}</dd></div>`;
+  }
+
+  async function handleCopyClick(e) {
+    const btn = e.target.closest('.copy-btn');
+    if (!btn) return;
+    const text = btn.dataset.copy || '';
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_) {
+      // Fallback for older browsers / non-HTTPS contexts
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (_) { /* noop */ }
+      document.body.removeChild(ta);
+    }
+    const original = btn.innerHTML;
+    btn.classList.add('copied');
+    btn.innerHTML = '<span class="copy-btn-ico" aria-hidden="true">✓</span>Copied';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = original;
+    }, 1400);
   }
 
   function planNotice(name, plan) {
@@ -306,6 +364,9 @@
     if (action === 'change_request_completed' && Array.isArray(d?.fields_updated)) return `${d.fields_updated.length} field(s) updated`;
     return '';
   }
+
+  // Single delegated copy handler covers every .copy-btn in the detail view.
+  document.addEventListener('click', handleCopyClick);
 
   window.AdminDetail = {
     open,
