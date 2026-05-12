@@ -176,19 +176,12 @@
           <span class="field-err">Please enter your studio address.</span>
         </div>
       </div>
-      <div class="fr">
+      <div class="fr x1">
         <div class="f">
           <label for="website">Website URL <span class="req">*</span></label>
           <input type="url" id="website" data-required placeholder="https://yourstudio.com.au">
           <span class="field-err">Please enter a valid website URL.</span>
         </div>
-        <div class="f">
-          <label for="supportUrl">Support or contact page URL <span class="req">*</span></label>
-          <input type="url" id="supportUrl" data-required placeholder="https://yourstudio.com.au/contact">
-          <span class="field-note">Linked in email footers so families can reach you.</span>
-          <span class="field-err">Please enter a valid contact page URL.</span>
-        </div>
-      </div>
     </div>
 
     <div class="card">
@@ -228,12 +221,6 @@
             <option>Admin</option>
           </select>
         </div>
-        <div class="f">
-          <label for="slEmail">StudioLAB login email</label>
-          <input type="email" id="slEmail" placeholder="Your StudioLAB account email">
-          <span class="field-note">The email you use to log into StudioLAB, which helps us link the two systems.</span>
-        </div>
-      </div>
     </div>
 
     <div class="fnav">
@@ -288,34 +275,12 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">✍️</div>Email copy and voice</div>
-      <div class="fr">
+      <div class="fr x1">
         <div class="f">
           <label for="signOff">Email sign-off <span class="req">*</span></label>
           <input type="text" id="signOff" data-required placeholder="e.g. Sarah Johnson, Dance Academy Melbourne">
           <span class="field-note">Appears at the bottom of every email. Typically name plus studio name.</span>
           <span class="field-err">Please enter an email sign-off.</span>
-        </div>
-        <div class="f">
-          <label for="tone">Email tone <span class="hint">(optional)</span></label>
-          <select id="tone">
-            <option value="">No preference, match my studio feel</option>
-            <option>Warm and friendly</option>
-            <option>Professional and formal</option>
-            <option>Casual and conversational</option>
-            <option>Playful and energetic</option>
-          </select>
-        </div>
-      </div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="footerNotes">Footer notes <span class="hint">(optional taglines, disclaimers, extra links)</span></label>
-          <textarea id="footerNotes" rows="2" placeholder="e.g. Follow us on Instagram @studioname | ABN 12 345 678 901"></textarea>
-        </div>
-      </div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="studioDesc">Short studio description <span class="hint">(2 to 3 sentences)</span></label>
-          <textarea id="studioDesc" rows="3" placeholder="Tell us about your studio: style, what makes you different, types of classes, and who you serve."></textarea>
         </div>
       </div>
     </div>
@@ -365,20 +330,11 @@
         </div>
       </div>
       <div class="cond" id="dnsCond">
-        <div class="fr">
+        <div class="fr x1">
           <div class="f">
             <label for="emailDomain">Your email domain <span class="req">*</span></label>
             <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com.au">
             <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
-          </div>
-          <div class="f">
-            <label for="dnsAccess">DNS access</label>
-            <select id="dnsAccess">
-              <option value="">Select how we'll handle DNS</option>
-              <option>I can access DNS myself and apply the records</option>
-              <option>I need to forward DNS records to my IT team or web host</option>
-              <option>I'm not sure, please contact me</option>
-            </select>
           </div>
         </div>
         <div class="co co-blue" style="margin-bottom:0; margin-top:8px;">We will generate DKIM and Return Path DNS records and send them to you with clear instructions. Propagation typically takes 1 to 48 hours after the records are added.</div>
@@ -403,7 +359,7 @@
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">💬</div>SMS phone number</div>
       <div class="co co-blue">We purchase and configure an SMS-enabled phone number for your account. This number is used for outbound SMS automations. <strong>You don't need an existing number.</strong> We handle provisioning. A2P / 10DLC registration may be required depending on your region.</div>
-      <div class="fr">
+      <div class="fr x1">
         <div class="f">
           <label for="smsType">Number type preference <span class="req">*</span></label>
           <select id="smsType">
@@ -414,21 +370,11 @@
             <option value="nosure">No preference, you choose</option>
           </select>
         </div>
-        <div class="f">
-          <label for="areaCode">Preferred area code <span class="hint">(if local number)</span></label>
-          <input type="text" id="areaCode" placeholder="e.g. 03 (AU) or 310 (US)">
-        </div>
       </div>
       <div class="f" id="portRow" style="display:none; margin-top:10px;">
         <label for="portNum">Existing number to port</label>
         <input type="tel" id="portNum" placeholder="+61 4XX XXX XXX">
         <span class="field-note">Porting timelines vary, typically 3 to 10 business days.</span>
-      </div>
-      <div class="fr x1" style="margin-top:14px; margin-bottom:0;">
-        <div class="f">
-          <label for="smsTone">SMS tone notes <span class="hint">(optional)</span></label>
-          <input type="text" id="smsTone" placeholder="e.g. Keep it short and warm, like a text from the studio">
-        </div>
       </div>
     </div>
 

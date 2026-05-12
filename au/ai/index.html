@@ -179,19 +179,12 @@
           <span class="field-err">Please enter your studio address.</span>
         </div>
       </div>
-      <div class="fr">
+      <div class="fr x1">
         <div class="f">
           <label for="website">Website URL <span class="req">*</span></label>
           <input type="url" id="website" data-required placeholder="https://yourstudio.com.au">
           <span class="field-err">Please enter a valid website URL.</span>
         </div>
-        <div class="f">
-          <label for="supportUrl">Support or contact page URL <span class="req">*</span></label>
-          <input type="url" id="supportUrl" data-required placeholder="https://yourstudio.com.au/contact">
-          <span class="field-note">Linked in email footers so families can reach you.</span>
-          <span class="field-err">Please enter a valid contact page URL.</span>
-        </div>
-      </div>
     </div>
 
     <div class="card">
@@ -231,12 +224,6 @@
             <option>Admin</option>
           </select>
         </div>
-        <div class="f">
-          <label for="slEmail">StudioLAB login email</label>
-          <input type="email" id="slEmail" placeholder="Your StudioLAB account email">
-          <span class="field-note">The email you use to log into StudioLAB, which helps us link the two systems.</span>
-        </div>
-      </div>
     </div>
 
     <div class="fnav">
@@ -291,34 +278,12 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">✍️</div>Email copy and voice</div>
-      <div class="fr">
+      <div class="fr x1">
         <div class="f">
           <label for="signOff">Email sign-off <span class="req">*</span></label>
           <input type="text" id="signOff" data-required placeholder="e.g. Sarah Johnson, Dance Academy Melbourne">
           <span class="field-note">Appears at the bottom of every email. Typically name plus studio name.</span>
           <span class="field-err">Please enter an email sign-off.</span>
-        </div>
-        <div class="f">
-          <label for="tone">Email tone <span class="hint">(optional)</span></label>
-          <select id="tone">
-            <option value="">No preference, match my studio feel</option>
-            <option>Warm and friendly</option>
-            <option>Professional and formal</option>
-            <option>Casual and conversational</option>
-            <option>Playful and energetic</option>
-          </select>
-        </div>
-      </div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="footerNotes">Footer notes <span class="hint">(optional taglines, disclaimers, extra links)</span></label>
-          <textarea id="footerNotes" rows="2" placeholder="e.g. Follow us on Instagram @studioname | ABN 12 345 678 901"></textarea>
-        </div>
-      </div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="studioDesc">Short studio description <span class="hint">(2 to 3 sentences, used for AI chat widget and landing pages)</span></label>
-          <textarea id="studioDesc" rows="3" placeholder="Tell us about your studio: style, what makes you different, types of classes, and who you serve."></textarea>
         </div>
       </div>
     </div>
@@ -368,20 +333,11 @@
         </div>
       </div>
       <div class="cond" id="dnsCond">
-        <div class="fr">
+        <div class="fr x1">
           <div class="f">
             <label for="emailDomain">Your email domain <span class="req">*</span></label>
             <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com.au">
             <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
-          </div>
-          <div class="f">
-            <label for="dnsAccess">DNS access</label>
-            <select id="dnsAccess">
-              <option value="">Select how we'll handle DNS</option>
-              <option>I can access DNS myself and apply the records</option>
-              <option>I need to forward DNS records to my IT team or web host</option>
-              <option>I'm not sure, please contact me</option>
-            </select>
           </div>
         </div>
         <div class="co co-blue" style="margin-bottom:0; margin-top:8px;">We will generate DKIM and Return Path DNS records and send them to you with clear instructions. Propagation typically takes 1 to 48 hours after the records are added.</div>
@@ -406,7 +362,7 @@
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">💬</div>SMS phone number</div>
       <div class="co co-blue">We purchase and configure an SMS-enabled phone number for your account. This number is used for outbound SMS automations. <strong>You don't need an existing number.</strong> We handle provisioning. A2P / 10DLC registration may be required depending on your region.</div>
-      <div class="fr">
+      <div class="fr x1">
         <div class="f">
           <label for="smsType">Number type preference <span class="req">*</span></label>
           <select id="smsType">
@@ -417,21 +373,11 @@
             <option value="nosure">No preference, you choose</option>
           </select>
         </div>
-        <div class="f">
-          <label for="areaCode">Preferred area code <span class="hint">(if local number)</span></label>
-          <input type="text" id="areaCode" placeholder="e.g. 03 (AU) or 310 (US)">
-        </div>
       </div>
       <div class="f" id="portRow" style="display:none; margin-top:10px;">
         <label for="portNum">Existing number to port</label>
         <input type="tel" id="portNum" placeholder="+61 4XX XXX XXX">
         <span class="field-note">Porting timelines vary, typically 3 to 10 business days.</span>
-      </div>
-      <div class="fr x1" style="margin-top:14px; margin-bottom:0;">
-        <div class="f">
-          <label for="smsTone">SMS tone notes <span class="hint">(optional)</span></label>
-          <input type="text" id="smsTone" placeholder="e.g. Keep it short and warm, like a text from the studio">
-        </div>
       </div>
     </div>
 
@@ -546,135 +492,30 @@
     </div>
   </div>
 
-  <!-- ─────────────── STEP 7: AI Knowledge Base ─────────────── -->
+  <!-- ─────────────── STEP 7: AI Knowledge Base (decoupled) ─────────────── -->
   <div class="panel" id="s7">
     <div class="sh">
       <div class="sh-tag">Step 7 of 8</div>
-      <h2 class="sh-title">AI knowledge base</h2>
-      <div class="sh-desc">This is the most important step for Dominate AI. The AI chat and voice agents answer from this knowledge base only. They will not guess or invent information. We compile it, send you a summary for approval, then activate.</div>
-    </div>
-
-    <div class="co co-amber"><strong>Quality standards:</strong> We build this from exactly what you provide. No assumptions, no invented content. The AI will say "I'm not sure, let me connect you with the studio" for anything outside this knowledge base. Take your time filling this in thoroughly.</div>
-
-    <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">📍</div>Category 1: Studio profile</div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="kb-profile">Studio locations, hours, and contact details <span class="req">*</span></label>
-          <textarea id="kb-profile" rows="5" data-required placeholder="Include: all studio locations with addresses, opening hours for each, phone numbers, email addresses, parking information, accessibility info."></textarea>
-          <span class="field-err">Please share studio profile details.</span>
-        </div>
-      </div>
+      <h2 class="sh-title">Your AI knowledge base</h2>
+      <div class="sh-desc">The most important part of Dominate AI, handled in its own dedicated form.</div>
     </div>
 
     <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">🩰</div>Category 2: Classes and timetable</div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="kb-classes">Class types, age groups, styles, and schedule <span class="req">*</span></label>
-          <textarea id="kb-classes" rows="6" data-required placeholder="Include: all class types (e.g. Ballet, Hip Hop, Jazz), age groups for each, skill levels, class duration, current timetable, class sizes, what to wear, what to bring."></textarea>
-          <span class="field-err">Please share class and timetable details.</span>
-        </div>
-      </div>
+      <div class="ct"><div class="ct-icon" aria-hidden="true">🧠</div>We will send this separately</div>
+      <p style="margin:0 0 10px; color:var(--g6); line-height:1.6;">Your AI knowledge base is what the AI chat and voice agents draw from when they answer families. It needs detailed input across class info, pricing, policies, FAQs, and voice agent rules. Doing it well takes 30 to 45 focused minutes.</p>
+      <p style="margin:0 0 10px; color:var(--g6); line-height:1.6;">Rather than tack it onto the end of this form, we will send you a dedicated knowledge base link within 24 hours of submission. You can build it in your own time, save your progress, and come back as often as you need.</p>
+      <p style="margin:0; color:var(--g6); line-height:1.6;">Your account configuration begins immediately after this form is submitted. The AI chat widget and voice agent activate once your knowledge base is reviewed and approved.</p>
     </div>
 
     <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">💰</div>Category 3: Pricing</div>
-      <div class="co co-red"><strong>Important:</strong> Specify below whether the AI is allowed to quote prices directly. If pricing is complex or negotiated, it's often better to have the AI say "contact us for pricing."</div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="kb-pricing">Tuition fees and pricing structure <span class="req">*</span></label>
-          <textarea id="kb-pricing" rows="5" data-required placeholder="Include: term fees per class type, casual rates, sibling discounts, payment plans available, what's included in fees, any fee exclusions."></textarea>
-          <span class="field-err">Please share pricing details.</span>
-        </div>
-      </div>
-      <div class="fr x1" style="margin-top:10px; margin-bottom:0;">
-        <div class="f">
-          <span class="f-q-label" id="lbl-quote">Can the AI quote prices directly to families?</span>
-          <div class="yn" role="radiogroup" aria-labelledby="lbl-quote">
-            <button type="button" class="yn-b" id="quotePriceY" data-yn="quotePrice" data-val="true" role="radio" aria-checked="false">Yes, AI can share prices</button>
-            <button type="button" class="yn-b" id="quotePriceN" data-yn="quotePrice" data-val="false" role="radio" aria-checked="false">No, direct to studio for pricing</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">📋</div>Category 4: Studio policies</div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="kb-policies">Enrolment and operational policies <span class="req">*</span></label>
-          <textarea id="kb-policies" rows="5" data-required placeholder="Include: enrolment terms, cancellation policy, refund policy, trial class policy, makeup class policy, attendance expectations, photo or video consent, uniform requirements."></textarea>
-          <span class="field-err">Please share studio policies.</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">🎭</div>Category 5: Upcoming events</div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="kb-events">Concerts, showcases, competitions, and studio events</label>
-          <textarea id="kb-events" rows="4" placeholder="Include: upcoming concert or showcase dates and costs, competition dates, any open days or trial class events, costume fittings schedule."></textarea>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">❓</div>Category 6: FAQs</div>
-      <div class="co co-blue">Minimum 10 Q&amp;A pairs. These become the core of the AI's response capability. Think about every question a new family might ask. The more thorough, the better the AI performs.</div>
-      <div class="faq-list" id="faqList">
-        <div class="faq-item">
-          <input type="text" placeholder="Question, e.g. What age can my child start?" class="faq-q">
-          <input type="text" placeholder="Answer, e.g. We accept students from age 3..." class="faq-a">
-          <button type="button" class="faq-del" data-action="del-faq" aria-label="Remove this question and answer"><span aria-hidden="true">&times;</span></button>
-        </div>
-        <div class="faq-item">
-          <input type="text" placeholder="Question" class="faq-q">
-          <input type="text" placeholder="Answer" class="faq-a">
-          <button type="button" class="faq-del" data-action="del-faq" aria-label="Remove this question and answer"><span aria-hidden="true">&times;</span></button>
-        </div>
-        <div class="faq-item">
-          <input type="text" placeholder="Question" class="faq-q">
-          <input type="text" placeholder="Answer" class="faq-a">
-          <button type="button" class="faq-del" data-action="del-faq" aria-label="Remove this question and answer"><span aria-hidden="true">&times;</span></button>
-        </div>
-      </div>
-      <button type="button" class="add-btn" data-action="add-faq">+ Add another Q&amp;A</button>
-    </div>
-
-    <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">🚫</div>Restricted topics and AI rules</div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="kb-restricted">Topics the AI must NOT answer <span class="hint">(optional but recommended)</span></label>
-          <textarea id="kb-restricted" rows="3" placeholder="e.g. Do not answer questions about specific teacher salaries or staffing changes. Do not discuss competitor studios. Do not quote custom pricing packages."></textarea>
-        </div>
-      </div>
-      <div class="fr x1" style="margin-top:12px; margin-bottom:0;">
-        <div class="f">
-          <label for="kb-tone">AI tone and personality</label>
-          <textarea id="kb-tone" rows="2" placeholder="e.g. Warm, helpful, and encouraging. Reflect the energy of a passionate dance studio. Use first names when known. Keep responses concise."></textarea>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">📞</div>AI voice agent rules</div>
-      <div class="co co-blue">The AI voice agent answers calls to your studio number. Configure when it engages and when it defers to a human.</div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="voiceHours">Voice agent activation hours <span class="req">*</span></label>
-          <input type="text" id="voiceHours" data-required placeholder="e.g. After hours only (after 6pm and weekends) or always on">
-          <span class="field-err">Please specify activation hours.</span>
-        </div>
-      </div>
-      <div class="fr x1" style="margin-top:10px; margin-bottom:0;">
-        <div class="f">
-          <label for="voiceEscalate">When should the AI escalate to a human?</label>
-          <textarea id="voiceEscalate" rows="2" placeholder="e.g. Always offer to take a callback message. Escalate immediately for complaints, urgent medical, or if the caller asks to speak to a person."></textarea>
-        </div>
-      </div>
+      <div class="ct"><div class="ct-icon" aria-hidden="true">✓</div>What happens next</div>
+      <ul style="margin:0; padding-left:18px; color:var(--g6); line-height:1.7; font-size:13px;">
+        <li>Submit this form on the next step</li>
+        <li>You receive a confirmation email at the contact address you provide</li>
+        <li>Within 24 hours, we send a dedicated AI knowledge base link to that same address</li>
+        <li>You build the knowledge base in your own time, in as many sittings as you need</li>
+        <li>Our team reviews, prepares it for the AI, and shares a final preview before activation</li>
+      </ul>
     </div>
 
     <div class="fnav">
@@ -683,6 +524,7 @@
       <button type="button" class="btn btn-p" data-action="next">Review →</button>
     </div>
   </div>
+
 
   <!-- ─────────────── STEP 8: Review & Submit ─────────────── -->
   <div class="panel" id="s8">
