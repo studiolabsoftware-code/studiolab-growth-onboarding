@@ -1,5 +1,7 @@
 // StudioLAB Growth email templates. Inline-styled HTML, dark indigo header,
-// magenta SL mark, white body card, indigo CTA.
+// brand logo, white body card, indigo CTA.
+
+const LOGO_URL = 'https://app.studiolabgrowth.com/assets/growth-logo-email.png';
 
 const COL = {
   in_d: '#13102E',
@@ -19,11 +21,8 @@ function layout(opts: { previewText: string; body: string }): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COL.g1};padding:32px 16px;">
   <tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
-      <tr><td style="background:${COL.in_d};padding:24px 32px;border-radius:12px 12px 0 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-          <td style="width:34px;height:34px;background:${COL.mg};border-radius:8px;text-align:center;color:#fff;font-weight:800;font-size:14px;">SL</td>
-          <td style="padding-left:12px;color:#fff;font-weight:700;font-size:16px;letter-spacing:-0.3px;">StudioLAB <span style="color:${COL.mg};">Growth</span></td>
-        </tr></table>
+      <tr><td style="background:${COL.in_d};padding:22px 32px;border-radius:12px 12px 0 0;text-align:left;">
+        <img src="${LOGO_URL}" alt="StudioLAB Growth" width="127" height="30" style="display:block;height:30px;width:auto;border:0;outline:none;text-decoration:none;">
       </td></tr>
       <tr><td style="background:#fff;padding:32px;border-radius:0 0 12px 12px;font-size:14px;line-height:1.6;color:${COL.g8};">
         ${opts.body}

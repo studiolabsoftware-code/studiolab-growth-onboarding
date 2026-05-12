@@ -19,6 +19,13 @@ Deno.serve(async (req) => {
     const row = payload.record || payload;
     if (!row || !row.id) return jsonResponse({ ok: false, error: 'No record.' }, 400);
 
+    // Drafts created by verify-otp must NOT trigger the confirmation/admin
+    // emails. The save-draft Edge Function handles those inline at the moment
+    // of finalization. Bail early so this webhook is a no-op for drafts.
+    if (row.status === 'draft') {
+      return jsonResponse({ ok: true, skipped: 'draft' });
+    }
+
     const sb = adminClient();
     const appUrl = Deno.env.get('ADMIN_APP_URL') || '';
     const ref = String(row.id).replace(/-/g, '').substring(0, 8).toUpperCase();

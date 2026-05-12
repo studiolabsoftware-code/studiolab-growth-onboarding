@@ -19,6 +19,8 @@ function isValidEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
+const LOGO_URL = 'https://app.studiolabgrowth.com/assets/growth-logo-email.png';
+
 function otpEmail(code: string) {
   const subject = `Your StudioLAB Growth code: ${code}`;
   const html = `
@@ -26,7 +28,9 @@ function otpEmail(code: string) {
 <html><head><meta charset="utf-8"></head>
 <body style="margin:0; padding:0; background:#F2F3F7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; color:#13102E;">
   <div style="max-width:480px; margin:0 auto; padding:32px 20px;">
-    <div style="background:#13102E; color:#fff; padding:18px 24px; border-radius:12px 12px 0 0; font-weight:700; letter-spacing:0.2px;">StudioLAB Growth</div>
+    <div style="background:#13102E; padding:22px 24px; border-radius:12px 12px 0 0; text-align:left;">
+      <img src="${LOGO_URL}" alt="StudioLAB Growth" width="127" height="30" style="display:block;height:30px;width:auto;border:0;">
+    </div>
     <div style="background:#fff; border:1px solid #DFE0EC; border-top:none; border-radius:0 0 12px 12px; padding:28px 24px;">
       <h1 style="margin:0 0 12px; font-size:18px; font-weight:700;">Your verification code</h1>
       <p style="margin:0 0 20px; font-size:14px; color:#4A4C65; line-height:1.55;">Enter this code on your setup form to continue. The code expires in ${OTP_TTL_MIN} minutes.</p>
