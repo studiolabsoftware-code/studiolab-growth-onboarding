@@ -330,7 +330,11 @@
       bar.setAttribute('aria-valuenow', String(pct));
       bar.setAttribute('aria-valuetext', 'Step ' + n + ' of ' + total);
     }
-    if (n === total) buildSummary();
+    if (n === total) {
+      buildSummary();
+      ensurePaymentBlock();
+      refreshPricing();
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     // Move focus to the panel heading for screen-reader users.
     const heading = panel(n).querySelector('.sh-title');
@@ -714,27 +718,179 @@
     if (el) el.textContent = v;
   }
 
-  async function handleSubmit(btn) {
+  // ── Payment block (final step) ────────────────────────────────────────────
+  // Renders the payment summary, discount-code field, Pay & Save buttons,
+  // and a "Save draft, pay later" link above the original submit button.
+  // The original button is hidden but kept in DOM so existing prev-nav and
+  // step-pill wiring stay intact.
+
+  let pricingState = { discountCode: '', pricing: null, fetching: false };
+
+  function paymentPanel() {
+    return panels()[totalSteps() - 1];
+  }
+
+  function ensurePaymentBlock() {
+    const p = paymentPanel();
+    if (!p || p.querySelector('#payblock')) return;
+
+    const submitErr = p.querySelector('#submitErr');
+    const fnav = p.querySelector('.fnav');
+    const wrap = document.createElement('div');
+    wrap.id = 'payblock';
+    wrap.className = 'payblock';
+    wrap.innerHTML = ''
+      + '<div class="payblock-hdr">Your setup fee</div>'
+      + '<div class="payblock-rows" id="payblock-rows">'
+      +   '<div class="payblock-row"><span class="payblock-k">Subtotal</span><span class="payblock-v" id="pay-subtotal">—</span></div>'
+      +   '<div class="payblock-row" id="pay-discount-row" hidden><span class="payblock-k" id="pay-discount-k">Discount</span><span class="payblock-v" id="pay-discount">—</span></div>'
+      +   '<div class="payblock-row" id="pay-tax-row" hidden><span class="payblock-k" id="pay-tax-k">GST (10%)</span><span class="payblock-v" id="pay-tax">—</span></div>'
+      +   '<div class="payblock-row payblock-total"><span class="payblock-k">Total to pay today</span><span class="payblock-v" id="pay-total">—</span></div>'
+      + '</div>'
+      + '<div class="payblock-discount">'
+      +   '<label for="pay-code">Have a discount code?</label>'
+      +   '<div class="payblock-discount-row">'
+      +     '<input type="text" id="pay-code" autocomplete="off" spellcheck="false" placeholder="Enter code">'
+      +     '<button type="button" class="btn btn-g payblock-apply" id="pay-code-apply">Apply</button>'
+      +   '</div>'
+      +   '<span class="payblock-discount-msg" id="pay-code-msg" aria-live="polite"></span>'
+      + '</div>'
+      + '<div class="payblock-actions">'
+      +   '<button type="button" class="btn btn-ok payblock-pay" id="payBtn">Pay &amp; submit</button>'
+      +   '<button type="button" class="btn-link payblock-later" id="payLaterBtn">Save draft, pay later →</button>'
+      + '</div>'
+      + '<p class="payblock-foot">You\'ll be redirected to Stripe to complete payment securely. Your details are saved either way.</p>';
+
+    // Insert above submit-err so error styling sits between summary and the
+    // legacy nav row.
+    if (submitErr && submitErr.parentNode) submitErr.parentNode.insertBefore(wrap, submitErr);
+    else p.insertBefore(wrap, fnav);
+
+    // Hide the legacy submit button — payblock has its own. Keep it in DOM
+    // so prev-nav/step-pill logic that references it doesn't break.
+    const legacy = p.querySelector('#submitBtn');
+    if (legacy) legacy.style.display = 'none';
+    const sctr = p.querySelector('.sctr');
+    // The Pay button replaces the rightmost CTA, so the step counter looks
+    // off centred — keep it where it is, just pull the nav row up a bit.
+
+    // Wire interactions.
+    p.querySelector('#pay-code-apply').addEventListener('click', applyDiscount);
+    p.querySelector('#pay-code').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); applyDiscount(); }
+    });
+    p.querySelector('#payBtn').addEventListener('click', (e) => handlePayAndSubmit(e.currentTarget));
+    p.querySelector('#payLaterBtn').addEventListener('click', (e) => handleSaveLater(e.currentTarget));
+  }
+
+  function formatMoney(cents, currency) {
+    return ((cents || 0) / 100).toLocaleString('en-AU', {
+      style: 'currency',
+      currency: currency || 'AUD',
+      minimumFractionDigits: 2,
+    });
+  }
+
+  async function refreshPricing() {
+    if (!state.plan || !state.setup) return;
+    if (pricingState.fetching) return;
+    pricingState.fetching = true;
+    try {
+      const r = await callFn('resolve-pricing', {
+        plan: state.plan,
+        setup_type: state.setup,
+        country: val('country') || (REGION === 'AU' ? 'AU' : ''),
+        discount_code: pricingState.discountCode || null,
+      });
+      pricingState.fetching = false;
+      const data = r.data || {};
+      if (!r.ok || data.ok === false) {
+        // Distinguish a discount-code error (still show base price) from a
+        // missing-product hard error.
+        if (data.code && data.code.startsWith('discount_')) {
+          setDiscountMsg(data.error || 'Could not apply discount.', true);
+          pricingState.discountCode = '';
+          await refreshPricing();
+        } else {
+          setPriceBlockError(data.error || 'Could not load the price for this plan.');
+        }
+        return;
+      }
+      pricingState.pricing = data;
+      renderPricing(data);
+    } catch (err) {
+      pricingState.fetching = false;
+      console.error('refreshPricing failed:', err);
+      setPriceBlockError('Could not load the price. Please try again in a moment.');
+    }
+  }
+
+  function renderPricing(p) {
+    const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    const setRow = (id, show) => { const el = document.getElementById(id); if (el) el.hidden = !show; };
+
+    setT('pay-subtotal', formatMoney(p.list_amount_cents, p.currency));
+    if (p.discount_amount_cents && p.discount_amount_cents > 0) {
+      setRow('pay-discount-row', true);
+      setT('pay-discount-k', `Discount${p.discount_code ? ' (' + p.discount_code + ')' : ''}`);
+      setT('pay-discount', '− ' + formatMoney(p.discount_amount_cents, p.currency));
+    } else {
+      setRow('pay-discount-row', false);
+    }
+    if (p.tax_amount_cents && p.tax_amount_cents > 0) {
+      setRow('pay-tax-row', true);
+      setT('pay-tax-k', `GST (${p.tax_rate_percent}%)`);
+      setT('pay-tax', formatMoney(p.tax_amount_cents, p.currency));
+    } else {
+      setRow('pay-tax-row', false);
+    }
+    setT('pay-total', formatMoney(p.total_with_tax_cents, p.currency));
+
+    // Sync the discount input value with the applied code.
+    const codeIn = document.getElementById('pay-code');
+    if (codeIn && pricingState.discountCode && codeIn.value.trim().toUpperCase() !== pricingState.discountCode) {
+      codeIn.value = pricingState.discountCode;
+    }
+    if (p.discount_code) setDiscountMsg(`Discount applied: ${formatMoney(p.discount_amount_cents, p.currency)} off.`, false);
+  }
+
+  function setPriceBlockError(msg) {
+    const rows = document.getElementById('payblock-rows');
+    if (rows) rows.innerHTML = `<div class="payblock-row payblock-error">${escapeHtml(msg)}</div>`;
+  }
+
+  function setDiscountMsg(msg, isError) {
+    const el = document.getElementById('pay-code-msg');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.classList.toggle('payblock-discount-err', !!isError);
+    el.classList.toggle('payblock-discount-ok', !!msg && !isError);
+  }
+
+  async function applyDiscount() {
+    const input = document.getElementById('pay-code');
+    if (!input) return;
+    const v = input.value.trim();
+    setDiscountMsg('', false);
+    pricingState.discountCode = v ? v.toUpperCase() : '';
+    await refreshPricing();
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  async function handlePayAndSubmit(btn) {
     if (PREVIEW_MODE) {
-      window.alert('Preview mode: submission is disabled.');
+      window.alert('Preview mode: payment is disabled.');
       return;
     }
     const hp = document.getElementById('hp-company');
-    if (hp && hp.value.trim()) {
-      showDone('SPAMTRAP');
-      return;
-    }
+    if (hp && hp.value.trim()) { showDone('SPAMTRAP'); return; }
     if (!validatePanel(totalSteps())) return;
-    if (state.uploading) {
-      console.warn('Logo upload still in progress, please wait.');
-      return;
-    }
+    if (state.uploading) { console.warn('Logo upload in progress'); return; }
     const session = loadSession();
-    if (!sessionValid(session)) {
-      console.error('Session expired before submit.');
-      showAuthGate(true);
-      return;
-    }
+    if (!sessionValid(session)) { showAuthGate(true); return; }
 
     const errEl = document.getElementById('submitErr');
     if (errEl) errEl.classList.remove('vis');
@@ -742,22 +898,32 @@
     const originalLabel = btn.innerHTML;
     btn.disabled = true;
     btn.setAttribute('aria-busy', 'true');
-    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Submitting...';
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Redirecting to Stripe…';
 
     try {
       const payload = buildPayload();
-      const r = await callFn('save-draft', {
+      const saveR = await callFn('save-draft', {
         session_token: session.token,
         payload,
         last_step_completed: state.step,
-        finalize: true,
+        finalize: false,
       });
-      if (!r.ok || !r.data || !r.data.ok) {
-        throw new Error(r.data && r.data.error ? r.data.error : 'Submit failed');
+      if (!saveR.ok || !saveR.data || saveR.data.ok === false) {
+        throw new Error((saveR.data && saveR.data.error) || 'Could not save before payment.');
       }
-      const ref = r.data.ref || (r.data.submission_id ? String(r.data.submission_id).replace(/-/g, '').substring(0, 8).toUpperCase() : '');
-      clearSession();
-      showDone(ref);
+      const co = await callFn('create-checkout-session', {
+        session_token: session.token,
+        discount_code: pricingState.discountCode || null,
+        return_origin: window.location.origin,
+        cancel_path: window.location.pathname,
+      });
+      if (!co.ok || !co.data || co.data.ok === false || !co.data.url) {
+        throw new Error((co.data && co.data.error) || 'Could not create payment session.');
+      }
+      // Hand off to Stripe. Session stays valid so a cancel-return lands the
+      // studio back on this step with all their data intact.
+      window.location.href = co.data.url;
+      return;
     } catch (err) {
       console.error('Submission failed:', err);
       btn.disabled = false;
@@ -765,6 +931,69 @@
       btn.innerHTML = originalLabel;
       if (errEl) errEl.classList.add('vis');
     }
+  }
+
+  async function handleSaveLater(btn) {
+    if (PREVIEW_MODE) {
+      window.alert('Preview mode: save is disabled.');
+      return;
+    }
+    if (!validatePanel(totalSteps())) return;
+    if (state.uploading) { console.warn('Logo upload in progress'); return; }
+    const session = loadSession();
+    if (!sessionValid(session)) { showAuthGate(true); return; }
+
+    const errEl = document.getElementById('submitErr');
+    if (errEl) errEl.classList.remove('vis');
+
+    const originalLabel = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = 'Saving…';
+
+    try {
+      const payload = buildPayload();
+      const r = await callFn('save-draft', {
+        session_token: session.token,
+        payload,
+        last_step_completed: state.step,
+        finalize: false,
+      });
+      if (!r.ok || !r.data || r.data.ok === false) {
+        throw new Error((r.data && r.data.error) || 'Could not save draft.');
+      }
+      const subId = (r.data.submission && r.data.submission.id) || '';
+      const ref = subId ? String(subId).replace(/-/g, '').substring(0, 8).toUpperCase() : '';
+      showSavedForLater(ref);
+    } catch (err) {
+      console.error('Save-for-later failed:', err);
+      btn.disabled = false;
+      btn.innerHTML = originalLabel;
+      if (errEl) errEl.classList.add('vis');
+    }
+  }
+
+  function showSavedForLater(ref) {
+    const done = document.getElementById('doneScreen');
+    if (!done) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const fmain = document.querySelector('.fmain') || document.querySelector('main') || document.body;
+    fmain.style.display = 'none';
+    done.style.display = '';
+    done.setAttribute('tabindex', '-1');
+    setText('done-ref', ref);
+    setText('done-studio', val('studioName') || 'Not provided');
+    setText('done-plan', (PLAN_LABEL[state.plan] || state.plan));
+    setText('done-setup', setupFeeSummaryLine());
+    const titleEl = done.querySelector('.done-title');
+    const descEl = done.querySelector('.done-desc');
+    const timelineEl = document.getElementById('done-timeline');
+    if (titleEl) titleEl.textContent = 'Draft saved. Pay when you’re ready.';
+    if (descEl) descEl.textContent = 'Your setup details are saved. When you’re ready to pay, we’ll send you a secure payment link. Setup begins once payment is complete.';
+    if (timelineEl) timelineEl.textContent = 'Awaiting payment';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (done.focus) done.focus();
   }
 
   // ── Auto-save (silent, per step nav) ──────────────────────────────────────
@@ -1153,7 +1382,7 @@
         const action = actionBtn.dataset.action;
         if (action === 'next') nextStep();
         else if (action === 'prev') prevStep();
-        else if (action === 'submit') handleSubmit(actionBtn);
+        else if (action === 'submit') handlePayAndSubmit(actionBtn);
         else if (action === 'add-faq') addFaqRow();
         else if (action === 'del-faq') delFaqRow(actionBtn);
         return;
