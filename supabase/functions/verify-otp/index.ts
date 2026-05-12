@@ -33,8 +33,9 @@ Deno.serve(async (req) => {
     const normEmail = String(email).trim().toLowerCase();
     const sb = adminClient();
 
-    // Find latest unused OTP for this email. limit(1) without maybeSingle()
-    // so accidental multiple unused rows never break the lookup.
+    // Match the code against any unused unexpired row for this email.
+    // Multiple codes can coexist in the studio's inbox when delivery is slow
+    // or they hit resend; the first one they paste should work.
     const { data: otpRows } = await sb
       .from('studio_otps')
       .select('*')
@@ -42,22 +43,24 @@ Deno.serve(async (req) => {
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
-      .limit(1);
-    const otp = (otpRows && otpRows[0]) || null;
-
-    if (!otp) return jsonResponse({ ok: false, error: 'No active code. Request a new one.' }, 400);
-
-    if (otp.attempts >= MAX_ATTEMPTS) {
+      .limit(10);
+    const rows = otpRows || [];
+    if (!rows.length) return jsonResponse({ ok: false, error: 'No active code. Request a new one.' }, 400);
+    const newest = rows[0];
+    if (newest.attempts >= MAX_ATTEMPTS) {
       return jsonResponse({ ok: false, error: 'Too many attempts. Request a new code.' }, 429);
     }
 
     const incomingHash = await sha256Hex(String(code));
-    if (incomingHash !== otp.code_hash) {
-      await sb.from('studio_otps').update({ attempts: otp.attempts + 1 }).eq('id', otp.id);
+    const otp = rows.find((r) => r.code_hash === incomingHash);
+    if (!otp) {
+      await sb.from('studio_otps').update({ attempts: newest.attempts + 1 }).eq('id', newest.id);
       return jsonResponse({ ok: false, error: 'Code is incorrect.' }, 400);
     }
 
-    // Mark OTP used
+    // Mark just the matching OTP used. Other unexpired codes stay valid
+    // until their own TTL elapses — harmless since each is single-use and
+    // both throttle and attempt caps still apply.
     await sb.from('studio_otps').update({ used_at: new Date().toISOString() }).eq('id', otp.id);
 
     // Generic mode: return whatever drafts exist for this email so the caller

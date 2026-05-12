@@ -46,25 +46,28 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: 'This email is not authorised as an admin.' }, 403);
     }
 
-    // 2. Validate OTP via the shared studio_otps table. Take the newest
-    // unused, unexpired row if more than one exists (defensive — send-otp now
-    // invalidates prior codes, but legacy rows may still be around).
+    // 2. Validate OTP. Match against any unused unexpired row for this
+    // email — studios commonly have several codes in their inbox after a
+    // delivery delay or a couple of resend clicks, and we don't want them
+    // to fail just because they typed the second-newest one.
     const { data: otpRows } = await sb.from('studio_otps')
       .select('*')
       .ilike('email', normEmail)
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
-      .limit(1);
-    const otp = (otpRows && otpRows[0]) || null;
-    if (!otp) return jsonResponse({ ok: false, error: 'No active code. Request a new one.' }, 400);
-    if (otp.attempts >= MAX_ATTEMPTS) {
+      .limit(10);
+    const rows = otpRows || [];
+    if (!rows.length) return jsonResponse({ ok: false, error: 'No active code. Request a new one.' }, 400);
+    const newest = rows[0];
+    if (newest.attempts >= MAX_ATTEMPTS) {
       return jsonResponse({ ok: false, error: 'Too many attempts. Request a new code.' }, 429);
     }
 
     const incomingHash = await sha256Hex(String(code));
-    if (incomingHash !== otp.code_hash) {
-      await sb.from('studio_otps').update({ attempts: otp.attempts + 1 }).eq('id', otp.id);
+    const otp = rows.find((r) => r.code_hash === incomingHash);
+    if (!otp) {
+      await sb.from('studio_otps').update({ attempts: newest.attempts + 1 }).eq('id', newest.id);
       return jsonResponse({ ok: false, error: 'Code is incorrect.' }, 400);
     }
     await sb.from('studio_otps').update({ used_at: new Date().toISOString() }).eq('id', otp.id);
