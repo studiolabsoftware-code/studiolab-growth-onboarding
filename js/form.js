@@ -5,11 +5,15 @@
 (function () {
   'use strict';
 
-  const TOTAL_STEPS = 8;
+  // Plan is locked by the URL each form is served from. window.PLAN is set in
+  // launch/, scale/, and ai/ before this script loads. Total step count is read
+  // from the DOM so each plan-specific HTML can carry only the panels it needs.
+  const PLAN = window.PLAN || 'launch';
+  const totalSteps = () => document.querySelectorAll('.panel').length;
 
   const state = {
     step: 1,
-    plan: 'launch',
+    plan: PLAN,
     setup: 'dfy',
     yn: { dns: null, season: null, quotePrice: null },
     logoUrl: null,
@@ -41,7 +45,8 @@
 
   // ── Step navigation ───────────────────────────────────────────────────────
   function goTo(n) {
-    if (n < 1 || n > TOTAL_STEPS) return;
+    const total = totalSteps();
+    if (n < 1 || n > total) return;
     state.step = n;
     panels().forEach((p) => p.classList.remove('active'));
     panel(n).classList.add('active');
@@ -60,14 +65,14 @@
         sp.disabled = true;
       }
     });
-    const pct = Math.round((n / TOTAL_STEPS) * 100);
+    const pct = Math.round((n / total) * 100);
     if (progFill) progFill.style.width = pct + '%';
     const bar = progBar();
     if (bar) {
       bar.setAttribute('aria-valuenow', String(pct));
-      bar.setAttribute('aria-valuetext', 'Step ' + n + ' of ' + TOTAL_STEPS);
+      bar.setAttribute('aria-valuetext', 'Step ' + n + ' of ' + total);
     }
-    if (n === 8) buildSummary();
+    if (n === total) buildSummary();
     window.scrollTo({ top: 0, behavior: 'smooth' });
     // Move focus to the panel heading for screen-reader users.
     const heading = panel(n).querySelector('.sh-title');
@@ -81,7 +86,7 @@
   function nextStep() {
     if (!validatePanel(state.step)) return;
     const target = state.step + 1;
-    if (target > TOTAL_STEPS) return;
+    if (target > totalSteps()) return;
     goTo(target);
   }
 
@@ -593,7 +598,7 @@
   function init() {
     wireFieldErrors();
     bindEvents();
-    selectPlan('launch');
+    // Plan is locked by the URL the form is served from. No selectPlan call here.
     selectSetup('dfy');
     const c1 = document.getElementById('col1t');
     if (c1 && !c1.value) c1.value = document.getElementById('col1p').value.toUpperCase();

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>StudioLAB Growth: Launch Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/form.css">
+<script>window.PLAN = 'launch';</script>
+</head>
+<body>
+
+<a class="sr-only" href="#fmain">Skip to form</a>
+<h1 class="sr-only">StudioLAB Growth Launch setup</h1>
+
+<header class="hdr">
+  <div class="hdr-inner">
+    <div class="logo-mark" aria-hidden="true">SL</div>
+    <div class="logo-text" aria-hidden="true">StudioLAB <span>Growth</span></div>
+    <div class="hdr-div" aria-hidden="true"></div>
+    <div class="hdr-sub" aria-hidden="true">Launch Setup</div>
+  </div>
+  <div class="prog" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="17"><div class="prog-fill" id="pf" style="width:17%"></div></div>
+</header>
+
+<nav class="snav" aria-label="Form steps">
+  <div class="snav-inner">
+    <button type="button" class="sp active" data-s="1" aria-current="step"><span class="sp-n" aria-hidden="true">1</span><span>Setup</span></button>
+    <button type="button" class="sp" data-s="2" disabled><span class="sp-n" aria-hidden="true">2</span><span>Studio</span></button>
+    <button type="button" class="sp" data-s="3" disabled><span class="sp-n" aria-hidden="true">3</span><span>Branding</span></button>
+    <button type="button" class="sp" data-s="4" disabled><span class="sp-n" aria-hidden="true">4</span><span>Email</span></button>
+    <button type="button" class="sp" data-s="5" disabled><span class="sp-n" aria-hidden="true">5</span><span>Automations</span></button>
+    <button type="button" class="sp" data-s="6" disabled><span class="sp-n" aria-hidden="true">6</span><span>Review</span></button>
+  </div>
+</nav>
+
+<div class="main" id="fmain">
+
+  <!-- ─────────────── STEP 1: Setup type ─────────────── -->
+  <div class="panel active" id="s1">
+    <div class="sh">
+      <div class="sh-tag">Step 1 of 6</div>
+      <h2 class="sh-title">Choose your setup style</h2>
+      <div class="sh-desc">Both options produce the same end result. The difference is who does the configuration work.</div>
+    </div>
+
+    <div class="card">
+      <div class="ct" id="lbl-setup"><div class="ct-icon" aria-hidden="true">🛠️</div>Setup preference</div>
+      <div class="setup-grid" role="radiogroup" aria-labelledby="lbl-setup">
+        <label class="setup-card sel" id="sc-dfy" data-setup="dfy">
+          <input type="radio" name="setup" value="dfy" aria-label="Done-For-You: our team configures your account, 3 to 7 business days" checked>
+          <div class="setup-dot" aria-hidden="true"></div>
+          <div class="setup-name" aria-hidden="true">Done-For-You</div>
+          <div class="setup-desc" aria-hidden="true">Our team configures your entire account. You provide the information, we handle everything else. Completed within 3 to 7 business days.</div>
+        </label>
+        <label class="setup-card" id="sc-guided" data-setup="guided">
+          <input type="radio" name="setup" value="guided" aria-label="Guided self-setup: you configure your account, 60 to 120 minutes">
+          <div class="setup-dot" aria-hidden="true"></div>
+          <div class="setup-name" aria-hidden="true">Guided (self-setup)</div>
+          <div class="setup-desc" aria-hidden="true">You configure your own account using our step-by-step guide, with support available if you get stuck. Estimated 60 to 120 minutes.</div>
+        </label>
+      </div>
+    </div>
+
+    <div class="fnav">
+      <div class="sctr">Step 1 of 6</div>
+      <button type="button" class="btn btn-p" data-action="next">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ─────────────── STEP 2: Studio Details ─────────────── -->
+  <div class="panel" id="s2">
+    <div class="sh">
+      <div class="sh-tag">Step 2 of 6</div>
+      <h2 class="sh-title">Studio details</h2>
+      <div class="sh-desc">This populates your StudioLAB Growth business profile. It's the source of truth for your account name, contact details, and timezone.</div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">🏫</div>Business profile</div>
+      <div class="co co-blue"><strong>These details appear throughout your StudioLAB Growth account.</strong> Enter them exactly as you want them to appear in emails and system records. Business name and legal business name should match your official registration if you need compliance features later.</div>
+      <div class="fr">
+        <div class="f">
+          <label for="studioName">Studio or business name <span class="req">*</span></label>
+          <input type="text" id="studioName" data-required placeholder="e.g. Dance Academy Melbourne">
+          <span class="field-note">Displayed in emails as the sender and in all communications.</span>
+          <span class="field-err">Please enter your studio name.</span>
+        </div>
+        <div class="f">
+          <label for="legalName">Legal business name <span class="hint">(if different)</span></label>
+          <input type="text" id="legalName" placeholder="e.g. Dance Academy Pty Ltd">
+        </div>
+      </div>
+      <div class="fr x3">
+        <div class="f">
+          <label for="country">Country <span class="req">*</span></label>
+          <select id="country" data-required>
+            <option value="">Select</option>
+            <option value="AU">Australia</option>
+            <option value="US">United States</option>
+            <option value="CA">Canada</option>
+            <option value="UK">United Kingdom</option>
+          </select>
+          <span class="field-err">Please select your country.</span>
+        </div>
+        <div class="f">
+          <label for="timezone">Time zone <span class="req">*</span></label>
+          <select id="timezone" data-required>
+            <option value="">Select</option>
+            <optgroup label="Australia">
+              <option value="Australia/Sydney">Sydney / Melbourne (AEST)</option>
+              <option value="Australia/Brisbane">Brisbane (AEST no DST)</option>
+              <option value="Australia/Perth">Perth (AWST)</option>
+              <option value="Australia/Adelaide">Adelaide (ACST)</option>
+            </optgroup>
+            <optgroup label="United States">
+              <option value="America/New_York">Eastern Time (ET)</option>
+              <option value="America/Chicago">Central Time (CT)</option>
+              <option value="America/Denver">Mountain Time (MT)</option>
+              <option value="America/Los_Angeles">Pacific Time (PT)</option>
+            </optgroup>
+            <optgroup label="Canada">
+              <option value="America/Toronto">Toronto (ET)</option>
+              <option value="America/Vancouver">Vancouver (PT)</option>
+            </optgroup>
+            <optgroup label="United Kingdom">
+              <option value="Europe/London">London (GMT / BST)</option>
+            </optgroup>
+          </select>
+          <span class="field-err">Please select your time zone.</span>
+        </div>
+        <div class="f">
+          <label for="studioType">Studio type</label>
+          <select id="studioType">
+            <option value="">Select</option>
+            <option>Dance Studio</option>
+            <option>Yoga / Pilates</option>
+            <option>Gymnastics</option>
+            <option>Martial Arts</option>
+            <option>Music School</option>
+            <option>Performing Arts</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="fr x1">
+        <div class="f">
+          <label for="address">Studio address <span class="req">*</span></label>
+          <input type="text" id="address" data-required placeholder="Street, suburb, state, postcode">
+          <span class="field-note">Used in email footers and for business verification. Should match your EIN, ABN, or registration address.</span>
+          <span class="field-err">Please enter your studio address.</span>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="f">
+          <label for="website">Website URL <span class="req">*</span></label>
+          <input type="url" id="website" data-required placeholder="https://yourstudio.com.au">
+          <span class="field-err">Please enter a valid website URL.</span>
+        </div>
+        <div class="f">
+          <label for="supportUrl">Support or contact page URL <span class="req">*</span></label>
+          <input type="url" id="supportUrl" data-required placeholder="https://yourstudio.com.au/contact">
+          <span class="field-note">Linked in email footers so families can reach you.</span>
+          <span class="field-err">Please enter a valid contact page URL.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">👤</div>Primary contact</div>
+      <div class="fr">
+        <div class="f">
+          <label for="firstName">First name <span class="req">*</span></label>
+          <input type="text" id="firstName" data-required placeholder="Sarah">
+          <span class="field-err">Please enter your first name.</span>
+        </div>
+        <div class="f">
+          <label for="lastName">Last name <span class="req">*</span></label>
+          <input type="text" id="lastName" data-required placeholder="Johnson">
+          <span class="field-err">Please enter your last name.</span>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="f">
+          <label for="contactEmail">Email address <span class="req">*</span></label>
+          <input type="email" id="contactEmail" data-required placeholder="sarah@yourstudio.com">
+          <span class="field-err">Please enter a valid email address.</span>
+        </div>
+        <div class="f">
+          <label for="contactPhone">Phone number <span class="req">*</span> <span class="hint">(include country code)</span></label>
+          <input type="tel" id="contactPhone" data-required placeholder="+61 4XX XXX XXX">
+          <span class="field-err">Please enter your phone number.</span>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="f">
+          <label for="contactRole">Role</label>
+          <select id="contactRole">
+            <option value="">Select</option>
+            <option>Studio Owner</option>
+            <option>Studio Director</option>
+            <option>Studio Manager</option>
+            <option>Admin</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="slEmail">StudioLAB login email</label>
+          <input type="email" id="slEmail" placeholder="Your StudioLAB account email">
+          <span class="field-note">The email you use to log into StudioLAB, which helps us link the two systems.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="fnav">
+      <button type="button" class="btn btn-g" data-action="prev">← Back</button>
+      <div class="sctr">Step 2 of 6</div>
+      <button type="button" class="btn btn-p" data-action="next">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ─────────────── STEP 3: Branding ─────────────── -->
+  <div class="panel" id="s3">
+    <div class="sh">
+      <div class="sh-tag">Step 3 of 6</div>
+      <h2 class="sh-title">Branding and voice</h2>
+      <div class="sh-desc">Used to brand all email templates and the email footer.</div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">🖼️</div>Studio logo</div>
+      <div class="co co-blue"><strong>PNG or SVG with transparent background preferred.</strong> Minimum 400px wide. Used in all email headers.</div>
+      <label class="fu" id="logoZone">
+        <input type="file" id="logoFile" accept=".png,.svg,.jpg,.jpeg">
+        <div class="fu-ico" aria-hidden="true">🖼️</div>
+        <div class="fu-txt">Click to upload studio logo</div>
+        <div class="fu-hint">PNG, SVG or JPG, transparent background, min 400px wide</div>
+        <div class="fu-name" id="logoFn"></div>
+        <div class="fu-spin" id="logoSpin">Uploading...</div>
+      </label>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">🎨</div>Brand colours</div>
+      <div class="co co-blue">These are applied to email template headers, buttons, and accents. If you're unsure of your hex code, send us a screenshot and we'll match it.</div>
+      <div class="fr">
+        <div class="f">
+          <label for="col1t">Primary colour <span class="req">*</span> <span class="hint">(main brand colour)</span></label>
+          <div class="cf">
+            <input type="color" id="col1p" value="#E8197F" aria-label="Primary colour picker">
+            <input type="text" id="col1t" placeholder="#E8197F" maxlength="7" data-required>
+          </div>
+          <span class="field-err">Please choose a primary colour.</span>
+        </div>
+        <div class="f">
+          <label for="col2t">Secondary colour <span class="hint">(accent, optional)</span></label>
+          <div class="cf">
+            <input type="color" id="col2p" value="#4A3F8A" aria-label="Secondary colour picker">
+            <input type="text" id="col2t" placeholder="#4A3F8A" maxlength="7">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">✍️</div>Email copy and voice</div>
+      <div class="fr">
+        <div class="f">
+          <label for="signOff">Email sign-off <span class="req">*</span></label>
+          <input type="text" id="signOff" data-required placeholder="e.g. Sarah Johnson, Dance Academy Melbourne">
+          <span class="field-note">Appears at the bottom of every email. Typically name plus studio name.</span>
+          <span class="field-err">Please enter an email sign-off.</span>
+        </div>
+        <div class="f">
+          <label for="tone">Email tone <span class="hint">(optional)</span></label>
+          <select id="tone">
+            <option value="">No preference, match my studio feel</option>
+            <option>Warm and friendly</option>
+            <option>Professional and formal</option>
+            <option>Casual and conversational</option>
+            <option>Playful and energetic</option>
+          </select>
+        </div>
+      </div>
+      <div class="fr x1">
+        <div class="f">
+          <label for="footerNotes">Footer notes <span class="hint">(optional taglines, disclaimers, extra links)</span></label>
+          <textarea id="footerNotes" rows="2" placeholder="e.g. Follow us on Instagram @studioname | ABN 12 345 678 901"></textarea>
+        </div>
+      </div>
+      <div class="fr x1">
+        <div class="f">
+          <label for="studioDesc">Short studio description <span class="hint">(2 to 3 sentences)</span></label>
+          <textarea id="studioDesc" rows="3" placeholder="Tell us about your studio: style, what makes you different, types of classes, and who you serve."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="fnav">
+      <button type="button" class="btn btn-g" data-action="prev">← Back</button>
+      <div class="sctr">Step 3 of 6</div>
+      <button type="button" class="btn btn-p" data-action="next">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ─────────────── STEP 4: Email Setup ─────────────── -->
+  <div class="panel" id="s4">
+    <div class="sh">
+      <div class="sh-tag">Step 4 of 6</div>
+      <h2 class="sh-title">Email sending setup</h2>
+      <div class="sh-desc">Configures how emails appear in families' inboxes: who they're from, and where replies go. Custom domain setup improves deliverability significantly.</div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">✉️</div>Sender configuration</div>
+      <div class="co co-blue">These control how your emails appear in families' inboxes. The <strong>From name</strong> is what they see first, and the <strong>Reply-to email</strong> is where replies go. Get these right and your emails feel personal, not automated.</div>
+      <div class="fr">
+        <div class="f">
+          <label for="fromName">From name <span class="req">*</span></label>
+          <input type="text" id="fromName" data-required placeholder="e.g. Sarah at Dance Academy">
+          <span class="field-note">This is what appears as the sender name in the inbox. Keep it personal: first name or first name plus studio works best.</span>
+          <span class="field-err">Please enter a From name.</span>
+        </div>
+        <div class="f">
+          <label for="replyEmail">Reply-to email address <span class="req">*</span></label>
+          <input type="email" id="replyEmail" data-required placeholder="hello@yourstudio.com.au">
+          <span class="field-note">Where family replies will go. Usually your main studio email.</span>
+          <span class="field-err">Please enter a valid reply-to email.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">🌐</div>Custom email domain</div>
+      <div class="co co-amber"><strong>Strongly recommended.</strong> Sending from your own domain (e.g. @yourstudio.com.au) significantly improves deliverability and prevents emails landing in spam. Requires a DNS record change. We provide the exact records to add.</div>
+      <div class="f">
+        <span class="f-q-label" id="lbl-dns">Would you like to set up a custom sending domain?</span>
+        <div class="yn" id="dnsYN" role="radiogroup" aria-labelledby="lbl-dns">
+          <button type="button" class="yn-b" id="dnsY" data-yn="dns" data-val="true" role="radio" aria-checked="false">Yes, set it up</button>
+          <button type="button" class="yn-b" id="dnsN" data-yn="dns" data-val="false" role="radio" aria-checked="false">No, use built-in email for now</button>
+        </div>
+      </div>
+      <div class="cond" id="dnsCond">
+        <div class="fr">
+          <div class="f">
+            <label for="emailDomain">Your email domain <span class="req">*</span></label>
+            <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com.au">
+            <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
+          </div>
+          <div class="f">
+            <label for="dnsAccess">DNS access</label>
+            <select id="dnsAccess">
+              <option value="">Select how we'll handle DNS</option>
+              <option>I can access DNS myself and apply the records</option>
+              <option>I need to forward DNS records to my IT team or web host</option>
+              <option>I'm not sure, please contact me</option>
+            </select>
+          </div>
+        </div>
+        <div class="co co-blue" style="margin-bottom:0; margin-top:8px;">We will generate DKIM and Return Path DNS records and send them to you with clear instructions. Propagation typically takes 1 to 48 hours after the records are added.</div>
+      </div>
+    </div>
+
+    <div class="fnav">
+      <button type="button" class="btn btn-g" data-action="prev">← Back</button>
+      <div class="sctr">Step 4 of 6</div>
+      <button type="button" class="btn btn-p" data-action="next">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ─────────────── STEP 5: Automations ─────────────── -->
+  <div class="panel" id="s5">
+    <div class="sh">
+      <div class="sh-tag">Step 5 of 6</div>
+      <h2 class="sh-title">Your season and enrolment setup</h2>
+      <div class="sh-desc">The automations are driven by StudioLAB events: season data and enrolment status. We need context on your current setup so triggers are timed correctly.</div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">📅</div>Current season status</div>
+      <div class="co co-amber"><strong>Important for timing.</strong> The re-enrolment automation is driven by your season's open date and billing start date. We need to know where you are in your cycle so the emails trigger at exactly the right time.</div>
+      <div class="f">
+        <span class="f-q-label" id="lbl-season">Do you have an active season set up in StudioLAB?</span>
+        <div class="yn" role="radiogroup" aria-labelledby="lbl-season">
+          <button type="button" class="yn-b" id="seasonY" data-yn="season" data-val="true" role="radio" aria-checked="false">Yes, season is live</button>
+          <button type="button" class="yn-b" id="seasonN" data-yn="season" data-val="false" role="radio" aria-checked="false">Not yet</button>
+        </div>
+      </div>
+      <div class="cond" id="seasonCond">
+        <div class="fr">
+          <div class="f">
+            <label for="seasonName">Season or term name</label>
+            <input type="text" id="seasonName" placeholder="e.g. Term 2 2025 or Fall Semester 2025">
+          </div>
+          <div class="f">
+            <label for="enrollOpenDate">Enrolment open date</label>
+            <input type="text" id="enrollOpenDate" placeholder="e.g. 14 April 2025">
+          </div>
+        </div>
+        <div class="fr">
+          <div class="f">
+            <label for="billingStart">Billing or tuition start date</label>
+            <input type="text" id="billingStart" placeholder="e.g. 28 April 2025">
+          </div>
+          <div class="f">
+            <label for="seasonEnd">Season end date</label>
+            <input type="text" id="seasonEnd" placeholder="e.g. 27 June 2025">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">⚡</div>Confirm active workflows</div>
+      <div class="co co-blue">These are the workflows included in your Launch plan. Both are pre-configured. Confirm which should be active at launch. You can turn either on or off later.</div>
+      <div class="tg-group">
+        <label class="tg chk" data-toggle>
+          <input type="checkbox" value="ae" data-workflow checked>
+          <div class="tg-box" aria-hidden="true"></div>
+          <div><div class="tg-lbl">Abandoned enrolment recovery</div><div class="tg-desc">3-touch email sequence (60 min, 24 hr, 72 hr) when a family starts registration but doesn't complete it. Stops the moment enrolment is completed.</div></div>
+        </label>
+        <label class="tg chk" data-toggle>
+          <input type="checkbox" value="re" data-workflow checked>
+          <div class="tg-box" aria-hidden="true"></div>
+          <div><div class="tg-lbl">Re-enrolment campaign</div><div class="tg-desc">6-email countdown sequence triggered when a new season opens. Runs until the family re-enrols or the season closes.</div></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="fnav">
+      <button type="button" class="btn btn-g" data-action="prev">← Back</button>
+      <div class="sctr">Step 5 of 6</div>
+      <button type="button" class="btn btn-p" data-action="next">Review →</button>
+    </div>
+  </div>
+
+  <!-- ─────────────── STEP 6: Review & Submit ─────────────── -->
+  <div class="panel" id="s6">
+    <div class="sh">
+      <div class="sh-tag">Step 6 of 6</div>
+      <h2 class="sh-title">Review and submit</h2>
+      <div class="sh-desc">Check everything before submitting. Our team will review your information, contact you within 1 business day, and begin configuration.</div>
+    </div>
+
+    <div class="sum-grid">
+      <div class="sum-sec">
+        <div class="sum-hdr"><span aria-hidden="true">📦</span> Plan and setup</div>
+        <div class="sum-body">
+          <div class="sum-f"><div class="sum-k">Plan</div><div class="sum-v" id="sv-plan">Launch</div></div>
+          <div class="sum-f"><div class="sum-k">Setup type</div><div class="sum-v" id="sv-setup">Not provided</div></div>
+        </div>
+      </div>
+      <div class="sum-sec">
+        <div class="sum-hdr"><span aria-hidden="true">🏫</span> Studio details</div>
+        <div class="sum-body">
+          <div class="sum-f"><div class="sum-k">Studio name</div><div class="sum-v" id="sv-studio">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Country</div><div class="sum-v" id="sv-country">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Contact</div><div class="sum-v" id="sv-contact">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Email</div><div class="sum-v" id="sv-email">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Phone</div><div class="sum-v" id="sv-phone">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Website</div><div class="sum-v" id="sv-website">Not provided</div></div>
+        </div>
+      </div>
+      <div class="sum-sec">
+        <div class="sum-hdr"><span aria-hidden="true">🎨</span> Branding</div>
+        <div class="sum-body">
+          <div class="sum-f"><div class="sum-k">Logo</div><div class="sum-v" id="sv-logo">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Primary colour</div><div class="sum-v" id="sv-col1">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Sign-off</div><div class="sum-v" id="sv-signoff">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Tone</div><div class="sum-v" id="sv-tone">Not provided</div></div>
+        </div>
+      </div>
+      <div class="sum-sec">
+        <div class="sum-hdr"><span aria-hidden="true">✉️</span> Email setup</div>
+        <div class="sum-body">
+          <div class="sum-f"><div class="sum-k">From name</div><div class="sum-v" id="sv-fromname">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Reply-to</div><div class="sum-v" id="sv-replyto">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Custom domain</div><div class="sum-v" id="sv-domain">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Season active</div><div class="sum-v" id="sv-season">Not provided</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">📝</div>Additional notes</div>
+      <div class="f">
+        <label for="extraNotes">Anything else we should know?</label>
+        <textarea id="extraNotes" rows="4" placeholder="Any specific requirements, questions, or context that doesn't fit the form above. e.g. We run holiday intensives outside normal seasons. We have 2 locations. We want to launch in May."></textarea>
+      </div>
+    </div>
+
+    <div class="hp" aria-hidden="true">
+      <label for="hp-company">Company (leave blank)</label>
+      <input type="text" id="hp-company" tabindex="-1" autocomplete="off">
+    </div>
+
+    <div class="submit-err" id="submitErr" role="alert">Something went wrong. Please try again, or email <a href="mailto:growth@studiolabgrowth.com">growth@studiolabgrowth.com</a> if it keeps failing.</div>
+
+    <div class="fnav">
+      <button type="button" class="btn btn-g" data-action="prev">← Back</button>
+      <div class="sctr">Step 6 of 6</div>
+      <button type="button" class="btn btn-ok" id="submitBtn" data-action="submit">Submit setup ✓</button>
+    </div>
+  </div>
+
+</div><!-- /fmain -->
+
+<div class="done-screen" id="doneScreen" role="status" aria-live="polite" tabindex="-1">
+  <div class="done-ico">✓</div>
+  <div class="done-title">All received. Thank you!</div>
+  <div class="done-desc">We've got everything we need to get your Launch setup underway. Our team will review your submission and be in touch within 1 business day to confirm setup has begun.</div>
+  <div class="done-detail">
+    <div class="done-detail-row"><span class="done-detail-key">Reference</span><span class="done-detail-val done-ref" id="done-ref"></span></div>
+    <div class="done-detail-row"><span class="done-detail-key">Studio</span><span class="done-detail-val" id="done-studio"></span></div>
+    <div class="done-detail-row"><span class="done-detail-key">Plan</span><span class="done-detail-val" id="done-plan">Launch</span></div>
+    <div class="done-detail-row"><span class="done-detail-key">Setup type</span><span class="done-detail-val" id="done-setup"></span></div>
+    <div class="done-detail-row"><span class="done-detail-key">Timeline</span><span class="done-detail-val" id="done-timeline">3 to 5 business days</span></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/form.js"></script>
+</body>
+</html>
