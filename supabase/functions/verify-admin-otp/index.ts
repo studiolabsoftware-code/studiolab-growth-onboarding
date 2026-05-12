@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
     // 1. Allowlist check
     const { data: adminRow } = await sb.from('admin_users')
-      .select('email, role, name')
+      .select('id, email, role, name')
       .ilike('email', normEmail)
       .eq('is_active', true)
       .maybeSingle();
@@ -99,6 +99,13 @@ Deno.serve(async (req) => {
     if (verifyErr || !verifyData || !verifyData.session) {
       throw new Error('verifyOtp failed: ' + (verifyErr?.message || 'no session'));
     }
+
+    // Stamp last_login_at so the admin user list can show who is active. Best
+    // effort — never block sign-in on this.
+    sb.from('admin_users')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', adminRow.id)
+      .then(({ error }) => { if (error) console.warn('last_login_at update failed:', error); });
 
     return jsonResponse({
       ok: true,

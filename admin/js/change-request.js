@@ -47,12 +47,6 @@
       ['port_number', 'Number to port'],
       ['sms_tone', 'SMS tone notes'],
     ]},
-    { group: 'Automations', items: [
-      ['season_name', 'Season name'],
-      ['enrol_open_date', 'Enrolment open date'],
-      ['billing_start', 'Billing start'],
-      ['season_end', 'Season end'],
-    ]},
     { group: 'AI knowledge base', plan: ['ai'], items: [
       ['kb_profile', 'Studio profile'],
       ['kb_classes', 'Classes & timetable'],

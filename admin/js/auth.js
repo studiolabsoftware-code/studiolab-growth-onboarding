@@ -10,7 +10,7 @@
   const SB_URL = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) || '';
   const FN_BASE = SB_URL + '/functions/v1/';
 
-  window.AdminAuth = { currentUser: null, sb };
+  window.AdminAuth = { currentUser: null, profile: null, sb };
 
   let pendingEmail = '';
 
@@ -23,13 +23,58 @@
     showStep('email');
   }
 
-  function showDashboard(email) {
+  async function showDashboard(email) {
     $('loginView').style.display = 'none';
     $('dashboardView').style.display = '';
     $('admUser').style.display = '';
     $('admUserEmail').textContent = email;
+
+    // Load profile so the UI can role-gate.
+    await loadProfile();
+    applyRoleGating();
+
     if (window.AdminDashboard && window.AdminDashboard.init) window.AdminDashboard.init();
   }
+
+  async function loadProfile() {
+    if (!sb) return;
+    const { data, error } = await sb.rpc('get_admin_profile');
+    if (error) { console.warn('get_admin_profile failed:', error); return; }
+    const row = Array.isArray(data) ? data[0] : data;
+    window.AdminAuth.profile = row || null;
+  }
+
+  function applyRoleGating() {
+    const profile = window.AdminAuth.profile;
+    const role = profile?.role || 'admin';
+    const navEl = $('admNav');
+    if (navEl) navEl.style.display = '';
+    const usersTab = $('admNavUsers');
+    if (usersTab) usersTab.style.display = role === 'owner' ? '' : 'none';
+
+    document.body.classList.remove('role-owner', 'role-admin', 'role-va');
+    document.body.classList.add('role-' + role);
+  }
+
+  function showSection(name) {
+    const list = $('listScreen');
+    const detail = $('detailScreen');
+    const users = $('usersScreen');
+    if (name === 'users') {
+      if (list) list.style.display = 'none';
+      if (detail) detail.style.display = 'none';
+      if (users) users.style.display = '';
+      if (window.AdminUsers && window.AdminUsers.show) window.AdminUsers.show();
+    } else {
+      if (users) users.style.display = 'none';
+      if (list) list.style.display = '';
+      if (detail) detail.style.display = 'none';
+    }
+    document.querySelectorAll('.adm-nav-link').forEach((b) => {
+      b.classList.toggle('active', b.dataset.section === name);
+    });
+  }
+  window.AdminAuth.showSection = showSection;
 
   function showStep(which) {
     $('loginStep1').style.display = which === 'email' ? '' : 'none';
@@ -166,8 +211,18 @@
     $('admSignOut').addEventListener('click', async () => {
       await sb.auth.signOut();
       window.AdminAuth.currentUser = null;
+      window.AdminAuth.profile = null;
       showLogin();
     });
+
+    const navEl = $('admNav');
+    if (navEl) {
+      navEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.adm-nav-link');
+        if (!btn) return;
+        showSection(btn.dataset.section);
+      });
+    }
 
     if (sb) sb.auth.onAuthStateChange(() => handleSession());
     handleSession();

@@ -83,6 +83,9 @@
       if (card && window.AdminDetail) window.AdminDetail.open(card.dataset.id);
     });
 
+    const syncBtn = $('sheetSyncBtn');
+    if (syncBtn) syncBtn.addEventListener('click', syncAllToSheet);
+
     $('groupsContainer').addEventListener('keydown', (e) => {
       const card = e.target.closest('.sub-card[data-id]');
       if (!card) return;
@@ -95,13 +98,79 @@
 
   async function loadRows() {
     const client = sb(); if (!client) return;
-    const { data, error } = await client
+    let q = client
       .from('submissions')
-      .select('id, created_at, last_saved_at, status, assigned_to, plan, region, setup_type, studio_name, contact_email, first_name, last_name')
+      .select('id, created_at, last_saved_at, status, assigned_to, plan, region, setup_type, studio_name, contact_email, first_name, last_name, sheets_synced_at, sheets_sync_error')
       .order('created_at', { ascending: false });
+
+    // VAs only see submissions assigned to them (matched on email for now —
+    // Phase 2 will replace this with a proper assignments table).
+    const profile = window.AdminAuth?.profile;
+    if (profile?.role === 'va') {
+      q = q.ilike('assigned_to', profile.email);
+    }
+
+    const { data, error } = await q;
     if (error) { console.error(error); return; }
     state.rows = data || [];
     render();
+    renderSheetSyncStatus();
+  }
+
+  function renderSheetSyncStatus() {
+    const el = document.getElementById('sheetSyncStatus');
+    if (!el) return;
+    const nonDrafts = state.rows.filter((r) => r.status !== 'draft');
+    if (!nonDrafts.length) { el.textContent = 'Sheet backup: no submissions yet'; el.classList.remove('warn'); return; }
+    const errored = nonDrafts.find((r) => r.sheets_sync_error);
+    if (errored) {
+      el.textContent = 'Sheet backup: last attempt failed';
+      el.classList.add('warn');
+      el.title = errored.sheets_sync_error;
+      return;
+    }
+    const stamps = nonDrafts.map((r) => r.sheets_synced_at).filter(Boolean).map((s) => new Date(s).getTime());
+    if (!stamps.length) { el.textContent = 'Sheet backup: never synced'; el.classList.add('warn'); return; }
+    const latest = new Date(Math.max(...stamps));
+    el.textContent = 'Sheet backup: synced ' + timeAgo(latest);
+    el.classList.remove('warn');
+    el.title = 'Last sync: ' + latest.toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  function timeAgo(d) {
+    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60)   return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + ' min ago';
+    if (s < 86400) return Math.floor(s / 3600) + ' hr ago';
+    return Math.floor(s / 86400) + ' day' + (s >= 172800 ? 's' : '') + ' ago';
+  }
+
+  async function syncAllToSheet() {
+    const btn = document.getElementById('sheetSyncBtn');
+    const status = document.getElementById('sheetSyncStatus');
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+    if (status) status.textContent = 'Sheet backup: syncing...';
+    try {
+      const client = sb();
+      const { data, error } = await client.functions.invoke('sync-to-sheet', { body: { all: true } });
+      if (error) throw error;
+      if (data && data.ok === false) throw new Error(data.error || 'Sync failed');
+      await loadRows();
+    } catch (err) {
+      console.error('sync-to-sheet failed:', err);
+      if (status) {
+        status.textContent = 'Sheet backup: sync failed';
+        status.classList.add('warn');
+        status.title = String(err.message || err);
+      }
+      window.alert('Sheet sync failed. ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
   }
 
   function subscribeRealtime() {

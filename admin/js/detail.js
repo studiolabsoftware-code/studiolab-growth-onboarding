@@ -125,13 +125,9 @@
             ['Lead sources', fmtList(sub.lead_sources)],
           ]) : planNotice('SMS & social', 'Launch')}
 
-          ${section('⚡ Automations', [
-            ['Active season', fmtBool(sub.season_active)],
-            ['Season name', fmtVal(sub.season_name), undefined, 'season_name'],
-            ['Enrolment open', fmtVal(sub.enrol_open_date), undefined, 'enrol_open_date'],
-            ['Billing start', fmtVal(sub.billing_start), undefined, 'billing_start'],
-            ['Season end', fmtVal(sub.season_end), undefined, 'season_end'],
-            ['Active workflows', fmtList(sub.active_workflows)],
+          ${section('⚡ Plan automations', [
+            ['Included', planAutomations(sub.plan), ''],
+            ['Notes', 'Activated automatically once the account is live. Timing is pulled from StudioLAB season data.', ''],
           ])}
 
           ${isAi ? section('🤖 AI knowledge base', [
@@ -170,6 +166,7 @@
                 <label for="detAssign">Assigned to</label>
                 <input type="text" id="detAssign" value="${ESC(sub.assigned_to || '')}" placeholder="email or name">
               </div>
+              ${sheetSyncRow(sub)}
             </div>
           </div>
 
@@ -202,6 +199,8 @@
     document.getElementById('detChangeReq').addEventListener('click', () => window.AdminChangeRequest.open(sub));
     const delBtn = document.getElementById('detDelete');
     if (delBtn) delBtn.addEventListener('click', handleDelete);
+    const syncOne = document.getElementById('detSheetSync');
+    if (syncOne) syncOne.addEventListener('click', syncThisToSheet);
 
     hydrateLogos();
   }
@@ -367,6 +366,90 @@
       btn.classList.remove('copied');
       btn.innerHTML = original;
     }, 1400);
+  }
+
+  const PLAN_AUTOMATIONS = {
+    launch: [
+      'Abandoned Enrolment Recovery (3 emails)',
+      'Re-Enrolment Campaign (6 emails)',
+    ],
+    scale: [
+      'Abandoned Enrolment Recovery (3 emails)',
+      'Abandoned Enrolment SMS',
+      'Re-Enrolment Campaign (6 emails)',
+      'Re-Enrolment SMS',
+      'Missed Call Text-Back',
+    ],
+    ai: [
+      'Abandoned Enrolment Recovery (3 emails)',
+      'Abandoned Enrolment SMS',
+      'Re-Enrolment Campaign (6 emails)',
+      'Re-Enrolment SMS',
+      'Missed Call Text-Back',
+      'AI Chat Widget (after KB review)',
+      'AI Voice Agent (after KB review)',
+    ],
+  };
+
+  function planAutomations(plan) {
+    const items = PLAN_AUTOMATIONS[plan] || [];
+    if (!items.length) return empty;
+    return '<ul style="margin:0;padding-left:18px;line-height:1.7;">' +
+      items.map((i) => `<li>${ESC(i)}</li>`).join('') + '</ul>';
+  }
+
+  function sheetSyncRow(sub) {
+    if (sub.status === 'draft') return '';
+    let label;
+    let warn = false;
+    if (sub.sheets_sync_error) {
+      label = 'Sheet backup: last sync failed';
+      warn = true;
+    } else if (!sub.sheets_synced_at) {
+      label = 'Sheet backup: not yet synced';
+      warn = true;
+    } else {
+      label = 'Sheet backup: ' + timeAgo(new Date(sub.sheets_synced_at));
+    }
+    const title = sub.sheets_sync_error ? ESC(sub.sheets_sync_error)
+      : sub.sheets_synced_at ? new Date(sub.sheets_synced_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
+      : '';
+    return `
+      <div class="det-sheet-sync">
+        <span class="det-sheet-sync-label${warn ? ' warn' : ''}" title="${title}">${label}</span>
+        <button type="button" id="detSheetSync">↻ Sync now</button>
+      </div>`;
+  }
+
+  function timeAgo(d) {
+    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60)   return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + ' min ago';
+    if (s < 86400) return Math.floor(s / 3600) + ' hr ago';
+    return Math.floor(s / 86400) + ' day' + (s >= 172800 ? 's' : '') + ' ago';
+  }
+
+  async function syncThisToSheet() {
+    if (!current) return;
+    const btn = document.getElementById('detSheetSync');
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+    try {
+      const client = sb();
+      const { data, error } = await client.functions.invoke('sync-to-sheet', { body: { submission_id: current.id } });
+      if (error) throw error;
+      if (data && data.ok === false) throw new Error(data.error || 'Sync failed');
+      // Pull the row again so the timestamp updates.
+      const { data: fresh } = await client.from('submissions').select('*').eq('id', current.id).single();
+      if (fresh) { current = fresh; open(current.id); }
+    } catch (err) {
+      console.error('sync-to-sheet failed:', err);
+      window.alert('Sheet sync failed. ' + (err.message || err));
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
   }
 
   function planNotice(name, plan) {

@@ -104,6 +104,24 @@ export function changeCompletedAdmin(opts: { studioName: string; adminUrl: strin
   return { subject, html: layout({ previewText: 'A studio has completed their change request.', body }) };
 }
 
+export function adminInvite(opts: {
+  inviteeName: string;
+  inviterName: string;
+  role: string;
+  adminUrl: string;
+}): { subject: string; html: string } {
+  const roleLabel = opts.role === 'owner' ? 'owner' : opts.role === 'va' ? 'virtual assistant' : 'admin';
+  const subject = `You have been invited to StudioLAB Growth Admin`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Welcome to StudioLAB Growth Admin</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.inviteeName)},</p>
+    <p style="margin:0 0 14px;"><strong>${escape(opts.inviterName)}</strong> has invited you to the StudioLAB Growth admin panel as a <strong>${escape(roleLabel)}</strong>.</p>
+    <p style="margin:0 0 14px;">To sign in, visit the admin panel and enter this email address. We will send you a 6-digit code to verify it is you.</p>
+    ${cta('Open the admin panel', opts.adminUrl)}
+    <p style="margin:18px 0 0;color:${COL.g6};font-size:12px;line-height:1.5;">If you were not expecting this invitation, you can safely ignore this email.</p>`;
+  return { subject, html: layout({ previewText: 'You have been invited to StudioLAB Growth Admin.', body }) };
+}
+
 function escape(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
 }

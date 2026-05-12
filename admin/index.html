@@ -25,6 +25,10 @@
     </a>
     <div class="hdr-div" aria-hidden="true"></div>
     <div class="hdr-sub" aria-hidden="true">Admin</div>
+    <nav class="adm-nav" id="admNav" style="display:none" aria-label="Admin sections">
+      <button type="button" class="adm-nav-link active" data-section="submissions">Submissions</button>
+      <button type="button" class="adm-nav-link" data-section="users" id="admNavUsers" style="display:none">Users</button>
+    </nav>
     <div class="adm-spacer"></div>
     <div class="adm-user" id="admUser" style="display:none">
       <span id="admUserEmail"></span>
@@ -82,6 +86,10 @@
         <button type="button" class="pill" data-plan="ai" aria-pressed="false">Dominate AI</button>
       </div>
       <div class="adm-spacer"></div>
+      <div class="adm-sheet-sync" id="sheetSync" title="Mirror all submissions to the backup Google Sheet">
+        <span class="sheet-sync-status" id="sheetSyncStatus">Sheet backup: —</span>
+        <button type="button" class="btn-link" id="sheetSyncBtn">↻ Sync now</button>
+      </div>
       <a class="adm-preview-link" href="#" id="previewLink" title="Preview a studio form as the studio would see it">↗ Preview a studio form</a>
     </div>
 
@@ -96,7 +104,62 @@
 
   <!-- Detail screen -->
   <div id="detailScreen" style="display:none"></div>
+
+  <!-- Users screen (owner only) -->
+  <div id="usersScreen" style="display:none">
+    <div class="users-hdr">
+      <div>
+        <h2 class="users-title">Admin users</h2>
+        <p class="users-desc">Invite team members and VAs. Owners can manage users; admins and VAs see this list as read-only.</p>
+      </div>
+      <button type="button" class="btn btn-p" id="usersInviteBtn">+ Invite user</button>
+    </div>
+    <div class="users-tablewrap">
+      <table class="adm-table users-table">
+        <thead>
+          <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last sign-in</th><th aria-label="Actions"></th></tr>
+        </thead>
+        <tbody id="usersTbody"><tr><td colspan="6" class="adm-empty">Loading users...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 </main>
+
+<!-- Invite user modal -->
+<div class="adm-modal" id="inviteModal" hidden>
+  <div class="adm-modal-backdrop" data-action="close-invite"></div>
+  <div class="adm-modal-card" role="dialog" aria-modal="true" aria-labelledby="inviteTitle">
+    <div class="adm-modal-hdr">
+      <h2 id="inviteTitle" class="adm-modal-title">Invite admin user</h2>
+      <button type="button" class="adm-modal-close" data-action="close-invite" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <div class="adm-modal-body">
+      <div class="f">
+        <label for="inviteName">Full name</label>
+        <input type="text" id="inviteName" placeholder="Jane Smith" autocomplete="name">
+        <span class="field-err" id="inviteNameErr">Please enter a name.</span>
+      </div>
+      <div class="f">
+        <label for="inviteEmail">Email address</label>
+        <input type="email" id="inviteEmail" placeholder="jane@example.com" autocomplete="email">
+        <span class="field-err" id="inviteEmailErr">Please enter a valid email.</span>
+      </div>
+      <div class="f">
+        <label for="inviteRole">Role</label>
+        <select id="inviteRole">
+          <option value="va">VA — only sees submissions assigned to them</option>
+          <option value="admin">Admin — sees all submissions, can manage them</option>
+          <option value="owner">Owner — full access, can manage users</option>
+        </select>
+      </div>
+      <div class="submit-err" id="inviteErr" role="alert">Could not save. Please try again.</div>
+    </div>
+    <div class="adm-modal-ftr">
+      <button type="button" class="btn btn-g" data-action="close-invite">Cancel</button>
+      <button type="button" class="btn btn-p" id="inviteSend">Send invite</button>
+    </div>
+  </div>
+</div>
 
 <!-- Change-request modal -->
 <div class="adm-modal" id="crModal" hidden>
@@ -139,5 +202,6 @@
 <script src="js/dashboard.js"></script>
 <script src="js/detail.js"></script>
 <script src="js/change-request.js"></script>
+<script src="js/users.js"></script>
 </body>
 </html>
