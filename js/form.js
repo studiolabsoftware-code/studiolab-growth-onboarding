@@ -135,6 +135,66 @@
     return label + ' · ' + p.amount + ' ' + p.currency + taxNote;
   }
 
+  // ── Country and timezone smart defaults ───────────────────────────────────
+  // The URL determines the studio's region. Pre-select country accordingly and
+  // filter the timezone select so only that country's options appear. Studios
+  // can change country to switch the timezone list.
+  const COUNTRY_TO_REGION = { AU: 'AU', US: 'US', CA: 'US', UK: 'US' };
+  const REGION_DEFAULT_COUNTRY = { AU: 'AU', US: 'US' };
+
+  function applyCountryToTimezone() {
+    const cSel = document.getElementById('country');
+    const tSel = document.getElementById('timezone');
+    if (!cSel || !tSel) return;
+    const country = cSel.value || REGION_DEFAULT_COUNTRY[REGION] || 'AU';
+    const groupLabelByCountry = {
+      AU: 'Australia',
+      US: 'United States',
+      CA: 'Canada',
+      UK: 'United Kingdom',
+    };
+    const wantedLabel = groupLabelByCountry[country];
+    let firstVisibleValue = '';
+    Array.from(tSel.querySelectorAll('optgroup')).forEach((og) => {
+      const show = og.label === wantedLabel;
+      og.style.display = show ? '' : 'none';
+      og.disabled = !show;
+      if (show && !firstVisibleValue) {
+        const opt = og.querySelector('option');
+        if (opt) firstVisibleValue = opt.value;
+      }
+    });
+    // If current selection is from a hidden group, snap to first visible option
+    const selectedOpt = tSel.options[tSel.selectedIndex];
+    if (!selectedOpt || (selectedOpt.parentElement && selectedOpt.parentElement.style.display === 'none')) {
+      tSel.value = firstVisibleValue;
+    }
+  }
+
+  function applyRegionDefaults() {
+    // Pre-select the country dropdown to the URL's region default.
+    const cSel = document.getElementById('country');
+    if (cSel && !cSel.value) {
+      const def = REGION_DEFAULT_COUNTRY[REGION] || 'AU';
+      cSel.value = def;
+    }
+    applyCountryToTimezone();
+  }
+
+  // ── Website URL normalisation ─────────────────────────────────────────────
+  // Studios can type "yourstudio.com" without protocol. We add https:// at
+  // submit time. Validation accepts a domain-shaped string with at least one dot.
+  function looksLikeDomain(v) {
+    const cleaned = String(v).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    return /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(cleaned);
+  }
+  function normaliseUrl(v) {
+    const s = String(v).trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) return s;
+    return 'https://' + s.replace(/^\/+/, '');
+  }
+
   // ── Step navigation ───────────────────────────────────────────────────────
   function goTo(n) {
     const total = totalSteps();
@@ -331,6 +391,7 @@
       if (!bad) {
         if (el.type === 'email') bad = !isEmail(v);
         else if (el.type === 'url') bad = !isUrl(v);
+        else if (el.id === 'website') bad = !looksLikeDomain(v);
         else if (el.id === 'col1t') bad = !isHex(v);
       }
       setFieldErr(el, bad);
@@ -485,7 +546,7 @@
       timezone: valOrNull('timezone'),
       studio_type: valOrNull('studioType'),
       address: valOrNull('address'),
-      website: valOrNull('website'),
+      website: val('website') ? normaliseUrl(val('website')) : null,
       support_url: valOrNull('supportUrl'),
 
       first_name: valOrNull('firstName'),
@@ -671,6 +732,7 @@
         const row = document.getElementById('portRow');
         if (row) row.style.display = t.value === 'existing' ? '' : 'none';
       }
+      else if (t.id === 'country') applyCountryToTimezone();
     });
 
     document.addEventListener('input', (e) => {
@@ -690,6 +752,7 @@
   function init() {
     wireFieldErrors();
     renderSetupCards();
+    applyRegionDefaults();
     bindEvents();
     // Plan is locked by the URL the form is served from. No selectPlan call here.
     selectSetup('dfy');
