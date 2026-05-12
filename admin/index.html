@@ -38,7 +38,7 @@
   <div class="auth-card">
     <div class="auth-icon" aria-hidden="true"><img src="../assets/growth-logo.svg" alt="StudioLAB Growth"></div>
     <h2 class="auth-title" id="loginHeading">Welcome back, team</h2>
-    <p class="auth-desc">Sign in with your admin email and we will send you a one-time link. No password needed.</p>
+    <p class="auth-desc">Sign in with your admin email. We will send you a 6-digit code to verify it is you.</p>
 
     <form id="loginStep1" class="auth-step" novalidate>
       <div class="f">
@@ -46,16 +46,22 @@
         <input type="email" id="loginEmail" placeholder="you@studiolabgrowth.com" autocomplete="email" aria-describedby="loginEmailErr" required>
         <span class="field-err" id="loginEmailErr">Please enter a valid admin email.</span>
       </div>
-      <button type="submit" class="btn btn-p auth-btn" id="loginSend">Send sign-in link</button>
-      <p class="auth-helper">We email a single-use link that signs you in instantly. The link expires after a few minutes.</p>
+      <button type="submit" class="btn btn-p auth-btn" id="loginSend">Send my code</button>
+      <p class="auth-helper">We email a single-use 6-digit code. The code expires after 10 minutes.</p>
     </form>
 
     <div id="loginStep2" class="auth-step" style="display:none">
-      <p class="auth-sent" role="status">Check your inbox for the sign-in link. Click it from this device to open the dashboard.</p>
-      <button type="button" class="auth-resend" id="loginRetry">Use a different email</button>
+      <p class="auth-sent">Your code is on its way to <strong id="loginSentEmail"></strong>. Pop into your inbox in a moment. If it is taking longer than a minute, check your spam folder.</p>
+      <div class="f">
+        <label for="loginCode">6-digit code</label>
+        <input type="text" id="loginCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456">
+        <span class="field-err" id="loginCodeErr"></span>
+      </div>
+      <button type="button" class="btn btn-p auth-btn" id="loginVerify">Verify and sign in</button>
+      <button type="button" class="auth-resend" id="loginRetry">Use a different email or send a new code</button>
     </div>
 
-    <div class="submit-err" id="loginErr" role="alert">We could not send the link. Please check the email and try again.</div>
+    <div class="submit-err" id="loginErr" role="alert">We could not send the code. Please check the email and try again.</div>
   </div>
 </section>
 
