@@ -96,63 +96,80 @@
       root.innerHTML = '<div class="adm-empty" style="padding:40px 0;">No products yet. Run migration 009 to seed the catalog.</div>';
       return;
     }
-    const rows = [];
-    rows.push(`
-      <div class="cat-row cat-row-head">
-        <div class="cat-cell-plan">Plan</div>
-        <div class="cat-cell-setup">Setup</div>
-        <div class="cat-cell-price">AUD</div>
-        <div class="cat-cell-price">USD</div>
-        <div class="cat-cell-meta">Last change</div>
-      </div>
-    `);
-
+    const cards = [];
     for (const plan of PLAN_ORDER) {
       for (const setup of SETUP_ORDER) {
         const aud = findProduct(plan, setup, 'AUD');
         const usd = findProduct(plan, setup, 'USD');
-        rows.push(`
-          <div class="cat-row">
-            <div class="cat-cell-plan"><span class="bdg bdg-plan-${plan}">${PLAN_LABEL[plan]}</span></div>
-            <div class="cat-cell-setup"><span class="bdg bdg-setup">${SETUP_LABEL[setup]}</span></div>
-            <div class="cat-cell-price">${renderPriceCell(aud)}</div>
-            <div class="cat-cell-price">${renderPriceCell(usd)}</div>
-            <div class="cat-cell-meta">${renderMetaCell(aud, usd)}</div>
-          </div>
-        `);
+        cards.push(renderProductCard(plan, setup, aud, usd));
       }
     }
-    root.innerHTML = rows.join('');
+    root.innerHTML = `<div class="cat-grid">${cards.join('')}</div>`;
   }
 
-  function renderPriceCell(p) {
-    if (!p) return '<span class="cat-empty">—</span>';
+  function renderProductCard(plan, setup, aud, usd) {
+    // The pair shares name/description/tax_code conceptually. We treat the
+    // AUD row as the source of truth for display and "Edit details" pushes
+    // any change to both rows via two consecutive update_details calls.
+    const head = aud || usd;
+    if (!head) return '';
+    const stamps = [aud, usd].filter(Boolean).map((p) => new Date(p.updated_at)).sort((a, b) => b - a);
+    const lastChange = stamps.length
+      ? stamps[0].toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
+      : '—';
+    return `
+      <article class="cat-card">
+        <header class="cat-card-hdr">
+          <div class="cat-card-tags">
+            <span class="bdg bdg-plan-${plan}">${PLAN_LABEL[plan]}</span>
+            <span class="bdg bdg-setup">${SETUP_LABEL[setup]}</span>
+          </div>
+          <button class="btn-link cat-card-edit" data-cat-action="edit-details" data-plan="${plan}" data-setup="${setup}">✎ Edit details</button>
+        </header>
+        <h3 class="cat-card-name">${escapeHtml(head.name)}</h3>
+        <p class="cat-card-desc">${escapeHtml(head.description || 'No description set.')}</p>
+        <div class="cat-card-prices">
+          ${renderPriceBox(aud, plan, setup)}
+          ${renderPriceBox(usd, plan, setup)}
+        </div>
+        <footer class="cat-card-foot">
+          <span class="cat-card-meta">Last change: ${escapeHtml(lastChange)}</span>
+        </footer>
+      </article>
+    `;
+  }
+
+  function renderPriceBox(p, plan, setup) {
+    if (!p) {
+      return `<div class="cat-pricebox cat-pricebox-empty"><div class="cat-pricebox-cur">—</div><div class="cat-pricebox-empty-msg">Missing row</div></div>`;
+    }
     const amt = (p.amount_cents || 0) / 100;
     const fmt = amt.toLocaleString('en-AU', { style: 'currency', currency: p.currency, minimumFractionDigits: 2 });
+    const taxNote = p.currency === 'AUD'
+      ? `<div class="cat-pricebox-tax">ex GST · ${(amt * 1.1).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })} inc GST</div>`
+      : '';
     const activeChip = p.active
       ? '<span class="cat-chip cat-chip-on">Active</span>'
       : '<span class="cat-chip cat-chip-off">Inactive</span>';
     const stripeChip = p.stripe_product_id
-      ? `<span class="cat-chip cat-chip-sync" title="${p.stripe_product_id}">Synced</span>`
+      ? `<span class="cat-chip cat-chip-sync" title="${escapeHtml(p.stripe_product_id)}">Synced</span>`
       : '<span class="cat-chip cat-chip-nosync">Not synced</span>';
     return `
-      <div class="cat-price">
-        <div class="cat-price-amt">${escapeHtml(fmt)}</div>
-        <div class="cat-price-chips">${activeChip}${stripeChip}</div>
-        <div class="cat-price-acts">
-          <button class="btn-link" data-cat-action="edit-price" data-id="${p.id}">Edit price</button>
-          <button class="btn-link" data-cat-action="history" data-id="${p.id}">History</button>
+      <div class="cat-pricebox">
+        <div class="cat-pricebox-row">
+          <div class="cat-pricebox-cur">${p.currency}</div>
+          <button class="cat-pricebox-edit" data-cat-action="edit-price" data-id="${p.id}" title="Edit price"><span aria-hidden="true">✎</span></button>
+        </div>
+        <div class="cat-pricebox-amt">${escapeHtml(fmt)}</div>
+        ${taxNote}
+        <div class="cat-pricebox-chips">${activeChip}${stripeChip}</div>
+        <div class="cat-pricebox-acts">
           <button class="btn-link" data-cat-action="toggle-active" data-id="${p.id}" data-active="${p.active}">${p.active ? 'Disable' : 'Enable'}</button>
           <button class="btn-link" data-cat-action="sync" data-id="${p.id}">${p.stripe_product_id ? 'Re-sync' : 'Sync to Stripe'}</button>
+          <button class="btn-link" data-cat-action="history" data-id="${p.id}">History</button>
         </div>
       </div>
     `;
-  }
-
-  function renderMetaCell(aud, usd) {
-    const stamps = [aud, usd].filter(Boolean).map((p) => new Date(p.updated_at)).sort((a, b) => b - a);
-    if (!stamps.length) return '<span class="muted">—</span>';
-    return `<span class="muted">${stamps[0].toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}</span>`;
   }
 
   function renderCodes() {
@@ -201,11 +218,55 @@
     const action = btn.dataset.catAction;
     const id = btn.dataset.id;
     if (action === 'edit-price') return editPrice(id);
+    if (action === 'edit-details') return editDetails(btn.dataset.plan, btn.dataset.setup);
     if (action === 'history') return showHistory(id);
     if (action === 'toggle-active') return toggleActive(id, btn.dataset.active !== 'true');
     if (action === 'sync') return syncToStripe(id, btn);
     if (action === 'edit-code') return openCodeModal(codes.find((c) => c.id === id));
     if (action === 'toggle-code') return toggleCode(id, btn.dataset.active !== 'true');
+  }
+
+  async function editDetails(plan, setup) {
+    const aud = findProduct(plan, setup, 'AUD');
+    const usd = findProduct(plan, setup, 'USD');
+    const head = aud || usd;
+    if (!head) return;
+    const body = `
+      <p>Update the product details. Changes apply to both the AUD and USD rows so they stay in sync, and are pushed to Stripe on the next Sync.</p>
+      <div class="cat-form" style="margin-top:12px;">
+        <div class="cat-form-row">
+          <label for="catDetName">Product name</label>
+          <input type="text" id="catDetName" value="${escapeHtml(head.name)}" maxlength="120">
+        </div>
+        <div class="cat-form-row">
+          <label for="catDetDesc">Description</label>
+          <textarea id="catDetDesc" rows="3" style="width:100%;padding:9px 12px;border:1px solid var(--g2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--g8);">${escapeHtml(head.description || '')}</textarea>
+          <p class="set-hint">Shown on the Stripe Checkout page and in the Stripe dashboard.</p>
+        </div>
+        <div class="cat-form-row">
+          <label for="catDetTax">Stripe tax code</label>
+          <input type="text" id="catDetTax" value="${escapeHtml(head.tax_code || 'txcd_10000000')}" placeholder="txcd_10000000">
+          <p class="set-hint">Default <code>txcd_10000000</code> (general services). Change only if Stripe support has advised a different code for this product.</p>
+        </div>
+      </div>
+    `;
+    const ok = await window.AdminModal.confirm({ title: 'Edit product details', message: body, confirmLabel: 'Save details' });
+    if (!ok) return;
+
+    const name = $('catDetName').value.trim();
+    const description = $('catDetDesc').value.trim();
+    const taxCode = $('catDetTax').value.trim();
+    if (!name) { await window.AdminModal.alert('Name cannot be blank.'); return; }
+    if (!/^txcd_[0-9a-z]+$/.test(taxCode)) { await window.AdminModal.alert('Tax code must look like txcd_… (lowercase letters/numbers).'); return; }
+
+    const patch = { name, description, tax_code: taxCode };
+    const targets = [aud, usd].filter(Boolean);
+    for (const t of targets) {
+      const r = await callFn('manage-products', { action: 'update_details', id: t.id, ...patch });
+      if (!r.ok) { await window.AdminModal.alert({ title: 'Could not save', message: escapeHtml(r.error || 'Unknown error.') }); return; }
+    }
+    await loadProducts();
+    renderMatrix();
   }
 
   async function editPrice(id) {

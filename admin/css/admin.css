@@ -318,36 +318,49 @@ body.role-va .adm-preview-link { display: none !important; }
 .cat-tab.active { background: #fff; color: var(--in-d); box-shadow: 0 1px 2px rgba(19,16,46,0.08); }
 .cat-tab:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
 
-.cat-matrix { background: #fff; border: 1px solid var(--g2); border-radius: 12px; overflow: hidden; }
-.cat-row { display: grid; grid-template-columns: 130px 130px 1fr 1fr 160px; gap: 0; border-top: 1px solid var(--g2); }
-.cat-row:first-child { border-top: none; }
-.cat-row-head { background: var(--mg); }
-.cat-row-head > div { padding: 12px 16px; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
-.cat-row > div { padding: 14px 16px; align-self: center; }
-.cat-cell-plan, .cat-cell-setup { font-weight: 600; color: var(--in-d); }
-.cat-cell-meta { font-size: 11px; color: var(--g6); }
-.cat-empty { color: var(--g4); font-style: italic; font-size: 12px; }
+/* Product card grid — one card per plan × setup, with AUD + USD inside */
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+@media (max-width: 720px) { .cat-grid { grid-template-columns: 1fr; } }
 
-.cat-price { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.cat-price-amt { font-size: 16px; font-weight: 700; color: var(--in-d); letter-spacing: -0.3px; }
-.cat-price-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.cat-card { background: #fff; border: 1px solid var(--g2); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.15s, box-shadow 0.15s; }
+.cat-card:hover { border-color: var(--in); box-shadow: 0 2px 10px rgba(19,16,46,0.06); }
+
+.cat-card-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cat-card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.cat-card-edit { font-size: 11px; color: var(--g6); padding: 4px 8px; border-radius: 6px; }
+.cat-card-edit:hover { color: var(--in); background: var(--in-l); text-decoration: none; }
+
+.cat-card-name { font-size: 16px; font-weight: 700; color: var(--in-d); letter-spacing: -0.3px; margin: 4px 0 0; }
+.cat-card-desc { font-size: 12px; color: var(--g6); margin: 0 0 6px; line-height: 1.5; }
+
+.cat-card-prices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 480px) { .cat-card-prices { grid-template-columns: 1fr; } }
+
+.cat-pricebox { background: var(--g1); border: 1px solid var(--g2); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.cat-pricebox-empty { opacity: 0.5; }
+.cat-pricebox-empty-msg { font-size: 11px; color: var(--g4); font-style: italic; }
+.cat-pricebox-row { display: flex; align-items: center; justify-content: space-between; }
+.cat-pricebox-cur { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; color: var(--g6); text-transform: uppercase; }
+.cat-pricebox-edit { background: transparent; border: none; color: var(--g6); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 6px; line-height: 1; font-family: inherit; }
+.cat-pricebox-edit:hover { color: var(--in); background: var(--in-l); }
+.cat-pricebox-edit:focus-visible { outline: 2px solid var(--in); outline-offset: 1px; }
+.cat-pricebox-amt { font-size: 20px; font-weight: 800; color: var(--in-d); letter-spacing: -0.4px; line-height: 1.1; }
+.cat-pricebox-tax { font-size: 10px; color: var(--g6); margin-top: -2px; }
+.cat-pricebox-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.cat-pricebox-acts { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.cat-pricebox-acts .btn-link { color: var(--in); padding: 2px 4px; font-size: 11px; }
+.cat-pricebox-acts .btn-link:hover { color: var(--in-d); text-decoration: underline; background: transparent; }
+
 .cat-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; }
 .cat-chip-on { background: var(--gr-l, #D1FAE5); color: var(--gr, #047857); }
-.cat-chip-off { background: var(--g1); color: var(--g6); border: 1px solid var(--g2); }
+.cat-chip-off { background: #fff; color: var(--g6); border: 1px solid var(--g2); }
 .cat-chip-sync { background: var(--in-l); color: var(--in); cursor: help; }
 .cat-chip-nosync { background: var(--am-l); color: var(--am); }
-.cat-price-acts { display: flex; gap: 6px; flex-wrap: wrap; }
-.cat-price-acts .btn-link { color: var(--in); padding: 2px 6px; font-size: 11px; }
-.cat-price-acts .btn-link:hover { color: var(--in-d); text-decoration: underline; background: transparent; }
 
-.cat-foot-hint { margin: 12px 4px 0; font-size: 11px; color: var(--g6); line-height: 1.5; }
+.cat-card-foot { border-top: 1px solid var(--g2); padding-top: 8px; margin-top: 4px; display: flex; justify-content: space-between; }
+.cat-card-meta { font-size: 11px; color: var(--g6); }
 
-@media (max-width: 880px) {
-  .cat-row { grid-template-columns: 1fr; }
-  .cat-row-head { display: none; }
-  .cat-row > div { border-top: 1px solid var(--g2); padding: 12px 16px; }
-  .cat-row > div:first-child { border-top: none; }
-}
+.cat-foot-hint { margin: 16px 4px 0; font-size: 11px; color: var(--g6); line-height: 1.5; }
 
 /* Discount codes tab */
 .cat-codes-hdr { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
