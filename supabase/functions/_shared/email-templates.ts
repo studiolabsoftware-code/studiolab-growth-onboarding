@@ -80,6 +80,20 @@ export function changeRequestEmail(opts: { studioName: string; updateUrl: string
   return { subject, html: layout({ previewText: 'A quick update needed before we continue your setup.', body }) };
 }
 
+export function verificationCode(opts: { code: string; expiresInMinutes: number }): { subject: string; html: string } {
+  const subject = `Your StudioLAB Growth code: ${opts.code}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your verification code</h1>
+    <p style="margin:0 0 18px;color:${COL.g6};">Enter this code on your setup form to keep going. It expires in ${opts.expiresInMinutes} minutes.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 18px;"><tr>
+      <td align="center" bgcolor="${COL.g1}" style="background:${COL.g1};border:1px solid ${COL.g2};border-radius:10px;padding:18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:30px;font-weight:800;letter-spacing:8px;color:${COL.mg};">
+        ${escape(opts.code)}
+      </td>
+    </tr></table>
+    <p style="margin:0;color:${COL.g6};font-size:12px;line-height:1.5;">If you did not request this code, you can ignore this email. Your account stays safe.</p>`;
+  return { subject, html: layout({ previewText: 'Your StudioLAB Growth verification code.', body }) };
+}
+
 export function changeCompletedAdmin(opts: { studioName: string; adminUrl: string; fields: string[] }): { subject: string; html: string } {
   const subject = `${opts.studioName} has completed their change request`;
   const body = `
