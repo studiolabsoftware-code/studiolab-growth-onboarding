@@ -5,17 +5,28 @@
 (function () {
   'use strict';
 
-  // Plan and region are both locked by the URL. window.PLAN and window.REGION
-  // are set inline in each form's HTML before this script loads. AU studios get
-  // AUD pricing. Everyone else gets USD. Per master spec, currencies never mix.
-  const PLAN = window.PLAN || 'launch';
-  const REGION = window.REGION || 'AU';
+  // Plan and region resolution order:
+  //   1. URL query params (?plan=launch&region=au) — new canonical pattern
+  //   2. window.PLAN / window.REGION inline scripts — legacy folder URLs
+  //   3. Defaults (launch + AU) for the generic /setup entry point pre-OTP
+  const _params = new URLSearchParams(window.location.search);
+  const _urlPlan = (_params.get('plan') || '').toLowerCase();
+  const _urlRegion = (_params.get('region') || '').toUpperCase();
+  const PLAN = _urlPlan || window.PLAN || 'launch';
+  const REGION = _urlRegion || window.REGION || 'AU';
+  // GENERIC_MODE means we landed without plan info in URL or inline scripts —
+  // the gate is shown without a plan-specific subheading, and after OTP we
+  // either look up the studio's existing draft or prompt for plan + region.
+  const GENERIC_MODE = !_urlPlan && !window.PLAN;
   const totalSteps = () => document.querySelectorAll('.panel').length;
 
   // Edge Function endpoints.
   const SB_URL = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) || '';
   const FN_BASE = SB_URL + '/functions/v1/';
-  const SESSION_KEY = 'sl-growth-session-' + REGION + '-' + PLAN;
+  // Single session key per browser. The studio is the studio regardless of
+  // which plan URL they last visited; the session row itself encodes plan +
+  // region. Switching plans requires re-verification, which is rare.
+  const SESSION_KEY = 'sl-growth-session';
 
   async function callFn(name, body) {
     const resp = await fetch(FN_BASE + name, {
@@ -834,15 +845,103 @@
     const orig = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Verifying...';
-    const r = await callFn('verify-otp', { email: otpEmail, code, plan: PLAN, region: REGION });
+
+    // In generic mode, omit plan and region so the server returns existing
+    // drafts and a verified_token we can exchange for a session after the
+    // studio picks a plan.
+    const body = GENERIC_MODE
+      ? { email: otpEmail, code }
+      : { email: otpEmail, code, plan: PLAN, region: REGION };
+    const r = await callFn('verify-otp', body);
     btn.disabled = false;
     btn.innerHTML = orig;
     if (!r.ok || !r.data || !r.data.ok) {
       setAuthError('authCodeErr', (r.data && r.data.error) || 'Verification failed.');
       return;
     }
+
+    if (r.data.generic) {
+      handleGenericVerified(r.data.verified_token, r.data.drafts || []);
+      return;
+    }
+
     storeSession(r.data.session_token, r.data.session_expires_at, otpEmail);
     enterForm(r.data.submission, Boolean(r.data.is_returning));
+  }
+
+  // Generic-mode after-OTP routing:
+  //   - Existing draft(s) found → redirect to its plan/region URL with session
+  //   - No draft → show plan + region picker; on selection, claim a session
+  function handleGenericVerified(verifiedToken, drafts) {
+    if (drafts.length > 0) {
+      // Take the most-recent draft (server already sorted desc by last_saved_at)
+      const d = drafts[0];
+      claimAndRedirect(verifiedToken, d.plan, d.region);
+      return;
+    }
+    showPlanPicker(verifiedToken);
+  }
+
+  async function claimAndRedirect(verifiedToken, plan, region) {
+    const r = await callFn('claim-draft', { email: otpEmail, verified_token: verifiedToken, plan, region });
+    if (!r.ok || !r.data || !r.data.ok) {
+      setAuthError('authCodeErr', (r.data && r.data.error) || 'Could not load your account.');
+      return;
+    }
+    storeSession(r.data.session_token, r.data.session_expires_at, otpEmail);
+    // Redirect to canonical URL for that plan + region
+    const target = '/setup/?plan=' + encodeURIComponent(plan) + '&region=' + encodeURIComponent(region);
+    if (window.location.pathname.startsWith('/setup') && _urlPlan === plan && _urlRegion === region) {
+      // Already on the right page, just hide gate and reveal form
+      enterForm(r.data.submission, true);
+    } else {
+      window.location.href = target;
+    }
+  }
+
+  function showPlanPicker(verifiedToken) {
+    const card = document.querySelector('#authGate .auth-card');
+    if (!card) return;
+    card.innerHTML = ''
+      + '<div class="auth-icon" aria-hidden="true">'
+      +   '<span class="sl-mark">SL</span>'
+      + '</div>'
+      + '<h2 class="auth-title">Pick your plan</h2>'
+      + '<p class="auth-desc">We could not find an existing setup for that email. Choose your plan and region to begin a fresh one. You can always change plans later.</p>'
+      + '<div class="picker-group" role="radiogroup" aria-label="Region">'
+      +   '<div class="picker-label">Region</div>'
+      +   '<div class="picker-row">'
+      +     '<label class="picker-card sel"><input type="radio" name="pickRegion" value="AU" checked><span>Australia (AUD)</span></label>'
+      +     '<label class="picker-card"><input type="radio" name="pickRegion" value="US"><span>US / International (USD)</span></label>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="picker-group" role="radiogroup" aria-label="Plan">'
+      +   '<div class="picker-label">Plan</div>'
+      +   '<div class="picker-row picker-stack">'
+      +     '<label class="picker-card sel"><input type="radio" name="pickPlan" value="launch" checked><span><strong>Launch</strong> · Email automation</span></label>'
+      +     '<label class="picker-card"><input type="radio" name="pickPlan" value="scale"><span><strong>Scale</strong> · Email + SMS + lead tracking</span></label>'
+      +     '<label class="picker-card"><input type="radio" name="pickPlan" value="ai"><span><strong>Dominate AI</strong> · Everything plus AI chat and voice</span></label>'
+      +   '</div>'
+      + '</div>'
+      + '<button type="button" class="btn btn-p auth-btn" id="pickerContinueBtn">Continue</button>';
+    // Wire selection styling
+    card.querySelectorAll('.picker-card input[type="radio"]').forEach((rb) => {
+      rb.addEventListener('change', (e) => {
+        const name = e.target.name;
+        card.querySelectorAll('input[name="' + name + '"]').forEach((other) => {
+          const lbl = other.closest('.picker-card');
+          if (lbl) lbl.classList.toggle('sel', other.checked);
+        });
+      });
+    });
+    const cont = card.querySelector('#pickerContinueBtn');
+    if (cont) cont.addEventListener('click', () => {
+      const plan = card.querySelector('input[name="pickPlan"]:checked').value;
+      const region = card.querySelector('input[name="pickRegion"]:checked').value;
+      cont.disabled = true;
+      cont.innerHTML = '<span class="spinner" aria-hidden="true"></span> Loading...';
+      claimAndRedirect(verifiedToken, plan, region);
+    });
   }
 
   function handleResendOrChange() {

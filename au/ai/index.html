@@ -31,18 +31,19 @@
 
 <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
   <div class="auth-card">
-    <div class="auth-icon" aria-hidden="true">👋</div>
-    <h2 class="auth-title" id="authTitle">Welcome to StudioLAB Growth</h2>
-    <p class="auth-desc">Glad you are here. We are about to set up your <strong id="authPlanName">Growth</strong> account so it can start working for you. Pop in your email below and we will send you a 6-digit code to make sure it is yours.</p>
+    <div class="auth-icon" aria-hidden="true"><span class="sl-mark">SL</span></div>
+    <h2 class="auth-title" id="authTitle">Let's get you set up</h2>
+    <p class="auth-desc">You're setting up your <strong>Dominate AI</strong> account. This takes about 15 minutes and we will walk you through each step.</p>
 
     <div class="auth-step" id="authStepEmail">
       <div class="f">
-        <label for="authEmail">Your email address</label>
-        <input type="email" id="authEmail" placeholder="you@yourstudio.com" autocomplete="email" required>
+        <label for="authEmail">Your studio email address</label>
+        <input type="email" id="authEmail" placeholder="sarah@yourstudio.com" autocomplete="email" required>
         <span class="field-err" id="authEmailErr"></span>
       </div>
       <button type="button" class="btn btn-p auth-btn" id="authSendBtn">Send my code</button>
-      <p class="auth-fineprint">From here your progress saves automatically. Step away and come back whenever suits, on any device. We will send the same code path to pick up exactly where you left off.</p>
+      <p class="auth-helper">Your progress saves automatically. Come back any time, on any device.</p>
+      <p class="auth-helper-faint">You will need your studio logo, brand colours, and email preferences. If you have your class info and pricing handy, that helps too.</p>
     </div>
 
     <div class="auth-step" id="authStepCode" hidden>

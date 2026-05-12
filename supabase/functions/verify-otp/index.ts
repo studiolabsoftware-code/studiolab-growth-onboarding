@@ -21,8 +21,14 @@ Deno.serve(async (req) => {
     const { email, code, plan, region } = await req.json();
     if (!email || !isValidEmail(email)) return jsonResponse({ ok: false, error: 'Invalid email address.' }, 400);
     if (!code || !/^\d{6}$/.test(String(code))) return jsonResponse({ ok: false, error: 'Code must be 6 digits.' }, 400);
-    if (!ALLOWED_PLANS.has(plan)) return jsonResponse({ ok: false, error: 'Unknown plan.' }, 400);
-    if (!ALLOWED_REGIONS.has(region)) return jsonResponse({ ok: false, error: 'Unknown region.' }, 400);
+    // Generic mode: caller does not yet know plan + region. We verify the OTP,
+    // then either look up an existing draft for this email (if any) and return
+    // it so the caller can route, or signal that a plan picker is needed.
+    const generic = !plan && !region;
+    if (!generic) {
+      if (!ALLOWED_PLANS.has(plan)) return jsonResponse({ ok: false, error: 'Unknown plan.' }, 400);
+      if (!ALLOWED_REGIONS.has(region)) return jsonResponse({ ok: false, error: 'Unknown region.' }, 400);
+    }
 
     const normEmail = String(email).trim().toLowerCase();
     const sb = adminClient();
@@ -52,6 +58,35 @@ Deno.serve(async (req) => {
 
     // Mark OTP used
     await sb.from('studio_otps').update({ used_at: new Date().toISOString() }).eq('id', otp.id);
+
+    // Generic mode: return whatever drafts exist for this email so the caller
+    // can either route to the right plan+region URL or prompt a plan picker.
+    if (generic) {
+      const { data: drafts } = await sb
+        .from('submissions')
+        .select('id, plan, region, status, last_step_completed, last_saved_at, studio_name')
+        .ilike('contact_email', normEmail)
+        .order('last_saved_at', { ascending: false, nullsFirst: false });
+      const verified = randomToken(16);
+      // Stash a short-lived verified-email marker so the caller can claim a
+      // session for a chosen plan+region without re-OTP. We re-use the
+      // studio_otps table by inserting a marker row used as a one-time bridge.
+      const expires = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      const verifiedHash = await sha256Hex(verified);
+      await sb.from('studio_otps').insert({
+        email: normEmail,
+        code_hash: 'verified:' + verifiedHash,
+        expires_at: expires,
+        used_at: null,
+      });
+      return jsonResponse({
+        ok: true,
+        generic: true,
+        verified_token: verified,
+        verified_expires_at: expires,
+        drafts: drafts || [],
+      });
+    }
 
     // Find or create draft submission for (email, plan, region)
     const { data: existing } = await sb

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>StudioLAB Growth: Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/form.css">
+</head>
+<body>
+
+<a class="sr-only" href="#authGate">Skip to setup</a>
+<h1 class="sr-only">StudioLAB Growth setup</h1>
+
+<header class="hdr">
+  <div class="hdr-inner">
+    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth home">
+      <img src="/assets/growth-logo-white.svg" alt="StudioLAB Growth">
+    </a>
+    <div class="hdr-div" aria-hidden="true"></div>
+    <div class="hdr-sub" id="hdrSub" aria-hidden="true">Account Setup</div>
+  </div>
+</header>
+
+<section class="auth-gate" id="authGate" aria-labelledby="authTitle">
+  <div class="auth-card">
+    <div class="auth-icon" aria-hidden="true"><span class="sl-mark">SL</span></div>
+    <h2 class="auth-title" id="authTitle">Welcome back</h2>
+    <p class="auth-desc" id="authSubhead">Enter your email to pick up where you left off. We will send you a 6-digit code and drop you straight back into your setup.</p>
+
+    <div class="auth-step" id="authStepEmail">
+      <div class="f">
+        <label for="authEmail">Your studio email address</label>
+        <input type="email" id="authEmail" placeholder="sarah@yourstudio.com" autocomplete="email" required>
+        <span class="field-err" id="authEmailErr"></span>
+      </div>
+      <button type="button" class="btn btn-p auth-btn" id="authSendBtn">Send my code</button>
+      <p class="auth-helper">Your progress saves automatically. Come back any time, on any device.</p>
+      <p class="auth-helper-faint" id="authNeedsHint" hidden>You will need your studio logo, brand colours, and email preferences. If you have your class info and pricing handy, that helps too.</p>
+    </div>
+
+    <div class="auth-step" id="authStepCode" hidden>
+      <p class="auth-sent">Your code is on its way to <strong id="authSentEmail"></strong>. Pop into your inbox in a moment. If it is taking longer than a minute, check your spam folder just in case.</p>
+      <div class="f">
+        <label for="authCode">6-digit code</label>
+        <input type="text" id="authCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456">
+        <span class="field-err" id="authCodeErr"></span>
+      </div>
+      <button type="button" class="btn btn-p auth-btn" id="authVerifyBtn">Verify and continue</button>
+      <button type="button" class="auth-resend" id="authResendBtn">Use a different email or send a new code</button>
+    </div>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/setup-gate.js"></script>
+</body>
+</html>

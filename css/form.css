@@ -442,3 +442,28 @@ select {
 .signout-row { max-width: 780px; margin: 0 auto; padding: 8px 24px; text-align: right; font-size: 11px; color: var(--g4); }
 .signout-row a, .signout-row button { background: none; border: none; color: var(--in); font-weight: 600; cursor: pointer; font-size: 11px; padding: 0; font-family: inherit; text-decoration: underline; }
 .signout-row a:hover, .signout-row button:hover { color: var(--mg); }
+
+/* SL mark used as gate icon (replaces wave emoji) */
+.sl-mark { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: var(--mg); color: #fff; border-radius: 12px; font-weight: 800; font-size: 16px; letter-spacing: 0.5px; }
+.auth-icon { background: transparent; padding: 0; overflow: hidden; }
+.auth-icon .sl-mark { width: 48px; height: 48px; }
+
+/* Larger heading per scope */
+.auth-title { font-size: 28px; line-height: 1.15; letter-spacing: -0.5px; margin-bottom: 10px; }
+.auth-desc { font-size: 14px; line-height: 1.55; }
+
+/* Helper text below button (not fine print) */
+.auth-helper { font-size: 12px; color: var(--g6); line-height: 1.55; margin: 14px 0 0; text-align: left; }
+.auth-helper-faint { font-size: 11px; color: var(--g4); line-height: 1.55; margin: 8px 0 0; text-align: left; }
+
+/* Plan + region picker (used in generic /setup with no draft found) */
+.picker-group { margin: 0 0 18px; }
+.picker-label { font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+.picker-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.picker-row.picker-stack { grid-template-columns: 1fr; }
+.picker-card { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--g2); border-radius: 10px; cursor: pointer; transition: border-color 0.15s, background 0.15s; font-size: 13px; color: var(--g8); user-select: none; }
+.picker-card:hover { border-color: var(--in); }
+.picker-card.sel { border-color: var(--in); background: var(--in-l); }
+.picker-card input[type="radio"] { width: 14px; height: 14px; accent-color: var(--in); margin: 0; flex-shrink: 0; }
+.picker-card span { line-height: 1.4; }
+.picker-card strong { color: var(--in-d); }
