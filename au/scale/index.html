@@ -28,6 +28,36 @@
   <div class="prog" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="14"><div class="prog-fill" id="pf" style="width:14%"></div></div>
 </header>
 
+
+<section class="auth-gate" id="authGate" aria-labelledby="authTitle">
+  <div class="auth-card">
+    <div class="auth-icon" aria-hidden="true">✉️</div>
+    <h2 class="auth-title" id="authTitle">Let's get started</h2>
+    <p class="auth-desc">Enter your email to begin or pick up where you left off. We will send you a 6-digit code to confirm it is yours, then auto-save your progress so you can return any time.</p>
+
+    <div class="auth-step" id="authStepEmail">
+      <div class="f">
+        <label for="authEmail">Email address</label>
+        <input type="email" id="authEmail" placeholder="you@yourstudio.com" autocomplete="email" required>
+        <span class="field-err" id="authEmailErr"></span>
+      </div>
+      <button type="button" class="btn btn-p auth-btn" id="authSendBtn">Send code</button>
+    </div>
+
+    <div class="auth-step" id="authStepCode" hidden>
+      <p class="auth-sent">Code sent to <strong id="authSentEmail"></strong>. Check your inbox, including spam.</p>
+      <div class="f">
+        <label for="authCode">6-digit code</label>
+        <input type="text" id="authCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456">
+        <span class="field-err" id="authCodeErr"></span>
+      </div>
+      <button type="button" class="btn btn-p auth-btn" id="authVerifyBtn">Verify and continue</button>
+      <button type="button" class="auth-resend" id="authResendBtn">Use a different email or send a new code</button>
+    </div>
+  </div>
+</section>
+
+<div id="formWrap" class="form-hidden">
 <nav class="snav" aria-label="Form steps">
   <div class="snav-inner">
     <button type="button" class="sp active" data-s="1" aria-current="step"><span class="sp-n" aria-hidden="true">1</span><span>Setup</span></button>
@@ -578,5 +608,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/form.js"></script>
+
+</div><!-- /formWrap -->
 </body>
 </html>

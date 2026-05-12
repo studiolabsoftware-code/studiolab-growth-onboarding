@@ -12,6 +12,34 @@
   const REGION = window.REGION || 'AU';
   const totalSteps = () => document.querySelectorAll('.panel').length;
 
+  // Edge Function endpoints.
+  const SB_URL = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) || '';
+  const FN_BASE = SB_URL + '/functions/v1/';
+  const SESSION_KEY = 'sl-growth-session-' + REGION + '-' + PLAN;
+
+  async function callFn(name, body) {
+    const resp = await fetch(FN_BASE + name, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    let data = null;
+    try { data = await resp.json(); } catch (_) { /* non-JSON response */ }
+    return { ok: resp.ok, status: resp.status, data: data || {} };
+  }
+
+  function loadSession() {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); }
+    catch (_) { return null; }
+  }
+  function storeSession(token, expiresAt, email) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token, expiresAt, email }));
+  }
+  function clearSession() { localStorage.removeItem(SESSION_KEY); }
+  function sessionValid(s) {
+    return Boolean(s && s.token && s.expiresAt && new Date(s.expiresAt) > new Date());
+  }
+
   // Setup fee pricing per master reference doc (May 2026).
   // AU prices show ex-GST headline with inc-GST hint. US shows single USD.
   // Dominate AI: the dfy slot is renamed to AI Activation Pack at render time.
@@ -240,11 +268,13 @@
     const target = state.step + 1;
     if (target > totalSteps()) return;
     goTo(target);
+    autoSave();
   }
 
   function prevStep() {
     if (state.step === 1) return;
     goTo(state.step - 1);
+    autoSave();
   }
 
   // ── Plan & setup selection ────────────────────────────────────────────────
@@ -630,9 +660,15 @@
       showDone('SPAMTRAP');
       return;
     }
-    if (!validatePanel(8)) return;
+    if (!validatePanel(totalSteps())) return;
     if (state.uploading) {
       console.warn('Logo upload still in progress, please wait.');
+      return;
+    }
+    const session = loadSession();
+    if (!sessionValid(session)) {
+      console.error('Session expired before submit.');
+      showAuthGate(true);
       return;
     }
 
@@ -645,15 +681,18 @@
     btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Submitting...';
 
     try {
-      if (!sb) throw new Error('Supabase client not initialised. Check js/supabase-config.js.');
       const payload = buildPayload();
-      const { data, error } = await sb
-        .from('submissions')
-        .insert(payload)
-        .select('id')
-        .single();
-      if (error) throw error;
-      const ref = String(data.id).replace(/-/g, '').substring(0, 8).toUpperCase();
+      const r = await callFn('save-draft', {
+        session_token: session.token,
+        payload,
+        last_step_completed: state.step,
+        finalize: true,
+      });
+      if (!r.ok || !r.data || !r.data.ok) {
+        throw new Error(r.data && r.data.error ? r.data.error : 'Submit failed');
+      }
+      const ref = r.data.ref || (r.data.submission_id ? String(r.data.submission_id).replace(/-/g, '').substring(0, 8).toUpperCase() : '');
+      clearSession();
       showDone(ref);
     } catch (err) {
       console.error('Submission failed:', err);
@@ -662,6 +701,239 @@
       btn.innerHTML = originalLabel;
       if (errEl) errEl.classList.add('vis');
     }
+  }
+
+  // ── Auto-save (silent, per step nav) ──────────────────────────────────────
+  let saveSeq = 0;
+  function setSaveIndicator(state) {
+    const el = document.getElementById('saveInd');
+    if (!el) return;
+    el.classList.remove('saving', 'saved', 'error', 'vis');
+    if (state === 'saving') { el.textContent = 'Saving...'; el.classList.add('vis', 'saving'); }
+    else if (state === 'saved') { el.textContent = 'Saved'; el.classList.add('vis', 'saved'); }
+    else if (state === 'error') { el.textContent = 'Save failed'; el.classList.add('vis', 'error'); }
+  }
+
+  async function autoSave() {
+    const session = loadSession();
+    if (!sessionValid(session)) return;  // silent no-op if not authed yet
+    const seq = ++saveSeq;
+    setSaveIndicator('saving');
+    try {
+      const payload = buildPayload();
+      const r = await callFn('save-draft', {
+        session_token: session.token,
+        payload,
+        last_step_completed: state.step,
+        finalize: false,
+      });
+      if (seq !== saveSeq) return;  // a newer save started, ignore this result
+      if (r.status === 401) {
+        clearSession();
+        setSaveIndicator('error');
+        showAuthGate(true);
+        return;
+      }
+      if (!r.ok || !r.data || !r.data.ok) {
+        setSaveIndicator('error');
+        return;
+      }
+      setSaveIndicator('saved');
+      // Fade after 1.5s
+      setTimeout(() => {
+        const el = document.getElementById('saveInd');
+        if (el) el.classList.remove('vis');
+      }, 1500);
+    } catch (e) {
+      console.warn('autoSave error:', e);
+      setSaveIndicator('error');
+    }
+  }
+
+  // ── Email gate (OTP) ──────────────────────────────────────────────────────
+  let otpEmail = '';
+
+  function showAuthGate(visible) {
+    const gate = document.getElementById('authGate');
+    const wrap = document.getElementById('formWrap');
+    if (gate) gate.style.display = visible ? '' : 'none';
+    if (wrap) wrap.classList.toggle('form-hidden', visible);
+  }
+
+  function showAuthStep(which) {
+    const sEmail = document.getElementById('authStepEmail');
+    const sCode  = document.getElementById('authStepCode');
+    if (sEmail) sEmail.hidden = which !== 'email';
+    if (sCode)  sCode.hidden  = which !== 'code';
+  }
+
+  function setAuthError(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.display = msg ? 'block' : 'none';
+  }
+
+  async function handleSendOtp() {
+    const inp = document.getElementById('authEmail');
+    const btn = document.getElementById('authSendBtn');
+    if (!inp || !btn) return;
+    const email = (inp.value || '').trim();
+    if (!isEmail(email)) { setAuthError('authEmailErr', 'Please enter a valid email address.'); return; }
+    setAuthError('authEmailErr', '');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Sending...';
+    const r = await callFn('send-otp', { email });
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    if (!r.ok || !r.data || !r.data.ok) {
+      setAuthError('authEmailErr', (r.data && r.data.error) || 'Could not send code. Please try again.');
+      return;
+    }
+    otpEmail = email;
+    const sentEl = document.getElementById('authSentEmail');
+    if (sentEl) sentEl.textContent = email;
+    showAuthStep('code');
+    setTimeout(() => {
+      const codeInp = document.getElementById('authCode');
+      if (codeInp) codeInp.focus();
+    }, 50);
+  }
+
+  async function handleVerifyOtp() {
+    const inp = document.getElementById('authCode');
+    const btn = document.getElementById('authVerifyBtn');
+    if (!inp || !btn) return;
+    const code = (inp.value || '').trim();
+    if (!/^\d{6}$/.test(code)) { setAuthError('authCodeErr', 'Code is 6 digits.'); return; }
+    setAuthError('authCodeErr', '');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Verifying...';
+    const r = await callFn('verify-otp', { email: otpEmail, code, plan: PLAN, region: REGION });
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    if (!r.ok || !r.data || !r.data.ok) {
+      setAuthError('authCodeErr', (r.data && r.data.error) || 'Verification failed.');
+      return;
+    }
+    storeSession(r.data.session_token, r.data.session_expires_at, otpEmail);
+    enterForm(r.data.submission, Boolean(r.data.is_returning));
+  }
+
+  function handleResendOrChange() {
+    showAuthStep('email');
+    setAuthError('authEmailErr', '');
+    setAuthError('authCodeErr', '');
+  }
+
+  function bindAuthGate() {
+    const send = document.getElementById('authSendBtn');
+    const verify = document.getElementById('authVerifyBtn');
+    const resend = document.getElementById('authResendBtn');
+    if (send) send.addEventListener('click', handleSendOtp);
+    if (verify) verify.addEventListener('click', handleVerifyOtp);
+    if (resend) resend.addEventListener('click', handleResendOrChange);
+    // Submit-on-enter for both forms
+    const ein = document.getElementById('authEmail');
+    if (ein) ein.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleSendOtp(); } });
+    const cin = document.getElementById('authCode');
+    if (cin) {
+      cin.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleVerifyOtp(); } });
+      cin.addEventListener('input', (e) => {
+        // Strip non-digits, max 6
+        e.target.value = e.target.value.replace(/\D+/g, '').slice(0, 6);
+      });
+    }
+  }
+
+  // ── Hydrate form from saved draft and reveal ──────────────────────────────
+  function hydrateFromSubmission(sub) {
+    if (!sub) return;
+    const setVal = (id, v) => {
+      const el = document.getElementById(id);
+      if (el && v != null && v !== '') el.value = v;
+    };
+    [
+      'studioName','legalName','country','timezone','studioType','address','website',
+      'firstName','lastName','contactPhone','contactRole',
+      'col1t','col2t','signOff','fromName','replyEmail','emailDomain',
+      'smsType','portNum',
+      'seasonName','enrollOpenDate','billingStart','seasonEnd',
+      'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
+      'voiceHours','voiceEscalate','extraNotes',
+    ].forEach((id) => setVal(id, sub[idToColumn(id)]));
+    // Lock the contact email display if it exists in the form (it does in Step 2)
+    const ce = document.getElementById('contactEmail');
+    if (ce && sub.contact_email) {
+      ce.value = sub.contact_email;
+      ce.readOnly = true;
+      ce.style.background = 'var(--g1)';
+    }
+    // Restore setup type if present
+    if (sub.setup_type) selectSetup(sub.setup_type);
+    // Restore yn states
+    if (sub.custom_domain != null) {
+      const btn = document.querySelector('[data-yn="dns"][data-val="' + (sub.custom_domain ? 'true' : 'false') + '"]');
+      if (btn) handleYn(btn);
+    }
+    if (sub.season_active != null) {
+      const btn = document.querySelector('[data-yn="season"][data-val="' + (sub.season_active ? 'true' : 'false') + '"]');
+      if (btn) handleYn(btn);
+    }
+    if (sub.kb_price_quoting != null) {
+      const btn = document.querySelector('[data-yn="quotePrice"][data-val="' + (sub.kb_price_quoting ? 'true' : 'false') + '"]');
+      if (btn) handleYn(btn);
+    }
+    // Restore workflow checkboxes
+    if (Array.isArray(sub.active_workflows)) {
+      $$('input[data-workflow]').forEach((cb) => {
+        cb.checked = sub.active_workflows.indexOf(cb.value) >= 0;
+        const lbl = cb.closest('.tg');
+        if (lbl) lbl.classList.toggle('chk', cb.checked);
+      });
+    }
+    if (Array.isArray(sub.lead_sources)) {
+      $$('input[data-lead]').forEach((cb) => {
+        cb.checked = sub.lead_sources.indexOf(cb.value) >= 0;
+        const lbl = cb.closest('.tg');
+        if (lbl) lbl.classList.toggle('chk', cb.checked);
+      });
+    }
+    if (sub.logo_url) state.logoUrl = sub.logo_url;
+    applyCountryToTimezone();
+  }
+
+  // Mapping JS field IDs (camelCase) to DB column names (snake_case)
+  function idToColumn(id) {
+    const map = {
+      studioName: 'studio_name', legalName: 'legal_name', studioType: 'studio_type',
+      firstName: 'first_name', lastName: 'last_name', contactPhone: 'contact_phone',
+      contactRole: 'role', col1t: 'primary_colour', col2t: 'secondary_colour',
+      signOff: 'sign_off', fromName: 'from_name', replyEmail: 'reply_email',
+      emailDomain: 'email_domain', smsType: 'sms_type', portNum: 'port_number',
+      seasonName: 'season_name', enrollOpenDate: 'enrol_open_date',
+      billingStart: 'billing_start', seasonEnd: 'season_end',
+      'kb-profile': 'kb_profile', 'kb-classes': 'kb_classes', 'kb-pricing': 'kb_pricing',
+      'kb-policies': 'kb_policies', 'kb-events': 'kb_events', 'kb-restricted': 'kb_restricted',
+      'kb-tone': 'kb_tone', voiceHours: 'voice_hours', voiceEscalate: 'voice_escalate',
+      extraNotes: 'extra_notes',
+    };
+    return map[id] || id;
+  }
+
+  function enterForm(submission, isReturning) {
+    // Hide gate, reveal form
+    showAuthGate(false);
+    if (submission) hydrateFromSubmission(submission);
+    if (isReturning) {
+      const banner = document.getElementById('restoredBanner');
+      if (banner) banner.classList.add('vis');
+    }
+    // Jump to last completed step (or 1 for new)
+    const target = Math.max(1, Math.min(totalSteps(), (submission && submission.last_step_completed) || 1));
+    goTo(target);
   }
 
   // ── ARIA wiring for field-level errors ────────────────────────────────────
@@ -749,11 +1021,12 @@
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
-  function init() {
+  async function init() {
     wireFieldErrors();
     renderSetupCards();
     applyRegionDefaults();
     bindEvents();
+    bindAuthGate();
     // Plan is locked by the URL the form is served from. No selectPlan call here.
     selectSetup('dfy');
     const c1 = document.getElementById('col1t');
@@ -765,7 +1038,36 @@
       const btns = $$('.yn-b', group);
       btns.forEach((b, i) => { b.tabIndex = i === 0 ? 0 : -1; });
     });
-    goTo(1);
+
+    // Auth check: existing session in localStorage?
+    const session = loadSession();
+    if (sessionValid(session)) {
+      // Try to resume by calling save-draft with empty payload to validate session.
+      // verify-otp returns the submission, but that requires a fresh OTP. Instead,
+      // we ping save-draft (which returns 401 on stale session). On success the
+      // session is alive but we don't get the draft data back. So we only rely on
+      // localStorage to skip the gate; for hydration we need a fresh verify-otp.
+      // Simplest: trust the session if not expired, reveal the form, jump to step 1.
+      // Returning studios with stale data should re-enter email + OTP.
+      const r = await callFn('save-draft', {
+        session_token: session.token,
+        payload: {},
+        last_step_completed: 0,
+        finalize: false,
+      });
+      if (r.ok && r.data && r.data.ok) {
+        showAuthGate(false);
+        goTo(1);
+        return;
+      } else {
+        clearSession();
+      }
+    }
+
+    // No valid session: show gate, hide form
+    showAuthGate(true);
+    showAuthStep('email');
+    goTo(1); // ready underneath the gate
   }
 
   if (document.readyState === 'loading') {
