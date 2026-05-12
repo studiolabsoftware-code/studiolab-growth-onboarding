@@ -295,7 +295,7 @@
     </div>
 
     <div class="cards-grid">
-    <div class="card">
+      <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🎨</div>Brand colours</div>
       <div class="brand-cols">
         <div class="brand-col">
@@ -317,7 +317,26 @@
       <div class="brand-cols-hint">Applied to email headers, buttons, and accents. Send a screenshot if you are unsure of your hex.</div>
     </div>
 
-    <div class="card">
+      <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">✉️</div>Sender configuration</div>
+      <div class="co co-blue">These control how your emails appear in families' inboxes. The <strong>From name</strong> is what they see first, and the <strong>Reply-to email</strong> is where replies go. Get these right and your emails feel personal, not automated.</div>
+      <div class="fr">
+        <div class="f">
+          <label for="fromName">From name <span class="req">*</span></label>
+          <input type="text" id="fromName" data-required placeholder="e.g. Sarah at Dance Academy">
+          <span class="field-note">This is what appears as the sender name in the inbox. Keep it personal: first name or first name plus studio works best.</span>
+          <span class="field-err">Please enter a From name.</span>
+        </div>
+        <div class="f">
+          <label for="replyEmail">Reply-to email address <span class="req">*</span></label>
+          <input type="email" id="replyEmail" data-required placeholder="hello@yourstudio.com">
+          <span class="field-note">Where family replies will go. Usually your main studio email.</span>
+          <span class="field-err">Please enter a valid reply-to email.</span>
+        </div>
+      </div>
+    </div>
+
+      <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">✍️</div>Email sign-off</div>
       <div class="sig-rows">
         <div class="f">
@@ -337,28 +356,7 @@
       <input type="hidden" id="signOff">
     </div>
 
-    
-
-    <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">✉️</div>Sender configuration</div>
-      <div class="co co-blue">These control how your emails appear in families' inboxes. The <strong>From name</strong> is what they see first, and the <strong>Reply-to email</strong> is where replies go. Get these right and your emails feel personal, not automated.</div>
-      <div class="fr">
-        <div class="f">
-          <label for="fromName">From name <span class="req">*</span></label>
-          <input type="text" id="fromName" data-required placeholder="e.g. Sarah at Dance Academy">
-          <span class="field-note">This is what appears as the sender name in the inbox. Keep it personal: first name or first name plus studio works best.</span>
-          <span class="field-err">Please enter a From name.</span>
-        </div>
-        <div class="f">
-          <label for="replyEmail">Reply-to email address <span class="req">*</span></label>
-          <input type="email" id="replyEmail" data-required placeholder="hello@yourstudio.com">
-          <span class="field-note">Where family replies will go. Usually your main studio email.</span>
-          <span class="field-err">Please enter a valid reply-to email.</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
+      <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🌐</div>Custom email domain</div>
       <div class="co co-amber"><strong>Strongly recommended.</strong> Sending from your own domain (e.g. @yourstudio.com) significantly improves deliverability and prevents emails landing in spam. Requires a DNS record change. We provide the exact records to add.</div>
       <div class="f">
