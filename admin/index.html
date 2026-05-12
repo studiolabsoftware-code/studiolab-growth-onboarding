@@ -34,23 +34,25 @@
 </header>
 
 <!-- ── Login view ──────────────────────────────────────────────────────── -->
-<section class="adm-login" id="loginView" aria-labelledby="loginHeading">
-  <div class="adm-login-card">
-    <h2 id="loginHeading" class="adm-login-title">Admin sign in</h2>
-    <p class="adm-login-desc">Enter your admin email. We will send you a one-time link to sign in.</p>
+<section class="auth-gate adm-login" id="loginView" aria-labelledby="loginHeading">
+  <div class="auth-card">
+    <div class="auth-icon" aria-hidden="true"><img src="../assets/growth-logo.svg" alt="StudioLAB Growth"></div>
+    <h2 class="auth-title" id="loginHeading">Welcome back, team</h2>
+    <p class="auth-desc">Sign in with your admin email and we will send you a one-time link. No password needed.</p>
 
-    <form id="loginStep1" novalidate>
+    <form id="loginStep1" class="auth-step" novalidate>
       <div class="f">
-        <label for="loginEmail">Email address</label>
+        <label for="loginEmail">Your admin email address</label>
         <input type="email" id="loginEmail" placeholder="you@studiolabgrowth.com" autocomplete="email" aria-describedby="loginEmailErr" required>
         <span class="field-err" id="loginEmailErr">Please enter a valid admin email.</span>
       </div>
-      <button type="submit" class="btn btn-p" id="loginSend">Send sign-in link</button>
+      <button type="submit" class="btn btn-p auth-btn" id="loginSend">Send sign-in link</button>
+      <p class="auth-helper">We email a single-use link that signs you in instantly. The link expires after a few minutes.</p>
     </form>
 
-    <div id="loginStep2" style="display:none">
-      <p class="adm-login-sent" role="status">Check your email for the sign-in link. You can close this tab once you have clicked it.</p>
-      <button type="button" class="btn-link" id="loginRetry">Use a different email</button>
+    <div id="loginStep2" class="auth-step" style="display:none">
+      <p class="auth-sent" role="status">Check your inbox for the sign-in link. Click it from this device to open the dashboard.</p>
+      <button type="button" class="auth-resend" id="loginRetry">Use a different email</button>
     </div>
 
     <div class="submit-err" id="loginErr" role="alert">We could not send the link. Please check the email and try again.</div>
