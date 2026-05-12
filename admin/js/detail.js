@@ -21,6 +21,16 @@
   const rawList = (v) => Array.isArray(v) && v.length ? v.join(', ') : '';
 
   let current = null;
+  let currentAssignment = null;
+  let currentAssignees = [];
+
+  const ASSIGNMENT_STATUS_LABEL = {
+    assigned: 'Assigned',
+    in_progress: 'In progress',
+    needs_recheck: 'Needs re-check',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+  };
 
   async function open(id) {
     const client = sb(); if (!client) return;
@@ -28,16 +38,26 @@
     const screen = document.getElementById('detailScreen');
     screen.innerHTML = '<div class="adm-empty" style="padding:60px">Loading...</div>';
 
-    const [{ data: sub, error }, { data: notes }, { data: log }] = await Promise.all([
+    const [{ data: sub, error }, { data: notes }, { data: log }, { data: assignees }, { data: assignment }] = await Promise.all([
       client.from('submissions').select('*').eq('id', id).single(),
       client.from('admin_notes').select('*').eq('submission_id', id).order('created_at', { ascending: false }),
       client.from('activity_log').select('*').eq('submission_id', id).order('created_at', { ascending: false }),
+      client.from('admin_users').select('id, name, email, role, is_active').eq('is_active', true).order('name'),
+      client.from('submission_assignments')
+        .select('id, admin_user_id, status, assigned_at, last_sent_at, completed_at, notes')
+        .eq('submission_id', id)
+        .in('status', ['assigned','in_progress','needs_recheck'])
+        .order('assigned_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
     if (error || !sub) {
       screen.innerHTML = '<div class="adm-empty">Could not load this submission.</div>';
       return;
     }
     current = sub;
+    currentAssignment = assignment || null;
+    currentAssignees = (assignees || []).filter((a) => a.role !== 'owner' || a.is_active);
     render(sub, notes || [], log || []);
 
     // Log a 'viewed' activity (best-effort)
@@ -162,10 +182,7 @@
                     `<option value="${s}"${s === sub.status ? ' selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}
                 </select>
               </div>
-              <div class="det-field">
-                <label for="detAssign">Assigned to</label>
-                <input type="text" id="detAssign" value="${ESC(sub.assigned_to || '')}" placeholder="email or name">
-              </div>
+              ${assignmentBlock()}
               ${sheetSyncRow(sub)}
             </div>
           </div>
@@ -194,7 +211,7 @@
 
     document.getElementById('detBack').addEventListener('click', () => window.AdminDashboard.showList());
     document.getElementById('detStatus').addEventListener('change', (e) => updateField('status', e.target.value));
-    document.getElementById('detAssign').addEventListener('change', (e) => updateField('assigned_to', e.target.value || null));
+    bindAssignmentControls();
     document.getElementById('detAddNote').addEventListener('click', addNote);
     document.getElementById('detChangeReq').addEventListener('click', () => window.AdminChangeRequest.open(sub));
     const delBtn = document.getElementById('detDelete');
@@ -398,6 +415,177 @@
       items.map((i) => `<li>${ESC(i)}</li>`).join('') + '</ul>';
   }
 
+  function assignmentBlock() {
+    const profile = window.AdminAuth?.profile;
+    const myRole = profile?.role || 'admin';
+    const canManage = myRole === 'owner' || myRole === 'admin';
+    const isAssignee = !!(profile && currentAssignment && currentAssignment.admin_user_id === profile.id);
+
+    const a = currentAssignment;
+    const assigneeName = a ? (currentAssignees.find((x) => x.id === a.admin_user_id)?.name || 'Unknown') : '';
+    const statusLabel = a ? (ASSIGNMENT_STATUS_LABEL[a.status] || a.status) : 'Unassigned';
+    const statusBdgClass = a ? `bdg-asgn-${a.status}` : 'bdg-asgn-none';
+    const assignedAt = a?.assigned_at ? new Date(a.assigned_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+    const dropdown = canManage ? `
+      <div class="det-field">
+        <label for="detAssignee">Assigned to</label>
+        <select id="detAssignee">
+          <option value="">— Unassigned —</option>
+          ${currentAssignees.map((u) => `
+            <option value="${ESC(u.id)}"${a && a.admin_user_id === u.id ? ' selected' : ''}>
+              ${ESC(u.name)} (${ESC(u.role)})
+            </option>`).join('')}
+        </select>
+      </div>` : `
+      <div class="det-field">
+        <label>Assigned to</label>
+        <div class="det-static">${a ? ESC(assigneeName) : '<span class="empty">Unassigned</span>'}</div>
+      </div>`;
+
+    const statusBlock = a ? `
+      <div class="det-field">
+        <label>Assignment status</label>
+        <div class="det-asgn-status">
+          <span class="bdg ${statusBdgClass}">${ESC(statusLabel)}</span>
+          <span class="det-asgn-since">since ${ESC(assignedAt)}</span>
+        </div>
+      </div>` : '';
+
+    // VAs viewing their own assignment can advance the status. Admins can too.
+    const showVaControls = a && (isAssignee || canManage);
+    const vaControls = showVaControls ? `
+      <div class="det-field det-asgn-actions">
+        <label>Update assignment status</label>
+        <div class="det-asgn-btns">
+          ${a.status !== 'in_progress' ? '<button type="button" class="btn btn-g" data-asgn-action="in_progress">Mark in progress</button>' : ''}
+          ${a.status !== 'completed' ? '<button type="button" class="btn btn-p" data-asgn-action="completed">Mark completed</button>' : ''}
+          ${a.status !== 'needs_recheck' ? '<button type="button" class="btn btn-g" data-asgn-action="needs_recheck">Flag needs re-check</button>' : ''}
+        </div>
+      </div>` : '';
+
+    return dropdown + statusBlock + vaControls;
+  }
+
+  function bindAssignmentControls() {
+    const select = document.getElementById('detAssignee');
+    if (select) select.addEventListener('change', (e) => changeAssignee(e.target.value || null));
+    document.querySelectorAll('[data-asgn-action]').forEach((btn) => {
+      btn.addEventListener('click', () => updateAssignmentStatus(btn.dataset.asgnAction));
+    });
+  }
+
+  async function changeAssignee(adminUserId) {
+    const client = sb();
+    const profile = window.AdminAuth?.profile;
+
+    // Unassign path: cancel the current active assignment
+    if (!adminUserId) {
+      if (!currentAssignment) return;
+      const { error } = await client.from('submission_assignments')
+        .update({ status: 'cancelled' })
+        .eq('id', currentAssignment.id);
+      if (error) { window.alert('Could not unassign: ' + error.message); return; }
+      await client.from('submissions').update({ assigned_to: null }).eq('id', current.id);
+      await client.from('activity_log').insert({
+        submission_id: current.id, action: 'assigned',
+        actor: window.AdminAuth.currentUser || 'admin',
+        details: { from: currentAssignment.admin_user_id, to: null },
+      });
+      currentAssignment = null;
+      await refreshAssignmentBlock();
+      return;
+    }
+
+    // Assign path: insert a new active row; the BEFORE INSERT trigger cancels prior active.
+    const { data: inserted, error } = await client.from('submission_assignments').insert({
+      submission_id: current.id,
+      admin_user_id: adminUserId,
+      assigned_by: profile?.id || null,
+      status: 'assigned',
+    }).select('*').single();
+    if (error) { window.alert('Could not assign: ' + error.message); return; }
+
+    // Mirror to legacy free-text field so existing dashboard cards and Sheet sync keep working.
+    const assignee = currentAssignees.find((u) => u.id === adminUserId);
+    await client.from('submissions').update({ assigned_to: assignee?.email || null }).eq('id', current.id);
+
+    await client.from('activity_log').insert({
+      submission_id: current.id, action: 'assigned',
+      actor: window.AdminAuth.currentUser || 'admin',
+      details: { to: assignee?.email || null, name: assignee?.name || null },
+    });
+    currentAssignment = inserted;
+    await refreshAssignmentBlock();
+    refreshTimeline();
+  }
+
+  async function updateAssignmentStatus(nextStatus) {
+    if (!currentAssignment) return;
+    const client = sb();
+    const profile = window.AdminAuth?.profile;
+    const isVa = profile?.role === 'va';
+    const isAssignee = profile && currentAssignment.admin_user_id === profile.id;
+
+    let error = null;
+    if (isVa && isAssignee) {
+      // VA self-update via RPC
+      const r = await client.rpc('va_update_my_assignment', {
+        p_assignment_id: currentAssignment.id, p_status: nextStatus,
+      });
+      error = r.error;
+    } else {
+      // Owner/admin direct update via RLS
+      const r = await client.from('submission_assignments')
+        .update({ status: nextStatus })
+        .eq('id', currentAssignment.id);
+      error = r.error;
+    }
+    if (error) { window.alert('Could not update: ' + error.message); return; }
+
+    // Refresh assignment from server (completed_at gets set by trigger)
+    const { data: refreshed } = await client.from('submission_assignments')
+      .select('id, admin_user_id, status, assigned_at, last_sent_at, completed_at, notes')
+      .eq('id', currentAssignment.id).maybeSingle();
+    currentAssignment = refreshed && (refreshed.status !== 'cancelled' && refreshed.status !== 'completed') ? refreshed : (refreshed?.status === 'completed' ? null : currentAssignment);
+
+    // If completed, drop the legacy assigned_to field too
+    if (nextStatus === 'completed') {
+      await client.from('submissions').update({ assigned_to: null }).eq('id', current.id);
+      currentAssignment = null;
+    }
+
+    await client.from('activity_log').insert({
+      submission_id: current.id, action: 'assignment_status_changed',
+      actor: window.AdminAuth.currentUser || 'admin',
+      details: { to: nextStatus },
+    });
+    await refreshAssignmentBlock();
+    refreshTimeline();
+  }
+
+  async function refreshAssignmentBlock() {
+    // Re-fetch and re-render only the Manage section pieces we control.
+    const client = sb();
+    const { data: assignment } = await client.from('submission_assignments')
+      .select('id, admin_user_id, status, assigned_at, last_sent_at, completed_at, notes')
+      .eq('submission_id', current.id)
+      .in('status', ['assigned','in_progress','needs_recheck'])
+      .order('assigned_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    currentAssignment = assignment || null;
+    // Re-render the whole Manage section by re-rendering the screen
+    render(current, [], []);
+    // Notes/timeline weren't passed — refetch them
+    const [{ data: notes }, { data: log }] = await Promise.all([
+      client.from('admin_notes').select('*').eq('submission_id', current.id).order('created_at', { ascending: false }),
+      client.from('activity_log').select('*').eq('submission_id', current.id).order('created_at', { ascending: false }),
+    ]);
+    renderNotes(notes || []);
+    renderTimeline(log || []);
+  }
+
   function sheetSyncRow(sub) {
     if (sub.status === 'draft') return '';
     let label;
@@ -562,6 +750,7 @@
     change_request_completed: 'Studio completed change request',
     note_added: 'Note added',
     assigned: 'Reassigned',
+    assignment_status_changed: 'Assignment status changed',
     plan_changed: 'Plan changed',
   };
 

@@ -238,3 +238,16 @@ body.adm-modal-open { overflow: hidden; }
 /* VAs don't operate the sheet-sync, preview, or change-request tooling. */
 body.role-va .adm-sheet-sync,
 body.role-va .adm-preview-link { display: none !important; }
+
+/* ── Assignment badges & detail block ──────────────── */
+.bdg-asgn-assigned       { background: var(--in-l); color: var(--in); }
+.bdg-asgn-in_progress    { background: var(--bl-l, #DBEAFE); color: var(--bl-d, #1E40AF); }
+.bdg-asgn-needs_recheck  { background: var(--am-l); color: var(--am); }
+.bdg-asgn-completed      { background: var(--gr-l, #D1FAE5); color: var(--gr-d, #047857); }
+.bdg-asgn-cancelled      { background: var(--g1); color: var(--g6); border: 1px solid var(--g2); }
+
+.det-asgn-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.det-asgn-since { font-size: 11px; color: var(--g6); }
+.det-static { padding: 8px 0; font-size: 13px; color: var(--g8); }
+.det-asgn-actions .det-asgn-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.det-asgn-actions .btn { font-size: 12px; padding: 6px 12px; min-height: 32px; }

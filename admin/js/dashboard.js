@@ -98,21 +98,53 @@
 
   async function loadRows() {
     const client = sb(); if (!client) return;
+
+    const profile = window.AdminAuth?.profile;
+    const isVa = profile?.role === 'va';
+
+    // For VAs, restrict to submissions they have an active assignment on.
+    let allowedIds = null;
+    if (isVa) {
+      const { data: ids } = await client.rpc('my_assigned_submission_ids');
+      allowedIds = (ids || []).map((row) => row.my_assigned_submission_ids || row);
+      if (!allowedIds.length) {
+        state.rows = [];
+        render();
+        renderSheetSyncStatus();
+        return;
+      }
+    }
+
     let q = client
       .from('submissions')
       .select('id, created_at, last_saved_at, status, assigned_to, plan, region, setup_type, studio_name, contact_email, first_name, last_name, sheets_synced_at, sheets_sync_error')
       .order('created_at', { ascending: false });
-
-    // VAs only see submissions assigned to them (matched on email for now —
-    // Phase 2 will replace this with a proper assignments table).
-    const profile = window.AdminAuth?.profile;
-    if (profile?.role === 'va') {
-      q = q.ilike('assigned_to', profile.email);
-    }
+    if (allowedIds) q = q.in('id', allowedIds);
 
     const { data, error } = await q;
     if (error) { console.error(error); return; }
-    state.rows = data || [];
+
+    // Pull active assignments alongside so the cards can show assignee name + status.
+    const subIds = (data || []).map((r) => r.id);
+    let assignmentMap = {};
+    if (subIds.length) {
+      const { data: asgns } = await client.from('submission_assignments')
+        .select('submission_id, admin_user_id, status, assigned_at')
+        .in('submission_id', subIds)
+        .in('status', ['assigned','in_progress','needs_recheck']);
+      const { data: users } = await client.from('admin_users')
+        .select('id, name, email');
+      const userById = {};
+      (users || []).forEach((u) => { userById[u.id] = u; });
+      (asgns || []).forEach((a) => {
+        assignmentMap[a.submission_id] = {
+          status: a.status,
+          assignee: userById[a.admin_user_id],
+        };
+      });
+    }
+
+    state.rows = (data || []).map((r) => ({ ...r, _assignment: assignmentMap[r.id] || null }));
     render();
     renderSheetSyncStatus();
   }
@@ -276,6 +308,16 @@
     const region = (r.region || 'AU').toUpperCase();
     const planLabel = PLAN_LABEL[r.plan] || r.plan || '—';
     const setupLabel = r.setup_type ? (SETUP_LABEL[r.setup_type] || r.setup_type) : 'Setup TBD';
+
+    const asgn = r._assignment;
+    let asgnBadge = '';
+    if (asgn && asgn.assignee) {
+      const aStatusLabel = ASSIGNMENT_STATUS_LABEL[asgn.status] || asgn.status;
+      asgnBadge = `<span class="bdg bdg-asgn-${asgn.status}" title="${escapeHtml(aStatusLabel)}">${escapeHtml(asgn.assignee.name)} · ${escapeHtml(aStatusLabel)}</span>`;
+    } else if (r.assigned_to) {
+      asgnBadge = `<span class="bdg bdg-setup">Assigned: ${escapeHtml(r.assigned_to)}</span>`;
+    }
+
     return `
       <div class="sub-card" data-id="${escapeHtml(r.id)}" tabindex="0" role="button" aria-label="${escapeHtml(r.studio_name || r.contact_email || 'Untitled')}">
         <div class="sc-row1">
@@ -285,10 +327,18 @@
         <div class="sc-meta">${escapeHtml(contact)}<br>${escapeHtml(date)} · ${region} · ${escapeHtml(setupLabel)}</div>
         <div class="sc-badges">
           <span class="bdg bdg-st-${r.status}">${escapeHtml(STATUS_LABEL[r.status] || r.status)}</span>
-          ${r.assigned_to ? `<span class="bdg bdg-setup">Assigned: ${escapeHtml(r.assigned_to)}</span>` : ''}
+          ${asgnBadge}
         </div>
       </div>`;
   }
+
+  const ASSIGNMENT_STATUS_LABEL = {
+    assigned: 'Assigned',
+    in_progress: 'In progress',
+    needs_recheck: 'Needs re-check',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+  };
 
   function openPreviewPicker() {
     const baseHtml = `
