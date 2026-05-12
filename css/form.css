@@ -474,3 +474,8 @@ select {
 @media (max-width: 480px) {
   .auth-card .auth-icon img { height: 32px; }
 }
+
+/* Admin preview banner (shown when ?preview=1 is in the URL) */
+.preview-banner { background: linear-gradient(90deg, var(--mg), var(--in)); color: #fff; padding: 10px 16px; font-size: 12px; text-align: center; font-weight: 500; letter-spacing: 0.2px; position: sticky; top: 0; z-index: 100; }
+.preview-banner strong { font-weight: 700; }
+.preview-banner a { color: #fff; }

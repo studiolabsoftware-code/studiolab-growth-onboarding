@@ -1,5 +1,5 @@
-/* Admin dashboard: submissions list with filter, search, realtime updates,
-   and row-click → detail view. */
+/* Admin dashboard: stats per stage + grouped submission cards by status.
+   Realtime updates via Supabase Realtime. */
 
 (function () {
   'use strict';
@@ -12,15 +12,21 @@
     changes_requested: 'Changes requested',
     setup_in_progress: 'Setup in progress',
     complete: 'Complete',
+    draft: 'Draft (not submitted)',
   };
   const PLAN_LABEL = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
   const SETUP_LABEL = { dfy: 'Done-For-You', guided: 'Guided' };
 
+  // Visible groups in order. 'complete' is hidden by default behind a toggle.
+  const VISIBLE_GROUPS = ['submitted', 'in_review', 'changes_requested', 'setup_in_progress'];
+  const STAT_GROUPS = ['submitted', 'in_review', 'changes_requested', 'setup_in_progress', 'complete'];
+
   const state = {
     rows: [],
-    filter: 'all',
+    plan: 'all',
     search: '',
-    sub: null,
+    showCompleted: false,
+    showDrafts: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -36,11 +42,11 @@
     if (window._dashboardBound) return;
     window._dashboardBound = true;
 
-    $('statusPills').addEventListener('click', (e) => {
+    $('planPills').addEventListener('click', (e) => {
       const pill = e.target.closest('.pill');
       if (!pill) return;
-      state.filter = pill.dataset.filter;
-      document.querySelectorAll('#statusPills .pill').forEach((p) => {
+      state.plan = pill.dataset.plan;
+      document.querySelectorAll('#planPills .pill').forEach((p) => {
         const isActive = p === pill;
         p.classList.toggle('active', isActive);
         p.setAttribute('aria-pressed', isActive ? 'true' : 'false');
@@ -53,17 +59,36 @@
       render();
     });
 
-    $('subsBody').addEventListener('click', (e) => {
-      const tr = e.target.closest('tr[data-id]');
-      if (tr && window.AdminDetail) window.AdminDetail.open(tr.dataset.id);
+    // Open preview when link is clicked — small dialog with six URLs
+    $('previewLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      openPreviewPicker();
     });
 
-    $('subsBody').addEventListener('keydown', (e) => {
-      const tr = e.target.closest('tr[data-id]');
-      if (!tr) return;
+    // Delegated handlers for group expand toggles and submission card clicks
+    $('groupsContainer').addEventListener('click', (e) => {
+      const toggle = e.target.closest('[data-toggle-completed]');
+      if (toggle) {
+        state.showCompleted = !state.showCompleted;
+        render();
+        return;
+      }
+      const draftsToggle = e.target.closest('[data-toggle-drafts]');
+      if (draftsToggle) {
+        state.showDrafts = !state.showDrafts;
+        render();
+        return;
+      }
+      const card = e.target.closest('.sub-card[data-id]');
+      if (card && window.AdminDetail) window.AdminDetail.open(card.dataset.id);
+    });
+
+    $('groupsContainer').addEventListener('keydown', (e) => {
+      const card = e.target.closest('.sub-card[data-id]');
+      if (!card) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        if (window.AdminDetail) window.AdminDetail.open(tr.dataset.id);
+        if (window.AdminDetail) window.AdminDetail.open(card.dataset.id);
       }
     });
   }
@@ -72,7 +97,7 @@
     const client = sb(); if (!client) return;
     const { data, error } = await client
       .from('submissions')
-      .select('id, created_at, status, assigned_to, plan, setup_type, studio_name, contact_email, first_name, last_name')
+      .select('id, created_at, last_saved_at, status, assigned_to, plan, region, setup_type, studio_name, contact_email, first_name, last_name')
       .order('created_at', { ascending: false });
     if (error) { console.error(error); return; }
     state.rows = data || [];
@@ -94,38 +119,143 @@
     if (id && window.AdminDetail) window.AdminDetail.open(id);
   }
 
+  function matchesFilters(r) {
+    if (state.plan !== 'all' && r.plan !== state.plan) return false;
+    if (!state.search) return true;
+    const hay = [r.studio_name, r.contact_email, r.first_name, r.last_name, r.assigned_to].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(state.search);
+  }
+
   function render() {
-    const body = $('subsBody');
-    const filtered = state.rows.filter((r) => {
-      if (state.filter !== 'all' && r.status !== state.filter) return false;
-      if (!state.search) return true;
-      const hay = [r.studio_name, r.contact_email, r.first_name, r.last_name, r.assigned_to].filter(Boolean).join(' ').toLowerCase();
-      return hay.includes(state.search);
+    renderStats();
+    renderGroups();
+  }
+
+  function renderStats() {
+    const counts = STAT_GROUPS.reduce((m, s) => (m[s] = 0, m), {});
+    counts.draft = 0;
+    state.rows.forEach((r) => {
+      if (counts[r.status] !== undefined) counts[r.status]++;
+    });
+    const html = STAT_GROUPS.map((s) => `
+      <div class="stat-card st-${s}">
+        <div class="stat-label">${escapeHtml(STATUS_LABEL[s])}</div>
+        <div class="stat-count">${counts[s]}</div>
+      </div>`).join('');
+    $('statsRow').innerHTML = html;
+  }
+
+  function renderGroups() {
+    const container = $('groupsContainer');
+    const filtered = state.rows.filter(matchesFilters);
+
+    // Group rows by status
+    const byStatus = {};
+    filtered.forEach((r) => {
+      const k = r.status || 'submitted';
+      (byStatus[k] = byStatus[k] || []).push(r);
     });
 
-    if (!filtered.length) {
-      body.innerHTML = '<tr><td colspan="7" class="adm-empty">No submissions match.</td></tr>';
-      return;
+    let html = '';
+    VISIBLE_GROUPS.forEach((s) => {
+      html += groupBlock(s, byStatus[s] || []);
+    });
+
+    // Completed group: collapsible
+    const completed = byStatus.complete || [];
+    const completedCount = completed.length;
+    html += `
+      <div class="completed-toggle">
+        <button type="button" data-toggle-completed>${state.showCompleted ? 'Hide' : 'Show'} completed (${completedCount})</button>
+      </div>`;
+    if (state.showCompleted) {
+      html += groupBlock('complete', completed);
     }
 
-    body.innerHTML = filtered.map((r) => {
-      const date = new Date(r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
-      const contact = [r.first_name, r.last_name].filter(Boolean).join(' ');
-      const label = `${r.studio_name || 'Untitled'}, ${PLAN_LABEL[r.plan] || r.plan} plan, ${STATUS_LABEL[r.status] || r.status}`;
-      return `
-        <tr data-id="${r.id}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
-          <td class="studio-cell">
-            <div>${escapeHtml(r.studio_name || 'Untitled')}</div>
-            <div class="muted" style="font-size:11px;color:var(--g6);font-weight:400;margin-top:2px;">${escapeHtml(contact)}</div>
-          </td>
-          <td><span class="bdg bdg-plan-${r.plan}">${PLAN_LABEL[r.plan] || r.plan}</span></td>
-          <td><span class="bdg bdg-setup">${SETUP_LABEL[r.setup_type] || r.setup_type}</span></td>
-          <td><span class="bdg bdg-st-${r.status}">${STATUS_LABEL[r.status] || r.status}</span></td>
-          <td class="muted">${escapeHtml(r.assigned_to || 'Unassigned')}</td>
-          <td class="muted">${escapeHtml(date)}</td>
-          <td class="muted" aria-hidden="true">›</td>
-        </tr>`;
-    }).join('');
+    // Drafts (unsubmitted): always collapsible, hidden by default
+    const drafts = byStatus.draft || [];
+    if (drafts.length) {
+      html += `
+        <div class="completed-toggle">
+          <button type="button" data-toggle-drafts>${state.showDrafts ? 'Hide' : 'Show'} drafts (${drafts.length})</button>
+        </div>`;
+      if (state.showDrafts) {
+        html += groupBlock('draft', drafts);
+      }
+    }
+
+    container.innerHTML = html || '<div class="adm-empty" style="padding:40px 0;">No submissions match.</div>';
+  }
+
+  function groupBlock(status, rows) {
+    const isEmpty = !rows.length;
+    return `
+      <div class="group-block${isEmpty ? ' empty' : ''}">
+        <div class="group-hdr">
+          <span>${escapeHtml(STATUS_LABEL[status] || status)}</span>
+          <span class="group-count">${rows.length}</span>
+        </div>
+        <div class="group-body">
+          ${isEmpty ? 'No submissions in this stage.' : rows.map(subCard).join('')}
+        </div>
+      </div>`;
+  }
+
+  function subCard(r) {
+    const date = new Date(r.last_saved_at || r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    const contact = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.contact_email || 'No contact yet';
+    const region = (r.region || 'AU').toUpperCase();
+    const planLabel = PLAN_LABEL[r.plan] || r.plan || '—';
+    const setupLabel = r.setup_type ? (SETUP_LABEL[r.setup_type] || r.setup_type) : 'Setup TBD';
+    return `
+      <div class="sub-card" data-id="${escapeHtml(r.id)}" tabindex="0" role="button" aria-label="${escapeHtml(r.studio_name || r.contact_email || 'Untitled')}">
+        <div class="sc-row1">
+          <span class="sc-name">${escapeHtml(r.studio_name || r.contact_email || 'Untitled')}</span>
+          <span class="bdg bdg-plan-${r.plan || 'launch'}">${escapeHtml(planLabel)}</span>
+        </div>
+        <div class="sc-meta">${escapeHtml(contact)}<br>${escapeHtml(date)} · ${region} · ${escapeHtml(setupLabel)}</div>
+        <div class="sc-badges">
+          <span class="bdg bdg-st-${r.status}">${escapeHtml(STATUS_LABEL[r.status] || r.status)}</span>
+          ${r.assigned_to ? `<span class="bdg bdg-setup">Assigned: ${escapeHtml(r.assigned_to)}</span>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function openPreviewPicker() {
+    const baseHtml = `
+      <div class="adm-modal" id="previewModal">
+        <div class="adm-modal-backdrop" data-action="close-preview"></div>
+        <div class="adm-modal-card" role="dialog" aria-modal="true" aria-labelledby="prevTitle">
+          <div class="adm-modal-hdr">
+            <h2 id="prevTitle" class="adm-modal-title">Preview a studio form</h2>
+            <button type="button" class="adm-modal-close" data-action="close-preview" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+          </div>
+          <div class="adm-modal-body">
+            <p style="margin:0 0 14px;font-size:13px;color:var(--g6);line-height:1.55;">Open any of the six studio onboarding forms with the gate bypassed. You can cycle through every step without filling in your email. Nothing you do here is saved.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              ${['au','us'].flatMap((r) => ['launch','scale','ai'].map((p) => {
+                const label = (r === 'au' ? 'AU' : 'US') + ' · ' + PLAN_LABEL[p];
+                return `<a class="picker-card" target="_blank" rel="noopener" href="/${r}/${p}/?preview=1"><span><strong>${label}</strong></span></a>`;
+              })).join('')}
+            </div>
+          </div>
+          <div class="adm-modal-ftr">
+            <button type="button" class="btn btn-g" data-action="close-preview">Close</button>
+          </div>
+        </div>
+      </div>`;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = baseHtml;
+    document.body.appendChild(wrap.firstElementChild);
+    document.body.addEventListener('click', closePreviewMaybe, { once: false });
+    function closePreviewMaybe(e) {
+      const close = e.target.closest('[data-action="close-preview"]');
+      if (close) {
+        const m = document.getElementById('previewModal');
+        if (m) m.remove();
+        document.body.removeEventListener('click', closePreviewMaybe);
+      }
+    }
   }
 
   function escapeHtml(s) {

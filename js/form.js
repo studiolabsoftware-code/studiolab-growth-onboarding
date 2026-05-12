@@ -18,6 +18,9 @@
   // the gate is shown without a plan-specific subheading, and after OTP we
   // either look up the studio's existing draft or prompt for plan + region.
   const GENERIC_MODE = !_urlPlan && !window.PLAN;
+  // PREVIEW_MODE allows admins to walk through the entire form without OTP,
+  // auto-save, or submission. Used from the admin dashboard's preview link.
+  const PREVIEW_MODE = _params.get('preview') === '1';
   const totalSteps = () => document.querySelectorAll('.panel').length;
 
   // Edge Function endpoints.
@@ -666,6 +669,10 @@
   }
 
   async function handleSubmit(btn) {
+    if (PREVIEW_MODE) {
+      window.alert('Preview mode: submission is disabled.');
+      return;
+    }
     const hp = document.getElementById('hp-company');
     if (hp && hp.value.trim()) {
       showDone('SPAMTRAP');
@@ -726,6 +733,7 @@
   }
 
   async function autoSave() {
+    if (PREVIEW_MODE) return;  // never save in preview
     const session = loadSession();
     if (!sessionValid(session)) return;  // silent no-op if not authed yet
     const seq = ++saveSeq;
@@ -771,6 +779,15 @@
     if (gate) gate.style.display = visible ? 'block' : 'none';
     if (wrap) wrap.classList.toggle('form-hidden', visible);
     if (signoutRow) signoutRow.style.display = visible ? 'none' : '';
+  }
+
+  function injectPreviewBanner() {
+    if (document.getElementById('previewBanner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'previewBanner';
+    banner.className = 'preview-banner';
+    banner.innerHTML = '<strong>Preview mode</strong> · Walking through the form as a studio would see it. Nothing on this page is saved. <a href="/admin/" style="margin-left:8px;color:#fff;text-decoration:underline;">Back to admin</a>';
+    document.body.insertBefore(banner, document.body.firstChild);
   }
 
   function ensureSignoutRow() {
@@ -1168,6 +1185,16 @@
     });
 
     ensureSignoutRow();
+
+    // Preview mode: admin walkthrough. Skip gate entirely, drop a banner up
+    // top, disable auto-save and submit. Used from the admin dashboard's
+    // 'Preview a studio form' link.
+    if (PREVIEW_MODE) {
+      showAuthGate(false);
+      injectPreviewBanner();
+      goTo(1);
+      return;
+    }
 
     // Auth check: existing session in localStorage? Synchronous check first,
     // then async validation against save-draft (which now returns the row so

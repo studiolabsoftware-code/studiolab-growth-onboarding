@@ -75,34 +75,22 @@
         <label for="searchInput" class="sr-only">Search submissions</label>
         <input type="search" id="searchInput" placeholder="Search studios, contacts, emails...">
       </div>
-      <div class="adm-pills" id="statusPills" role="group" aria-label="Filter by status">
-        <button type="button" class="pill active" data-filter="all" aria-pressed="true">All</button>
-        <button type="button" class="pill" data-filter="submitted" aria-pressed="false">Submitted</button>
-        <button type="button" class="pill" data-filter="in_review" aria-pressed="false">In review</button>
-        <button type="button" class="pill" data-filter="changes_requested" aria-pressed="false">Changes requested</button>
-        <button type="button" class="pill" data-filter="setup_in_progress" aria-pressed="false">Setup in progress</button>
-        <button type="button" class="pill" data-filter="complete" aria-pressed="false">Complete</button>
+      <div class="adm-pills" id="planPills" role="group" aria-label="Filter by plan">
+        <button type="button" class="pill active" data-plan="all" aria-pressed="true">All plans</button>
+        <button type="button" class="pill" data-plan="launch" aria-pressed="false">Launch</button>
+        <button type="button" class="pill" data-plan="scale" aria-pressed="false">Scale</button>
+        <button type="button" class="pill" data-plan="ai" aria-pressed="false">Dominate AI</button>
       </div>
+      <div class="adm-spacer"></div>
+      <a class="adm-preview-link" href="#" id="previewLink" title="Preview a studio form as the studio would see it">↗ Preview a studio form</a>
     </div>
 
-    <div class="adm-tablewrap">
-      <table class="adm-table">
-        <caption class="sr-only">Submissions list. Press Enter or Space on a row to open it.</caption>
-        <thead>
-          <tr>
-            <th scope="col">Studio</th>
-            <th scope="col">Plan</th>
-            <th scope="col">Setup</th>
-            <th scope="col">Status</th>
-            <th scope="col">Assigned</th>
-            <th scope="col">Submitted</th>
-            <th scope="col"><span class="sr-only">Open</span></th>
-          </tr>
-        </thead>
-        <tbody id="subsBody">
-          <tr><td colspan="7" class="adm-empty">Loading submissions...</td></tr>
-        </tbody>
-      </table>
+    <!-- Stats per stage -->
+    <div class="adm-stats" id="statsRow"></div>
+
+    <!-- Grouped cards by status -->
+    <div id="groupsContainer">
+      <div class="adm-empty" style="padding:40px 0;">Loading submissions...</div>
     </div>
   </div>
 

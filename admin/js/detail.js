@@ -72,6 +72,7 @@
         </div>
         <div class="det-actions">
           <button type="button" class="btn btn-p" id="detChangeReq">Request changes</button>
+          <button type="button" class="btn btn-danger" id="detDelete" title="Delete this submission">Delete</button>
         </div>
       </div>
 
@@ -79,76 +80,79 @@
         <div class="det-main">
 
           ${section('🏫 Studio details', [
-            ['Studio name', fmtVal(sub.studio_name)],
-            ['Legal business name', fmtVal(sub.legal_name)],
-            ['Country', fmtVal(sub.country)],
-            ['Time zone', fmtVal(sub.timezone)],
-            ['Studio type', fmtVal(sub.studio_type)],
-            ['Address', fmtVal(sub.address)],
-            ['Website', sub.website ? `<a href="${ESC(sub.website)}" target="_blank" rel="noopener">${ESC(sub.website)}</a>` : empty],
-            ['Support URL', sub.support_url ? `<a href="${ESC(sub.support_url)}" target="_blank" rel="noopener">${ESC(sub.support_url)}</a>` : empty],
+            ['Studio name', fmtVal(sub.studio_name), undefined, 'studio_name'],
+            ['Legal business name', fmtVal(sub.legal_name), undefined, 'legal_name'],
+            ['Country', fmtVal(sub.country), undefined, 'country'],
+            ['Time zone', fmtVal(sub.timezone), undefined, 'timezone'],
+            ['Studio type', fmtVal(sub.studio_type), undefined, 'studio_type'],
+            ['Address', fmtVal(sub.address), undefined, 'address'],
+            ['Website', sub.website ? `<a href="${ESC(sub.website)}" target="_blank" rel="noopener">${ESC(sub.website)}</a>` : empty, sub.website || '', 'website'],
+            ['Support URL', sub.support_url ? `<a href="${ESC(sub.support_url)}" target="_blank" rel="noopener">${ESC(sub.support_url)}</a>` : empty, sub.support_url || '', 'support_url'],
           ])}
 
           ${section('👤 Primary contact', [
-            ['Name', fmtVal([sub.first_name, sub.last_name].filter(Boolean).join(' '))],
-            ['Email', sub.contact_email ? `<a href="mailto:${ESC(sub.contact_email)}">${ESC(sub.contact_email)}</a>` : empty],
-            ['Phone', fmtVal(sub.contact_phone)],
-            ['Role', fmtVal(sub.role)],
-            ['StudioLAB login email', fmtVal(sub.studiolab_email)],
+            ['First name', fmtVal(sub.first_name), undefined, 'first_name'],
+            ['Last name', fmtVal(sub.last_name), undefined, 'last_name'],
+            ['Email', sub.contact_email ? `<a href="mailto:${ESC(sub.contact_email)}">${ESC(sub.contact_email)}</a>` : empty, sub.contact_email || '', 'contact_email'],
+            ['Phone', fmtVal(sub.contact_phone), undefined, 'contact_phone'],
+            ['Role', fmtVal(sub.role), undefined, 'role'],
+            ['StudioLAB login email', fmtVal(sub.studiolab_email), undefined, 'studiolab_email'],
           ])}
 
           ${section('🎨 Branding', [
-            ['Logo', sub.logo_url ? `<span style="font-family:monospace;font-size:11px;">${ESC(sub.logo_url)}</span>` : empty],
-            ['Primary colour', colourSwatch(sub.primary_colour)],
-            ['Secondary colour', colourSwatch(sub.secondary_colour)],
-            ['Sign-off', fmtVal(sub.sign_off)],
-            ['Email tone', fmtVal(sub.email_tone)],
-            ['Footer notes', fmtVal(sub.footer_notes)],
-            ['Studio description', fmtVal(sub.studio_description)],
+            ['Logo', logoBlock(sub.logo_url), sub.logo_url || ''],
+            ['Primary colour', colourSwatch(sub.primary_colour), sub.primary_colour || '', 'primary_colour'],
+            ['Secondary colour', colourSwatch(sub.secondary_colour), sub.secondary_colour || '', 'secondary_colour'],
+            ['Sign-off', fmtVal(sub.sign_off), undefined, 'sign_off'],
+            ['Email tone', fmtVal(sub.email_tone), undefined, 'email_tone'],
+            ['Footer notes', fmtVal(sub.footer_notes), undefined, 'footer_notes'],
+            ['Studio description', fmtVal(sub.studio_description), undefined, 'studio_description'],
           ])}
 
           ${section('✉️ Email setup', [
-            ['From name', fmtVal(sub.from_name)],
-            ['Reply-to', fmtVal(sub.reply_email)],
+            ['From name', fmtVal(sub.from_name), undefined, 'from_name'],
+            ['Reply-to', fmtVal(sub.reply_email), undefined, 'reply_email'],
             ['Custom domain', fmtBool(sub.custom_domain)],
-            ['Email domain', fmtVal(sub.email_domain)],
-            ['DNS access', fmtVal(sub.dns_access)],
+            ['Email domain', fmtVal(sub.email_domain), undefined, 'email_domain'],
+            ['DNS access', fmtVal(sub.dns_access), undefined, 'dns_access'],
           ])}
 
           ${(isScale || isAi) ? section('💬 SMS & social', [
-            ['Number preference', fmtVal(sub.sms_type)],
-            ['Area code', fmtVal(sub.area_code)],
-            ['Port number', fmtVal(sub.port_number)],
-            ['SMS tone notes', fmtVal(sub.sms_tone)],
+            ['Number preference', fmtVal(sub.sms_type), undefined, 'sms_type'],
+            ['Area code', fmtVal(sub.area_code), undefined, 'area_code'],
+            ['Port number', fmtVal(sub.port_number), undefined, 'port_number'],
+            ['SMS tone notes', fmtVal(sub.sms_tone), undefined, 'sms_tone'],
             ['Lead sources', fmtList(sub.lead_sources)],
           ]) : planNotice('SMS & social', 'Launch')}
 
           ${section('⚡ Automations', [
             ['Active season', fmtBool(sub.season_active)],
-            ['Season name', fmtVal(sub.season_name)],
-            ['Enrolment open', fmtVal(sub.enrol_open_date)],
-            ['Billing start', fmtVal(sub.billing_start)],
-            ['Season end', fmtVal(sub.season_end)],
+            ['Season name', fmtVal(sub.season_name), undefined, 'season_name'],
+            ['Enrolment open', fmtVal(sub.enrol_open_date), undefined, 'enrol_open_date'],
+            ['Billing start', fmtVal(sub.billing_start), undefined, 'billing_start'],
+            ['Season end', fmtVal(sub.season_end), undefined, 'season_end'],
             ['Active workflows', fmtList(sub.active_workflows)],
           ])}
 
           ${isAi ? section('🤖 AI knowledge base', [
-            ['Studio profile', fmtVal(sub.kb_profile)],
-            ['Classes & timetable', fmtVal(sub.kb_classes)],
-            ['Pricing', fmtVal(sub.kb_pricing)],
+            ['Studio profile', fmtVal(sub.kb_profile), undefined, 'kb_profile'],
+            ['Classes & timetable', fmtVal(sub.kb_classes), undefined, 'kb_classes'],
+            ['Pricing', fmtVal(sub.kb_pricing), undefined, 'kb_pricing'],
             ['AI can quote prices', fmtBool(sub.kb_price_quoting)],
-            ['Policies', fmtVal(sub.kb_policies)],
-            ['Events', fmtVal(sub.kb_events)],
+            ['Policies', fmtVal(sub.kb_policies), undefined, 'kb_policies'],
+            ['Events', fmtVal(sub.kb_events), undefined, 'kb_events'],
             ['FAQs', Array.isArray(sub.kb_faqs) && sub.kb_faqs.length
               ? `${sub.kb_faqs.length} Q&amp;A pairs`
               : empty, ''],
-            ['Restricted topics', fmtVal(sub.kb_restricted)],
-            ['AI tone', fmtVal(sub.kb_tone)],
-            ['Voice agent hours', fmtVal(sub.voice_hours)],
-            ['Voice escalation', fmtVal(sub.voice_escalate)],
+            ['Restricted topics', fmtVal(sub.kb_restricted), undefined, 'kb_restricted'],
+            ['AI tone', fmtVal(sub.kb_tone), undefined, 'kb_tone'],
+            ['Voice agent hours', fmtVal(sub.voice_hours), undefined, 'voice_hours'],
+            ['Voice escalation', fmtVal(sub.voice_escalate), undefined, 'voice_escalate'],
           ]) : planNotice('AI knowledge base', isLaunch ? 'Launch' : 'Scale')}
 
-          ${sub.extra_notes ? section('📝 Additional notes', [['Notes', ESC(sub.extra_notes)]]) : ''}
+          ${section('📝 Additional notes', [
+            ['Notes', sub.extra_notes ? ESC(sub.extra_notes) : empty, undefined, 'extra_notes'],
+          ])}
         </div>
 
         <div class="det-side">
@@ -196,6 +200,32 @@
     document.getElementById('detAssign').addEventListener('change', (e) => updateField('assigned_to', e.target.value || null));
     document.getElementById('detAddNote').addEventListener('click', addNote);
     document.getElementById('detChangeReq').addEventListener('click', () => window.AdminChangeRequest.open(sub));
+    const delBtn = document.getElementById('detDelete');
+    if (delBtn) delBtn.addEventListener('click', handleDelete);
+
+    hydrateLogos();
+  }
+
+  async function handleDelete() {
+    if (!current) return;
+    const msg = `Delete submission for "${current.studio_name || current.contact_email}"? This cannot be undone.\n\nAny logo file will be removed too.`;
+    if (!window.confirm(msg)) return;
+    const client = sb();
+    // Best-effort logo cleanup
+    if (current.logo_url) {
+      const [bucket, ...rest] = current.logo_url.split('/');
+      try { await client.storage.from(bucket).remove([rest.join('/')]); }
+      catch (e) { console.warn('logo cleanup failed:', e); }
+    }
+    const { error } = await client.from('submissions').delete().eq('id', current.id);
+    if (error) {
+      console.error('delete failed:', error);
+      window.alert('Delete failed. ' + (error.message || ''));
+      return;
+    }
+    current = null;
+    if (window.AdminDashboard && window.AdminDashboard.refresh) await window.AdminDashboard.refresh();
+    window.AdminDashboard.showList();
   }
 
   function section(title, rows) {
@@ -210,16 +240,15 @@
       </div>`;
   }
 
-  // Each row is [label, renderedHtml, copyText?]. If copyText is omitted we
-  // derive it from the renderedHtml by stripping tags. Empty/Not-provided
-  // values get no copy button.
+  // Each row is [label, renderedHtml, copyText?, editField?]. copyText falls
+  // back to a stripped version of renderedHtml. editField, when set, enables
+  // an Edit button that swaps the value into an input/textarea inline.
   function renderRow(row) {
-    const [k, v, explicitCopy] = row;
+    const [k, v, explicitCopy, editField] = row;
     let copy;
     if (explicitCopy !== undefined) {
       copy = explicitCopy;
     } else if (typeof v === 'string') {
-      // Strip HTML, decode entities, trim. Empty placeholder -> empty.
       const stripped = v.replace(/<[^>]+>/g, '')
         .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
@@ -228,10 +257,89 @@
     } else {
       copy = '';
     }
-    const btn = copy
+    const copyBtn = copy
       ? `<button type="button" class="copy-btn" data-copy="${ESC(copy)}" aria-label="Copy ${ESC(k)}"><span class="copy-btn-ico" aria-hidden="true">⧉</span>Copy</button>`
       : '';
-    return `<div class="det-row"><dt>${ESC(k)}</dt><dd><span class="det-val">${v}</span>${btn}</dd></div>`;
+    const editBtn = editField
+      ? `<button type="button" class="edit-btn" data-edit-field="${ESC(editField)}" data-edit-label="${ESC(k)}" aria-label="Edit ${ESC(k)}"><span class="copy-btn-ico" aria-hidden="true">✎</span>Edit</button>`
+      : '';
+    const dataAttr = editField ? ` data-field="${ESC(editField)}"` : '';
+    return `<div class="det-row"${dataAttr}><dt>${ESC(k)}</dt><dd><span class="det-val">${v}</span>${copyBtn}${editBtn}</dd></div>`;
+  }
+
+  // ── Inline edit ────────────────────────────────────────────────────────────
+  function enterEditMode(rowEl) {
+    if (rowEl.classList.contains('editing')) return;
+    const field = rowEl.dataset.field;
+    if (!field || !current) return;
+    const dd = rowEl.querySelector('dd');
+    const valEl = dd.querySelector('.det-val');
+    if (!dd || !valEl) return;
+    const raw = current[field];
+    const initial = raw === null || raw === undefined ? '' : String(raw);
+    const useTextarea = initial.length > 60 || /(notes|address|description|policies|profile|classes|pricing|events|restricted|tone|escalate|hours)/i.test(field);
+    rowEl.classList.add('editing');
+    rowEl.dataset.originalValue = initial;
+    const inputHtml = useTextarea
+      ? `<textarea class="edit-input" rows="${Math.min(8, Math.max(3, Math.ceil(initial.length / 60)))}">${ESC(initial)}</textarea>`
+      : `<input type="text" class="edit-input" value="${ESC(initial)}">`;
+    dd.innerHTML = `${inputHtml}
+      <div class="edit-actions">
+        <button type="button" class="btn btn-p edit-save">Save</button>
+        <button type="button" class="btn btn-g edit-cancel">Cancel</button>
+      </div>`;
+    const inp = dd.querySelector('.edit-input');
+    if (inp) {
+      inp.focus();
+      if (inp.tagName === 'INPUT') inp.select();
+    }
+  }
+
+  async function saveEdit(rowEl) {
+    const field = rowEl.dataset.field;
+    if (!field || !current) return;
+    const inp = rowEl.querySelector('.edit-input');
+    if (!inp) return;
+    const newVal = inp.value.trim();
+    const original = rowEl.dataset.originalValue || '';
+    if (newVal === original) { cancelEdit(rowEl); return; }
+    const client = sb();
+    const save = rowEl.querySelector('.edit-save');
+    if (save) { save.disabled = true; save.textContent = 'Saving...'; }
+    const updateValue = newVal === '' ? null : newVal;
+    const { error } = await client.from('submissions').update({ [field]: updateValue, updated_at: new Date().toISOString() }).eq('id', current.id);
+    if (error) {
+      console.error('field update failed:', error);
+      if (save) { save.disabled = false; save.textContent = 'Save'; }
+      window.alert('Save failed. ' + (error.message || ''));
+      return;
+    }
+    await client.from('activity_log').insert({
+      submission_id: current.id, action: 'note_added', // closest existing enum value
+      actor: window.AdminAuth.currentUser || 'admin',
+      details: { field, from: original, to: updateValue, edited_by_admin: true },
+    });
+    current[field] = updateValue;
+    open(current.id); // simplest refresh; preserves scroll
+  }
+
+  function cancelEdit(rowEl) {
+    if (!rowEl || !current) return;
+    rowEl.classList.remove('editing');
+    open(current.id);
+  }
+
+  function handleDetailClick(e) {
+    const edit = e.target.closest('.edit-btn');
+    if (edit) {
+      const row = edit.closest('.det-row');
+      if (row) enterEditMode(row);
+      return;
+    }
+    const save = e.target.closest('.edit-save');
+    if (save) { saveEdit(save.closest('.det-row')); return; }
+    const cancel = e.target.closest('.edit-cancel');
+    if (cancel) { cancelEdit(cancel.closest('.det-row')); return; }
   }
 
   async function handleCopyClick(e) {
@@ -272,6 +380,39 @@
   function colourSwatch(hex) {
     if (!hex) return empty;
     return `<span style="display:inline-flex;align-items:center;gap:8px;"><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:${ESC(hex)};border:1px solid var(--g2);"></span><span style="font-family:monospace;">${ESC(hex)}</span></span>`;
+  }
+
+  function logoBlock(path) {
+    if (!path) return empty;
+    return `<span class="logo-block" data-logo-path="${ESC(path)}">
+      <span class="logo-preview-wrap"><span class="logo-loading">Loading preview...</span></span>
+      <span class="logo-meta"><span class="logo-path">${ESC(path)}</span></span>
+    </span>`;
+  }
+
+  async function hydrateLogos() {
+    const client = sb();
+    if (!client) return;
+    const wrappers = document.querySelectorAll('.logo-block');
+    for (const wrap of wrappers) {
+      const path = wrap.dataset.logoPath;
+      if (!path) continue;
+      // logo_url stored as "logos/uuid.ext" — strip the bucket prefix
+      const [bucket, ...rest] = path.split('/');
+      const file = rest.join('/');
+      try {
+        const { data, error } = await client.storage.from(bucket).createSignedUrl(file, 3600);
+        if (error || !data?.signedUrl) throw error || new Error('No signed URL');
+        const preview = wrap.querySelector('.logo-preview-wrap');
+        const meta = wrap.querySelector('.logo-meta');
+        if (preview) preview.innerHTML = `<a href="${ESC(data.signedUrl)}" target="_blank" rel="noopener"><img src="${ESC(data.signedUrl)}" alt="Studio logo" class="logo-thumb"></a>`;
+        if (meta) meta.innerHTML = `<a href="${ESC(data.signedUrl)}" target="_blank" rel="noopener" class="logo-download">Open / download</a>`;
+      } catch (e) {
+        const preview = wrap.querySelector('.logo-preview-wrap');
+        if (preview) preview.innerHTML = '<span class="logo-loading" style="color:var(--rd);">Could not load preview</span>';
+        console.warn('logo signed url failed:', e);
+      }
+    }
   }
 
   async function updateField(field, value) {
@@ -365,8 +506,9 @@
     return '';
   }
 
-  // Single delegated copy handler covers every .copy-btn in the detail view.
+  // Delegated handlers for copy and inline-edit interactions across the detail view.
   document.addEventListener('click', handleCopyClick);
+  document.addEventListener('click', handleDetailClick);
 
   window.AdminDetail = {
     open,
