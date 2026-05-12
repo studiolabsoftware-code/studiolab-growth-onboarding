@@ -223,6 +223,10 @@ select {
 .setup-card.sel .setup-dot { border-color: var(--in); background: var(--in); box-shadow: inset 0 0 0 2px #fff; }
 .setup-name { font-size: 13px; font-weight: 700; color: var(--in-d); margin-bottom: 4px; padding-right: 20px; }
 .setup-desc { font-size: 11px; color: var(--g6); line-height: 1.5; }
+.setup-price { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--g2); display: flex; align-items: baseline; gap: 8px; }
+.setup-price-amt { font-size: 16px; font-weight: 800; color: var(--in-d); letter-spacing: -0.3px; }
+.setup-price-tax { font-size: 11px; color: var(--g6); font-weight: 500; }
+.setup-card.sel .setup-price { border-top-color: rgba(74, 63, 138, 0.25); }
 
 /* ── Toggle checkboxes ─────────────────────────────── */
 .tg-group { display: flex; flex-direction: column; gap: 8px; }

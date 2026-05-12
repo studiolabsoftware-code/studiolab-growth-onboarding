@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/form.css">
-<script>window.PLAN = 'scale';</script>
+<link rel="stylesheet" href="/css/form.css">
+<script>window.PLAN = 'scale'; window.REGION = 'US';</script>
 </head>
 <body>
 
@@ -20,7 +20,7 @@
 <header class="hdr">
   <div class="hdr-inner">
     <a class="hdr-logo" href="/" aria-label="StudioLAB Growth home">
-      <img src="../assets/growth-logo-white.svg" alt="StudioLAB Growth">
+      <img src="/assets/growth-logo-white.svg" alt="StudioLAB Growth">
     </a>
     <div class="hdr-div" aria-hidden="true"></div>
     <div class="hdr-sub" aria-hidden="true">Scale Setup</div>
@@ -58,12 +58,14 @@
           <div class="setup-dot" aria-hidden="true"></div>
           <div class="setup-name" aria-hidden="true">Done-For-You</div>
           <div class="setup-desc" aria-hidden="true">Our team configures your entire account. You provide the information, we handle everything else. Completed within 3 to 7 business days.</div>
+                  <div class="setup-price" data-price-slot="dfy" aria-hidden="true"></div>
         </label>
         <label class="setup-card" id="sc-guided" data-setup="guided">
           <input type="radio" name="setup" value="guided" aria-label="Guided self-setup: you configure your account, 60 to 120 minutes">
           <div class="setup-dot" aria-hidden="true"></div>
           <div class="setup-name" aria-hidden="true">Guided (self-setup)</div>
           <div class="setup-desc" aria-hidden="true">You configure your own account using our step-by-step guide, with support available if you get stuck. Estimated 60 to 120 minutes.</div>
+                  <div class="setup-price" data-price-slot="guided" aria-hidden="true"></div>
         </label>
       </div>
     </div>
@@ -609,7 +611,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../js/supabase-config.js"></script>
-<script src="../js/form.js"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/form.js"></script>
 </body>
 </html>

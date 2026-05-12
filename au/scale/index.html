@@ -5,27 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#13102E">
-<title>StudioLAB Growth: Launch Setup</title>
+<title>StudioLAB Growth: Scale Setup</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/form.css">
-<script>window.PLAN = 'launch';</script>
+<link rel="stylesheet" href="/css/form.css">
+<script>window.PLAN = 'scale'; window.REGION = 'AU';</script>
 </head>
 <body>
 
 <a class="sr-only" href="#fmain">Skip to form</a>
-<h1 class="sr-only">StudioLAB Growth Launch setup</h1>
+<h1 class="sr-only">StudioLAB Growth Scale setup</h1>
 
 <header class="hdr">
   <div class="hdr-inner">
     <a class="hdr-logo" href="/" aria-label="StudioLAB Growth home">
-      <img src="../assets/growth-logo-white.svg" alt="StudioLAB Growth">
+      <img src="/assets/growth-logo-white.svg" alt="StudioLAB Growth">
     </a>
     <div class="hdr-div" aria-hidden="true"></div>
-    <div class="hdr-sub" aria-hidden="true">Launch Setup</div>
+    <div class="hdr-sub" aria-hidden="true">Scale Setup</div>
   </div>
-  <div class="prog" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="17"><div class="prog-fill" id="pf" style="width:17%"></div></div>
+  <div class="prog" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="14"><div class="prog-fill" id="pf" style="width:14%"></div></div>
 </header>
 
 <nav class="snav" aria-label="Form steps">
@@ -34,8 +34,9 @@
     <button type="button" class="sp" data-s="2" disabled><span class="sp-n" aria-hidden="true">2</span><span>Studio</span></button>
     <button type="button" class="sp" data-s="3" disabled><span class="sp-n" aria-hidden="true">3</span><span>Branding</span></button>
     <button type="button" class="sp" data-s="4" disabled><span class="sp-n" aria-hidden="true">4</span><span>Email</span></button>
-    <button type="button" class="sp" data-s="5" disabled><span class="sp-n" aria-hidden="true">5</span><span>Automations</span></button>
-    <button type="button" class="sp" data-s="6" disabled><span class="sp-n" aria-hidden="true">6</span><span>Review</span></button>
+    <button type="button" class="sp" data-s="5" disabled><span class="sp-n" aria-hidden="true">5</span><span>SMS &amp; Social</span></button>
+    <button type="button" class="sp" data-s="6" disabled><span class="sp-n" aria-hidden="true">6</span><span>Automations</span></button>
+    <button type="button" class="sp" data-s="7" disabled><span class="sp-n" aria-hidden="true">7</span><span>Review</span></button>
   </div>
 </nav>
 
@@ -44,7 +45,7 @@
   <!-- ─────────────── STEP 1: Setup type ─────────────── -->
   <div class="panel active" id="s1">
     <div class="sh">
-      <div class="sh-tag">Step 1 of 6</div>
+      <div class="sh-tag">Step 1 of 7</div>
       <h2 class="sh-title">Choose your setup style</h2>
       <div class="sh-desc">Both options produce the same end result. The difference is who does the configuration work.</div>
     </div>
@@ -57,18 +58,20 @@
           <div class="setup-dot" aria-hidden="true"></div>
           <div class="setup-name" aria-hidden="true">Done-For-You</div>
           <div class="setup-desc" aria-hidden="true">Our team configures your entire account. You provide the information, we handle everything else. Completed within 3 to 7 business days.</div>
+                  <div class="setup-price" data-price-slot="dfy" aria-hidden="true"></div>
         </label>
         <label class="setup-card" id="sc-guided" data-setup="guided">
           <input type="radio" name="setup" value="guided" aria-label="Guided self-setup: you configure your account, 60 to 120 minutes">
           <div class="setup-dot" aria-hidden="true"></div>
           <div class="setup-name" aria-hidden="true">Guided (self-setup)</div>
           <div class="setup-desc" aria-hidden="true">You configure your own account using our step-by-step guide, with support available if you get stuck. Estimated 60 to 120 minutes.</div>
+                  <div class="setup-price" data-price-slot="guided" aria-hidden="true"></div>
         </label>
       </div>
     </div>
 
     <div class="fnav">
-      <div class="sctr">Step 1 of 6</div>
+      <div class="sctr">Step 1 of 7</div>
       <button type="button" class="btn btn-p" data-action="next">Continue →</button>
     </div>
   </div>
@@ -76,7 +79,7 @@
   <!-- ─────────────── STEP 2: Studio Details ─────────────── -->
   <div class="panel" id="s2">
     <div class="sh">
-      <div class="sh-tag">Step 2 of 6</div>
+      <div class="sh-tag">Step 2 of 7</div>
       <h2 class="sh-title">Studio details</h2>
       <div class="sh-desc">This populates your StudioLAB Growth business profile. It's the source of truth for your account name, contact details, and timezone.</div>
     </div>
@@ -218,7 +221,7 @@
 
     <div class="fnav">
       <button type="button" class="btn btn-g" data-action="prev">← Back</button>
-      <div class="sctr">Step 2 of 6</div>
+      <div class="sctr">Step 2 of 7</div>
       <button type="button" class="btn btn-p" data-action="next">Continue →</button>
     </div>
   </div>
@@ -226,9 +229,9 @@
   <!-- ─────────────── STEP 3: Branding ─────────────── -->
   <div class="panel" id="s3">
     <div class="sh">
-      <div class="sh-tag">Step 3 of 6</div>
+      <div class="sh-tag">Step 3 of 7</div>
       <h2 class="sh-title">Branding and voice</h2>
-      <div class="sh-desc">Used to brand all email templates and the email footer.</div>
+      <div class="sh-desc">Used to brand all email templates, the email footer, and SMS sender details.</div>
     </div>
 
     <div class="card">
@@ -302,7 +305,7 @@
 
     <div class="fnav">
       <button type="button" class="btn btn-g" data-action="prev">← Back</button>
-      <div class="sctr">Step 3 of 6</div>
+      <div class="sctr">Step 3 of 7</div>
       <button type="button" class="btn btn-p" data-action="next">Continue →</button>
     </div>
   </div>
@@ -310,7 +313,7 @@
   <!-- ─────────────── STEP 4: Email Setup ─────────────── -->
   <div class="panel" id="s4">
     <div class="sh">
-      <div class="sh-tag">Step 4 of 6</div>
+      <div class="sh-tag">Step 4 of 7</div>
       <h2 class="sh-title">Email sending setup</h2>
       <div class="sh-desc">Configures how emails appear in families' inboxes: who they're from, and where replies go. Custom domain setup improves deliverability significantly.</div>
     </div>
@@ -367,15 +370,85 @@
 
     <div class="fnav">
       <button type="button" class="btn btn-g" data-action="prev">← Back</button>
-      <div class="sctr">Step 4 of 6</div>
+      <div class="sctr">Step 4 of 7</div>
       <button type="button" class="btn btn-p" data-action="next">Continue →</button>
     </div>
   </div>
 
-  <!-- ─────────────── STEP 5: Automations ─────────────── -->
+  <!-- ─────────────── STEP 5: SMS & Social ─────────────── -->
   <div class="panel" id="s5">
     <div class="sh">
-      <div class="sh-tag">Step 5 of 6</div>
+      <div class="sh-tag">Step 5 of 7</div>
+      <h2 class="sh-title">SMS and lead sources</h2>
+      <div class="sh-desc">Required for SMS workflows and lead source tracking on your Scale plan.</div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">💬</div>SMS phone number</div>
+      <div class="co co-blue">We purchase and configure an SMS-enabled phone number for your account. This number is used for outbound SMS automations. <strong>You don't need an existing number.</strong> We handle provisioning. A2P / 10DLC registration may be required depending on your region.</div>
+      <div class="fr">
+        <div class="f">
+          <label for="smsType">Number type preference <span class="req">*</span></label>
+          <select id="smsType">
+            <option value="">Select preference</option>
+            <option value="local">Local number (matches my area)</option>
+            <option value="tollfree">Toll-free number</option>
+            <option value="existing">Port my existing number</option>
+            <option value="nosure">No preference, you choose</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="areaCode">Preferred area code <span class="hint">(if local number)</span></label>
+          <input type="text" id="areaCode" placeholder="e.g. 03 (AU) or 310 (US)">
+        </div>
+      </div>
+      <div class="f" id="portRow" style="display:none; margin-top:10px;">
+        <label for="portNum">Existing number to port</label>
+        <input type="tel" id="portNum" placeholder="+61 4XX XXX XXX">
+        <span class="field-note">Porting timelines vary, typically 3 to 10 business days.</span>
+      </div>
+      <div class="fr x1" style="margin-top:14px; margin-bottom:0;">
+        <div class="f">
+          <label for="smsTone">SMS tone notes <span class="hint">(optional)</span></label>
+          <input type="text" id="smsTone" placeholder="e.g. Keep it short and warm, like a text from the studio">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">🔗</div>Lead source access</div>
+      <div class="co co-amber"><strong>We need admin access to connect these.</strong> For security, do not enter login credentials here. We will follow up with a secure method to collect access once your form is submitted.</div>
+      <div class="sub-lbl">Which lead sources do you want connected?</div>
+      <div class="tg-group">
+        <label class="tg" data-toggle>
+          <input type="checkbox" value="facebook" data-lead>
+          <div class="tg-box" aria-hidden="true"></div>
+          <div><div class="tg-lbl">Facebook Lead Ads</div><div class="tg-desc">Auto-creates contacts in StudioLAB Growth from Facebook lead form submissions and tracks the lead source.</div></div>
+        </label>
+        <label class="tg" data-toggle>
+          <input type="checkbox" value="google" data-lead>
+          <div class="tg-box" aria-hidden="true"></div>
+          <div><div class="tg-lbl">Google Business Messages</div><div class="tg-desc">Syncs messages from your Google Business Profile directly into StudioLAB Growth so no enquiry is missed.</div></div>
+        </label>
+        <label class="tg" data-toggle>
+          <input type="checkbox" value="website_chat" data-lead>
+          <div class="tg-box" aria-hidden="true"></div>
+          <div><div class="tg-lbl">Website chat widget</div><div class="tg-desc">Embeds a chat widget on your website. We install the code. Enquiries from the widget flow directly into StudioLAB Growth.</div></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="fnav">
+      <button type="button" class="btn btn-g" data-action="prev">← Back</button>
+      <div class="sctr">Step 5 of 7</div>
+      <button type="button" class="btn btn-p" data-action="next">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ─────────────── STEP 6: Automations ─────────────── -->
+  <div class="panel" id="s6">
+    <div class="sh">
+      <div class="sh-tag">Step 6 of 7</div>
       <h2 class="sh-title">Your season and enrolment setup</h2>
       <div class="sh-desc">The automations are driven by StudioLAB events: season data and enrolment status. We need context on your current setup so triggers are timed correctly.</div>
     </div>
@@ -416,7 +489,7 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">⚡</div>Confirm active workflows</div>
-      <div class="co co-blue">These are the workflows included in your Launch plan. Both are pre-configured. Confirm which should be active at launch. You can turn either on or off later.</div>
+      <div class="co co-blue">These are the workflows included in your Scale plan. All are pre-configured. Confirm which should be active at launch. You can turn any on or off later.</div>
       <div class="tg-group">
         <label class="tg chk" data-toggle>
           <input type="checkbox" value="ae" data-workflow checked>
@@ -428,20 +501,35 @@
           <div class="tg-box" aria-hidden="true"></div>
           <div><div class="tg-lbl">Re-enrolment campaign</div><div class="tg-desc">6-email countdown sequence triggered when a new season opens. Runs until the family re-enrols or the season closes.</div></div>
         </label>
+        <label class="tg chk" data-toggle>
+          <input type="checkbox" value="ae_sms" data-workflow checked>
+          <div class="tg-box" aria-hidden="true"></div>
+          <div><div class="tg-lbl">Abandoned enrolment: SMS</div><div class="tg-desc">SMS at 24 hours alongside email (sent only if SMS consent is confirmed). Roadblock-targeted emails based on where the family dropped off.</div></div>
+        </label>
+        <label class="tg chk" data-toggle>
+          <input type="checkbox" value="mct" data-workflow checked>
+          <div class="tg-box" aria-hidden="true"></div>
+          <div><div class="tg-lbl">Missed call text-back</div><div class="tg-desc">Sends an automatic SMS and email when a call to the studio is missed. No enquiry falls through the cracks.</div></div>
+        </label>
+        <label class="tg chk" data-toggle>
+          <input type="checkbox" value="re_sms" data-workflow checked>
+          <div class="tg-box" aria-hidden="true"></div>
+          <div><div class="tg-lbl">Re-enrolment: SMS</div><div class="tg-desc">SMS at season open and last call, alongside the email sequence.</div></div>
+        </label>
       </div>
     </div>
 
     <div class="fnav">
       <button type="button" class="btn btn-g" data-action="prev">← Back</button>
-      <div class="sctr">Step 5 of 6</div>
+      <div class="sctr">Step 6 of 7</div>
       <button type="button" class="btn btn-p" data-action="next">Review →</button>
     </div>
   </div>
 
-  <!-- ─────────────── STEP 6: Review & Submit ─────────────── -->
-  <div class="panel" id="s6">
+  <!-- ─────────────── STEP 7: Review & Submit ─────────────── -->
+  <div class="panel" id="s7">
     <div class="sh">
-      <div class="sh-tag">Step 6 of 6</div>
+      <div class="sh-tag">Step 7 of 7</div>
       <h2 class="sh-title">Review and submit</h2>
       <div class="sh-desc">Check everything before submitting. Our team will review your information, contact you within 1 business day, and begin configuration.</div>
     </div>
@@ -450,7 +538,7 @@
       <div class="sum-sec">
         <div class="sum-hdr"><span aria-hidden="true">📦</span> Plan and setup</div>
         <div class="sum-body">
-          <div class="sum-f"><div class="sum-k">Plan</div><div class="sum-v" id="sv-plan">Launch</div></div>
+          <div class="sum-f"><div class="sum-k">Plan</div><div class="sum-v" id="sv-plan">Scale</div></div>
           <div class="sum-f"><div class="sum-k">Setup type</div><div class="sum-v" id="sv-setup">Not provided</div></div>
         </div>
       </div>
@@ -502,7 +590,7 @@
 
     <div class="fnav">
       <button type="button" class="btn btn-g" data-action="prev">← Back</button>
-      <div class="sctr">Step 6 of 6</div>
+      <div class="sctr">Step 7 of 7</div>
       <button type="button" class="btn btn-ok" id="submitBtn" data-action="submit">Submit setup ✓</button>
     </div>
   </div>
@@ -512,18 +600,18 @@
 <div class="done-screen" id="doneScreen" role="status" aria-live="polite" tabindex="-1">
   <div class="done-ico">✓</div>
   <div class="done-title">All received. Thank you!</div>
-  <div class="done-desc">We've got everything we need to get your Launch setup underway. Our team will review your submission and be in touch within 1 business day to confirm setup has begun.</div>
+  <div class="done-desc">We've got everything we need to get your Scale setup underway. Our team will review your submission and be in touch within 1 business day to confirm setup has begun.</div>
   <div class="done-detail">
     <div class="done-detail-row"><span class="done-detail-key">Reference</span><span class="done-detail-val done-ref" id="done-ref"></span></div>
     <div class="done-detail-row"><span class="done-detail-key">Studio</span><span class="done-detail-val" id="done-studio"></span></div>
-    <div class="done-detail-row"><span class="done-detail-key">Plan</span><span class="done-detail-val" id="done-plan">Launch</span></div>
+    <div class="done-detail-row"><span class="done-detail-key">Plan</span><span class="done-detail-val" id="done-plan">Scale</span></div>
     <div class="done-detail-row"><span class="done-detail-key">Setup type</span><span class="done-detail-val" id="done-setup"></span></div>
     <div class="done-detail-row"><span class="done-detail-key">Timeline</span><span class="done-detail-val" id="done-timeline">3 to 5 business days</span></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../js/supabase-config.js"></script>
-<script src="../js/form.js"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/form.js"></script>
 </body>
 </html>

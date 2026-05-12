@@ -5,11 +5,65 @@
 (function () {
   'use strict';
 
-  // Plan is locked by the URL each form is served from. window.PLAN is set in
-  // launch/, scale/, and ai/ before this script loads. Total step count is read
-  // from the DOM so each plan-specific HTML can carry only the panels it needs.
+  // Plan and region are both locked by the URL. window.PLAN and window.REGION
+  // are set inline in each form's HTML before this script loads. AU studios get
+  // AUD pricing. Everyone else gets USD. Per master spec, currencies never mix.
   const PLAN = window.PLAN || 'launch';
+  const REGION = window.REGION || 'AU';
   const totalSteps = () => document.querySelectorAll('.panel').length;
+
+  // Setup fee pricing per master reference doc (May 2026).
+  // AU prices show ex-GST headline with inc-GST hint. US shows single USD.
+  // Dominate AI: the dfy slot is renamed to AI Activation Pack at render time.
+  const PRICING = {
+    launch: {
+      AU: {
+        guided: { amount: '$99', currency: 'AUD', tax: 'ex GST · $109 inc GST' },
+        dfy:    { amount: '$400', currency: 'AUD', tax: 'ex GST · $440 inc GST' },
+      },
+      US: {
+        guided: { amount: '$79', currency: 'USD', tax: '' },
+        dfy:    { amount: '$299', currency: 'USD', tax: '' },
+      },
+    },
+    scale: {
+      AU: {
+        guided: { amount: '$99', currency: 'AUD', tax: 'ex GST · $109 inc GST' },
+        dfy:    { amount: '$400', currency: 'AUD', tax: 'ex GST · $440 inc GST' },
+      },
+      US: {
+        guided: { amount: '$79', currency: 'USD', tax: '' },
+        dfy:    { amount: '$299', currency: 'USD', tax: '' },
+      },
+    },
+    ai: {
+      AU: {
+        guided: { amount: '$99',  currency: 'AUD', tax: 'ex GST · $109 inc GST' },
+        dfy:    { amount: '$699', currency: 'AUD', tax: 'ex GST · $769 inc GST' },
+      },
+      US: {
+        guided: { amount: '$79',  currency: 'USD', tax: '' },
+        dfy:    { amount: '$549', currency: 'USD', tax: '' },
+      },
+    },
+  };
+
+  // Display label for each setup type, plan-aware. The DFY card on Dominate AI
+  // is rebadged as AI Activation Pack with a richer description.
+  const SETUP_DISPLAY = {
+    guided: {
+      label: 'Guided (self-setup)',
+      desc:  'You configure your own account using our step-by-step checklist, with support available if you get stuck. Delivered within 3 to 5 business days.',
+    },
+    dfy_default: {
+      label: 'Done-For-You',
+      desc:  'Our team configures your entire account. You provide the information, we handle everything else. Delivered within 5 to 7 business days.',
+    },
+    dfy_ai: {
+      label: 'AI Activation Pack',
+      desc:  'Full Done-For-You configuration plus knowledge base build, AI chat setup, voice agent setup and testing, and a live walkthrough. Delivered within 7 to 10 business days.',
+    },
+  };
 
   const state = {
     step: 1,
@@ -42,6 +96,44 @@
     try { new URL(v); return true; } catch (e) { return false; }
   };
   const isHex = (v) => /^#[0-9A-Fa-f]{6}$/.test(v);
+
+  // ── Pricing rendering ─────────────────────────────────────────────────────
+  function priceFor(setupType) {
+    const planTable = PRICING[PLAN] || PRICING.launch;
+    const regionTable = planTable[REGION] || planTable.AU;
+    return regionTable[setupType] || regionTable.dfy;
+  }
+
+  function setupLabelFor(setupType) {
+    if (setupType === 'guided') return SETUP_DISPLAY.guided;
+    return PLAN === 'ai' ? SETUP_DISPLAY.dfy_ai : SETUP_DISPLAY.dfy_default;
+  }
+
+  function renderSetupCards() {
+    document.querySelectorAll('.setup-card').forEach((card) => {
+      const setupType = card.dataset.setup;
+      if (!setupType) return;
+      const display = setupLabelFor(setupType);
+      const nameEl = card.querySelector('.setup-name');
+      const descEl = card.querySelector('.setup-desc');
+      const priceSlot = card.querySelector('[data-price-slot]');
+      if (nameEl) nameEl.textContent = display.label;
+      if (descEl) descEl.textContent = display.desc;
+      if (priceSlot) {
+        const p = priceFor(setupType);
+        priceSlot.innerHTML =
+          '<span class="setup-price-amt">' + p.amount + ' ' + p.currency + '</span>' +
+          (p.tax ? '<span class="setup-price-tax">' + p.tax + '</span>' : '');
+      }
+    });
+  }
+
+  function setupFeeSummaryLine() {
+    const p = priceFor(state.setup);
+    const label = setupLabelFor(state.setup).label;
+    const taxNote = p.tax ? ' (' + p.tax + ')' : '';
+    return label + ' · ' + p.amount + ' ' + p.currency + taxNote;
+  }
 
   // ── Step navigation ───────────────────────────────────────────────────────
   function goTo(n) {
@@ -359,7 +451,7 @@
 
   function buildSummary() {
     setSum('sv-plan', PLAN_LABEL[state.plan] || state.plan);
-    setSum('sv-setup', SETUP_LABEL[state.setup] || state.setup);
+    setSum('sv-setup', setupFeeSummaryLine());
     setSum('sv-studio', val('studioName'));
     setSum('sv-country', val('country'));
     const fn = val('firstName'), ln = val('lastName');
@@ -459,7 +551,7 @@
     setText('done-ref', ref);
     setText('done-studio', val('studioName') || 'Not provided');
     setText('done-plan', PLAN_LABEL[state.plan] || state.plan);
-    setText('done-setup', SETUP_LABEL[state.setup] || state.setup);
+    setText('done-setup', setupFeeSummaryLine());
     setText('done-timeline', state.setup === 'guided'
       ? 'You complete setup at your own pace'
       : '3 to 7 business days');
@@ -597,6 +689,7 @@
   // ── Init ──────────────────────────────────────────────────────────────────
   function init() {
     wireFieldErrors();
+    renderSetupCards();
     bindEvents();
     // Plan is locked by the URL the form is served from. No selectPlan call here.
     selectSetup('dfy');

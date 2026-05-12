@@ -5,5 +5,11 @@ node_modules/
 *.log
 .vscode/
 .idea/
+.claude/
 supabase/.temp/
 supabase/.branches/
+
+# Internal reference docs must never enter the public repo.
+assets/*.docx
+assets/*.doc
+assets/*.pdf
