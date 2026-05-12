@@ -414,7 +414,7 @@ select {
 .auth-sent strong { color: var(--in-d); font-weight: 700; }
 .auth-resend { background: none; border: none; color: var(--in); font-size: 12px; font-weight: 600; margin-top: 14px; cursor: pointer; padding: 4px 0; font-family: inherit; text-align: center; width: 100%; text-decoration: underline; }
 .auth-resend:hover { color: var(--in-d); }
-#authCode { font-family: 'SF Mono', Monaco, monospace; font-size: 18px; letter-spacing: 6px; text-align: center; }
+#authCode, #loginCode { font-family: 'SF Mono', Monaco, monospace; font-size: 18px; letter-spacing: 6px; text-align: center; }
 
 .auth-restored { font-size: 13px; color: var(--ok, #047857); background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; line-height: 1.5; display: none; }
 .auth-restored.vis { display: block; }

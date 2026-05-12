@@ -46,15 +46,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: 'This email is not authorised as an admin.' }, 403);
     }
 
-    // 2. Validate OTP via the shared studio_otps table
-    const { data: otp } = await sb.from('studio_otps')
+    // 2. Validate OTP via the shared studio_otps table. Take the newest
+    // unused, unexpired row if more than one exists (defensive — send-otp now
+    // invalidates prior codes, but legacy rows may still be around).
+    const { data: otpRows } = await sb.from('studio_otps')
       .select('*')
       .ilike('email', normEmail)
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+    const otp = (otpRows && otpRows[0]) || null;
     if (!otp) return jsonResponse({ ok: false, error: 'No active code. Request a new one.' }, 400);
     if (otp.attempts >= MAX_ATTEMPTS) {
       return jsonResponse({ ok: false, error: 'Too many attempts. Request a new code.' }, 429);

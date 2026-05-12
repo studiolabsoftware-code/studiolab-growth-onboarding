@@ -59,6 +59,14 @@ Deno.serve(async (req) => {
     const code_hash = await sha256Hex(code);
     const expires_at = new Date(Date.now() + OTP_TTL_MIN * 60 * 1000).toISOString();
 
+    // Invalidate any prior unused codes for this email so only the newest one
+    // can be used. Without this, multiple unused codes pile up during repeated
+    // sends and the verify path's single-row lookup breaks ambiguously.
+    await sb.from('studio_otps')
+      .update({ used_at: new Date().toISOString() })
+      .ilike('email', normEmail)
+      .is('used_at', null);
+
     const { error: insErr } = await sb.from('studio_otps').insert({
       email: normEmail, code_hash, expires_at,
     });

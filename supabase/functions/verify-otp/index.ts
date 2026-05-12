@@ -33,16 +33,17 @@ Deno.serve(async (req) => {
     const normEmail = String(email).trim().toLowerCase();
     const sb = adminClient();
 
-    // Find latest unused OTP for this email
-    const { data: otp } = await sb
+    // Find latest unused OTP for this email. limit(1) without maybeSingle()
+    // so accidental multiple unused rows never break the lookup.
+    const { data: otpRows } = await sb
       .from('studio_otps')
       .select('*')
       .ilike('email', normEmail)
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+    const otp = (otpRows && otpRows[0]) || null;
 
     if (!otp) return jsonResponse({ ok: false, error: 'No active code. Request a new one.' }, 400);
 
