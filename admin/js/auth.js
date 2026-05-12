@@ -209,21 +209,21 @@
         return;
       }
 
-      // Hydrate the Supabase Auth session so all subsequent queries on the
-      // dashboard run with the authenticated role and pass existing RLS.
+      // Hydrate the Supabase Auth session. setSession's network validation
+      // step can hang and lock the UI even though the tokens are already
+      // persisted to localStorage and a refresh would restore them. So we
+      // fire it without awaiting and move the UI on immediately.
       const { access_token, refresh_token } = r.data;
-      const { error: setErrSb } = await sb.auth.setSession({ access_token, refresh_token });
-      if (setErrSb) {
-        console.error('setSession failed:', setErrSb);
-        setErr('loginCodeErr', 'Sign-in failed. Please try again.');
-        return;
-      }
+      try {
+        const sp = sb.auth.setSession({ access_token, refresh_token });
+        if (sp && typeof sp.catch === 'function') sp.catch((e) => console.warn('setSession deferred:', e));
+      } catch (e) { console.warn('setSession threw:', e); }
 
       window.AdminAuth.currentUser = pendingEmail;
       // Don't release the button or in-flight flag — the dashboard takes over
       // the view from here. Releasing would let a stray Enter re-fire verify
       // against an already-used code and bounce the user back to the login.
-      try { await showDashboard(pendingEmail); } catch (e) { console.error('showDashboard failed:', e); }
+      try { showDashboard(pendingEmail); } catch (e) { console.error('showDashboard failed:', e); }
     } finally {
       // Only release locks if the session never landed (we're still on the
       // login screen). Otherwise leave them locked so the just-used code is
