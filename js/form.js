@@ -652,22 +652,24 @@
 
   function showLogoPreview(file, objectUrl) {
     const empty = document.getElementById('logoEmpty');
-    const prev = document.getElementById('logoPreview');
     const img = document.getElementById('logoPreviewImg');
     const fn = document.getElementById('logoFn');
-    const sz = document.getElementById('logoSize');
+    const removeBtn = document.getElementById('logoRemoveBtn');
     if (empty) empty.hidden = true;
-    if (prev) prev.hidden = false;
-    if (img) img.src = objectUrl;
-    if (fn) fn.textContent = file.name;
-    if (sz) sz.textContent = bytesToHuman(file.size);
+    if (img) { img.src = objectUrl; img.hidden = false; }
+    if (fn) fn.textContent = `${file.name} · ${bytesToHuman(file.size)}`;
+    if (removeBtn) removeBtn.hidden = false;
   }
 
   function resetLogoView() {
     const empty = document.getElementById('logoEmpty');
-    const prev = document.getElementById('logoPreview');
+    const img = document.getElementById('logoPreviewImg');
+    const fn = document.getElementById('logoFn');
+    const removeBtn = document.getElementById('logoRemoveBtn');
     if (empty) empty.hidden = false;
-    if (prev) prev.hidden = true;
+    if (img) { img.hidden = true; img.removeAttribute('src'); }
+    if (fn) fn.textContent = '';
+    if (removeBtn) removeBtn.hidden = true;
     const input = document.getElementById('logoFile');
     if (input) input.value = '';
     state.logoUrl = null;
@@ -734,13 +736,13 @@
   function bindLogoZone() {
     const zone = document.getElementById('logoZone');
     const input = document.getElementById('logoFile');
-    const replaceBtn = document.getElementById('logoReplace');
+    const uploadBtn = document.getElementById('logoUploadBtn');
+    const removeBtn = document.getElementById('logoRemoveBtn');
     if (!zone || !input || zone.dataset.bound === '1') return;
     zone.dataset.bound = '1';
 
-    // Click on the zone (anywhere except the Replace button) opens the picker.
+    // Thumbnail click and keyboard activation both open the file picker.
     zone.addEventListener('click', (e) => {
-      if (e.target && e.target.closest && e.target.closest('#logoReplace')) return;
       if (e.target && e.target.tagName === 'INPUT') return;
       input.click();
     });
@@ -748,17 +750,17 @@
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
     });
 
-    // Drag and drop.
+    // Drag and drop onto the thumbnail.
     ['dragenter','dragover'].forEach((evt) => {
       zone.addEventListener(evt, (e) => {
         e.preventDefault(); e.stopPropagation();
-        zone.classList.add('logo-zone-drag');
+        zone.classList.add('logo-thumb-drag');
       });
     });
     ['dragleave','drop'].forEach((evt) => {
       zone.addEventListener(evt, (e) => {
         e.preventDefault(); e.stopPropagation();
-        zone.classList.remove('logo-zone-drag');
+        zone.classList.remove('logo-thumb-drag');
       });
     });
     zone.addEventListener('drop', (e) => {
@@ -766,12 +768,16 @@
       if (file) handleLogoFile(file);
     });
 
-    if (replaceBtn) {
-      replaceBtn.addEventListener('click', (e) => {
+    if (uploadBtn) {
+      uploadBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        resetLogoView();
         input.click();
+      });
+    }
+    if (removeBtn) {
+      removeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        resetLogoView();
       });
     }
   }
@@ -1600,13 +1606,13 @@
     }
     if (sub.logo_url) {
       state.logoUrl = sub.logo_url;
-      const empty = document.getElementById('logoEmpty');
-      if (empty) {
-        const title = empty.querySelector('.logo-zone-title');
-        const hint = empty.querySelector('.logo-zone-hint');
-        if (title) title.textContent = 'Logo on file';
-        if (hint) hint.textContent = 'Drop or click to upload a replacement. PNG recommended, max 2.5 MB.';
-      }
+      // Surface that we have a logo on file. We don't have a public URL to
+      // render the thumbnail without a signed-URL round trip, so just show
+      // the filename hint and reveal the Remove button.
+      const fn = document.getElementById('logoFn');
+      const removeBtn = document.getElementById('logoRemoveBtn');
+      if (fn) fn.textContent = 'Logo on file. Upload a new one to replace.';
+      if (removeBtn) removeBtn.hidden = false;
     }
     applyCountryToTimezone();
   }

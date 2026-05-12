@@ -272,22 +272,22 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🖼️</div>Studio logo</div>
-      <div class="logo-zone" id="logoZone" tabindex="0" role="button" aria-label="Upload your studio logo. Drag a file here or press to browse.">
-        <input type="file" id="logoFile" accept="image/png,image/jpeg,image/gif" hidden>
-        <div class="logo-zone-empty" id="logoEmpty">
-          <div class="logo-zone-ico" aria-hidden="true">＋</div>
-          <div class="logo-zone-title">Drop your logo here, or click to browse</div>
-          <div class="logo-zone-hint">PNG with transparent background recommended. JPG or GIF also fine. Proposed size 350 × 180 px, max 2.5 MB.</div>
+      <div class="logo-row">
+        <div class="logo-thumb" id="logoZone" tabindex="0" role="button" aria-label="Upload your studio logo. Drag a file here, or press Enter to browse.">
+          <input type="file" id="logoFile" accept="image/png,image/jpeg,image/gif" hidden>
+          <div class="logo-thumb-empty" id="logoEmpty" aria-hidden="true">+</div>
+          <img class="logo-thumb-img" id="logoPreviewImg" alt="" hidden>
+          <div class="logo-thumb-spin" id="logoSpin" hidden><span class="spinner"></span></div>
         </div>
-        <div class="logo-zone-preview" id="logoPreview" hidden>
-          <div class="logo-zone-img-wrap"><img class="logo-zone-img" id="logoPreviewImg" alt=""></div>
-          <div class="logo-zone-meta">
-            <div class="logo-zone-name" id="logoFn"></div>
-            <div class="logo-zone-size" id="logoSize"></div>
+        <div class="logo-meta">
+          <div class="logo-meta-title">Studio logo</div>
+          <div class="logo-meta-desc">Recommended 350 × 180 px. Max 2.5 MB. PNG with a transparent background works best. JPG and GIF are also accepted.</div>
+          <div class="logo-meta-actions">
+            <button type="button" class="btn-logo btn-logo-up" id="logoUploadBtn">Upload</button>
+            <button type="button" class="btn-logo btn-logo-rm" id="logoRemoveBtn" hidden>Remove</button>
           </div>
-          <button type="button" class="logo-zone-replace" id="logoReplace">Replace</button>
+          <div class="logo-meta-file" id="logoFn"></div>
         </div>
-        <div class="logo-zone-spin" id="logoSpin" hidden><span class="spinner"></span> Uploading…</div>
       </div>
       <div class="logo-zone-err" id="logoErr" hidden></div>
     </div>

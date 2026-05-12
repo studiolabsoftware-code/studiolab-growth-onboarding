@@ -560,26 +560,35 @@ body.pay-modal-open { overflow: hidden; }
 
 /* ── Brand step: dropzone, tight colour pickers, signature preview ─── */
 
-/* Logo dropzone — bigger target, drag-and-drop friendly, with preview state */
-.logo-zone { position: relative; display: flex; align-items: center; justify-content: center; min-height: 160px; padding: 18px 22px; border: 2px dashed var(--g2); border-radius: 14px; background: var(--g1); cursor: pointer; transition: border-color 0.15s, background 0.15s; }
-.logo-zone:hover { border-color: var(--in); background: var(--in-l); }
-.logo-zone:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
-.logo-zone-drag { border-color: var(--mg); background: var(--mg-l); border-style: solid; }
-.logo-zone-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
-.logo-zone-ico { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 1px solid var(--g2); display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--in); font-weight: 700; margin-bottom: 4px; }
-.logo-zone-title { font-size: 14px; font-weight: 700; color: var(--in-d); }
-.logo-zone-hint { font-size: 11px; color: var(--g6); line-height: 1.5; max-width: 360px; }
+/* Studio logo — GHL-style two-column layout: thumbnail on the left, meta
+   and Upload/Remove buttons on the right. Drag-and-drop still works on
+   the thumbnail itself for power users. */
+.logo-row { display: flex; gap: 18px; align-items: flex-start; }
+@media (max-width: 480px) { .logo-row { flex-direction: column; align-items: stretch; gap: 14px; } }
 
-.logo-zone-preview { display: flex; align-items: center; gap: 14px; width: 100%; }
-.logo-zone-img-wrap { flex: 0 0 auto; width: 100px; height: 60px; padding: 6px; background: #fff; border: 1px solid var(--g2); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.logo-zone-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
-.logo-zone-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.logo-zone-name { font-size: 13px; font-weight: 600; color: var(--in-d); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.logo-zone-size { font-size: 11px; color: var(--g6); }
-.logo-zone-replace { background: #fff; border: 1px solid var(--g2); border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--in); cursor: pointer; font-family: inherit; transition: border-color 0.15s, color 0.15s; }
-.logo-zone-replace:hover { border-color: var(--in); color: var(--in-d); }
-.logo-zone-spin { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--g6); }
-.logo-zone-err { margin-top: 8px; color: var(--rd, #B91C1C); font-size: 12px; font-weight: 600; }
+.logo-thumb { position: relative; flex: 0 0 auto; width: 180px; height: 110px; border: 1px solid var(--g2); border-radius: 10px; background: var(--g1); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.logo-thumb:hover { border-color: var(--in); }
+.logo-thumb:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+.logo-thumb-drag { border-color: var(--mg); background: var(--mg-l); border-style: dashed; }
+.logo-thumb-empty { font-size: 36px; font-weight: 300; color: var(--g4); line-height: 1; }
+.logo-thumb-img { max-width: calc(100% - 12px); max-height: calc(100% - 12px); object-fit: contain; display: block; }
+.logo-thumb-spin { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.85); }
+@media (max-width: 480px) { .logo-thumb { width: 100%; height: 140px; } }
+
+.logo-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.logo-meta-title { font-size: 13px; font-weight: 700; color: var(--in-d); }
+.logo-meta-desc { font-size: 12px; color: var(--g6); line-height: 1.55; }
+.logo-meta-actions { display: flex; gap: 8px; margin-top: 4px; }
+.btn-logo { background: #fff; border: 1px solid var(--g2); border-radius: 8px; padding: 7px 18px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; min-height: 34px; transition: border-color 0.15s, color 0.15s, background 0.15s; }
+.btn-logo-up { color: var(--in); border-color: var(--in); }
+.btn-logo-up:hover { background: var(--in); color: #fff; }
+.btn-logo-rm { color: var(--g6); }
+.btn-logo-rm:hover { border-color: var(--rd, #B91C1C); color: var(--rd, #B91C1C); }
+.btn-logo:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+.logo-meta-file { font-size: 11px; color: var(--g6); margin-top: 4px; min-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logo-meta-file:empty { display: none; }
+
+.logo-zone-err { margin-top: 10px; color: var(--rd, #B91C1C); font-size: 12px; font-weight: 600; }
 
 /* Brand colour pickers — tighter and side-by-side */
 .brand-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
