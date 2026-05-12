@@ -467,3 +467,10 @@ select {
 .picker-card input[type="radio"] { width: 14px; height: 14px; accent-color: var(--in); margin: 0; flex-shrink: 0; }
 .picker-card span { line-height: 1.4; }
 .picker-card strong { color: var(--in-d); }
+
+/* Override: gate icon hosts the real Growth logo, not the SL mark */
+.auth-card .auth-icon { width: auto; height: auto; background: transparent; padding: 0; margin-bottom: 22px; }
+.auth-card .auth-icon img { display: block; height: 36px; width: auto; }
+@media (max-width: 480px) {
+  .auth-card .auth-icon img { height: 32px; }
+}

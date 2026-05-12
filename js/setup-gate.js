@@ -149,7 +149,7 @@
     const card = document.querySelector('#authGate .auth-card');
     if (!card) return;
     card.innerHTML = ''
-      + '<div class="auth-icon" aria-hidden="true"><span class="sl-mark">SL</span></div>'
+      + '<div class="auth-icon" aria-hidden="true">' + '<img src="/assets/growth-logo.svg" alt="StudioLAB Growth">' + '</div>'
       + '<h2 class="auth-title">Pick your plan to start</h2>'
       + '<p class="auth-desc">We could not find an existing setup for that email. Choose your plan and region to begin a fresh one.</p>'
       + '<div class="picker-group" role="radiogroup" aria-label="Region">'
