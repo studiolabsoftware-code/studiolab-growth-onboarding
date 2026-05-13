@@ -520,7 +520,7 @@ select {
 .paybar-amt { font-size: 28px; font-weight: 800; color: var(--in-d); letter-spacing: -0.6px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .paybar-sub { font-size: 12px; color: var(--g6); }
 .paybar-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
-.paybar-pay { padding: 12px 28px; font-size: 14px; font-weight: 700; min-height: 48px; }
+.paybar-pay { padding: 9px 20px; font-size: 13px; font-weight: 600; min-height: 38px; border-radius: 10px; }
 .paybar-later { background: transparent; border: none; color: var(--in); font-weight: 600; font-size: 12px; cursor: pointer; padding: 4px 8px; font-family: inherit; text-decoration: none; }
 .paybar-later:hover { color: var(--in-d); text-decoration: underline; }
 .paybar-later:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; border-radius: 4px; }
