@@ -9,8 +9,75 @@
   const sb = window.initSupabase ? window.initSupabase() : null;
   const SB_URL = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) || '';
   const FN_BASE = SB_URL + '/functions/v1/';
+  const ADMIN_JWT_KEY = window.ADMIN_JWT_KEY;
+  const ADMIN_REFRESH_KEY = 'sl-admin-refresh';
 
   window.AdminAuth = { currentUser: null, profile: null, sb };
+
+  // ── JWT refresh ────────────────────────────────────────────────────────
+  // The Supabase access token verify-admin-otp hands out lives for one
+  // hour. Without explicit refresh, the admin gets silently logged out
+  // mid-session: queries start returning 401, the dashboard renders as
+  // empty, and the only fix is a manual reload. We trade that for a
+  // proactive refresh loop here — well before expiry we POST the stored
+  // refresh_token to Supabase Auth, swap in the new access_token, and
+  // null the cached supabase-js client so subsequent calls pick it up.
+  let refreshTimer = null;
+
+  async function refreshAdminSession() {
+    let refresh;
+    try { refresh = localStorage.getItem(ADMIN_REFRESH_KEY); } catch (_) { refresh = null; }
+    if (!refresh) return false;
+    try {
+      const resp = await fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': window.SUPABASE_CONFIG.anonKey,
+        },
+        body: JSON.stringify({ refresh_token: refresh }),
+      });
+      if (!resp.ok) return false;
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.access_token) return false;
+      try {
+        localStorage.setItem(ADMIN_JWT_KEY, data.access_token);
+        if (data.refresh_token) localStorage.setItem(ADMIN_REFRESH_KEY, data.refresh_token);
+      } catch (_) { /* ignore */ }
+      // Force the supabase-js client to be re-built with the new JWT on
+      // the next sb() call. Existing in-flight queries keep the old token
+      // (Supabase still accepts it until its own expiry).
+      window._sbClient = null;
+      if (window.initSupabase) window.initSupabase();
+      return true;
+    } catch (e) {
+      console.warn('admin refresh failed:', e);
+      return false;
+    }
+  }
+
+  function scheduleProactiveRefresh(info) {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    const msToExp = (info.payload.exp * 1000) - Date.now();
+    // Refresh five minutes before expiry, but never sooner than one
+    // minute from now (avoids hammering on slow clocks).
+    const delay = Math.max(60 * 1000, msToExp - 5 * 60 * 1000);
+    refreshTimer = setTimeout(async () => {
+      const ok = await refreshAdminSession();
+      if (ok) {
+        const next = readAdminJwt();
+        if (next) scheduleProactiveRefresh(next);
+        else showSessionExpired();
+      } else {
+        showSessionExpired();
+      }
+    }, delay);
+  }
+
+  function showSessionExpired() {
+    const ex = document.getElementById('admSessionExpired');
+    if (ex) ex.style.display = 'flex';
+  }
 
   let pendingEmail = '';
 
@@ -160,11 +227,19 @@
 
   async function handleSession() {
     if (!sb) { showLogin(); return; }
-    const info = readAdminJwt();
+    let info = readAdminJwt();
+    if (!info) {
+      // JWT is missing or expired — try one refresh before sending them
+      // back to the login screen. If the refresh works, the user never
+      // even sees a flicker.
+      const refreshed = await refreshAdminSession();
+      if (refreshed) info = readAdminJwt();
+    }
     if (!info) { showLogin(); return; }
     const email = info.payload.email || info.payload.user_metadata?.email || '';
     if (!email) { showLogin(); return; }
     window.AdminAuth.currentUser = email;
+    scheduleProactiveRefresh(info);
     showDashboard(email);
   }
 
@@ -235,6 +310,9 @@
       // attach it as a global Authorization header to every request.
       try {
         localStorage.setItem(window.ADMIN_JWT_KEY, r.data.access_token);
+        if (r.data.refresh_token) {
+          localStorage.setItem(ADMIN_REFRESH_KEY, r.data.refresh_token);
+        }
       } catch (e) {
         console.error('Could not store admin JWT:', e);
         setErr('loginCodeErr', 'Your browser blocked storing the sign-in token. Please allow site data and try again.');
@@ -284,18 +362,25 @@
     }
 
     $('admSignOut').addEventListener('click', () => {
-      // Clear our admin JWT (and any leftover supabase-js auth tokens from
-      // older builds), then reload. The fresh page boot has no admin JWT
-      // attached, so the client comes up unauthenticated and lands on
-      // the login screen via handleSession.
+      // Clear our admin JWT, the refresh token, and any leftover
+      // supabase-js auth tokens from older builds, then reload. The fresh
+      // page boot has no admin JWT attached, so the client comes up
+      // unauthenticated and lands on the login screen via handleSession.
       try { localStorage.removeItem(window.ADMIN_JWT_KEY); } catch (_) {}
+      try { localStorage.removeItem(ADMIN_REFRESH_KEY); } catch (_) {}
       try {
         Object.keys(localStorage).forEach((k) => {
           if (k.startsWith('sb-') && k.includes('auth-token')) localStorage.removeItem(k);
         });
       } catch (_) {}
+      if (refreshTimer) clearTimeout(refreshTimer);
       window.location.reload();
     });
+
+    // Session-expired overlay: only shown if refresh fails. The single
+    // CTA reloads, which clears state and lands on the login screen.
+    const expBtn = document.getElementById('admSessionExpiredBtn');
+    if (expBtn) expBtn.addEventListener('click', () => window.location.reload());
 
     const navEl = $('admNav');
     if (navEl) {

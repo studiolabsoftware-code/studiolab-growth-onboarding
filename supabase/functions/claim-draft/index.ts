@@ -1,12 +1,13 @@
 // Bridges generic-mode OTP verification to a plan-specific draft. The studio
 // already proved email ownership via verify-otp (which returned a 5-minute
 // verified_token). They picked a plan + region. This function claims or
-// creates the draft for that combination and returns a 24-hour session token.
+// creates the draft for that combination and returns a 90-day session token.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex, randomToken } from '../_shared/supabase.ts';
 
-const SESSION_TTL_HOURS = 24;
+// Match verify-otp: studios should be able to resume a draft weeks later.
+const SESSION_TTL_HOURS = 24 * 90;
 const ALLOWED_PLANS  = new Set(['launch', 'scale', 'ai']);
 const ALLOWED_REGIONS = new Set(['AU', 'US']);
 

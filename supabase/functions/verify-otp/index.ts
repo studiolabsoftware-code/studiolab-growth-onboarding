@@ -1,11 +1,14 @@
 // Verifies a 6-digit OTP for an email. On success: finds or creates the draft
-// submission for (email, plan, region), issues a 24h session token, returns
+// submission for (email, plan, region), issues a 90-day session token, returns
 // the draft data so the form can hydrate.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex, randomToken } from '../_shared/supabase.ts';
 
-const SESSION_TTL_HOURS = 24;
+// Long-lived studio session. Onboarding payloads are not sensitive (studio
+// name, classes, public KB content) and we want studios to be able to come
+// back to a half-finished draft weeks later without re-verifying.
+const SESSION_TTL_HOURS = 24 * 90;
 const MAX_ATTEMPTS = 5;
 const ALLOWED_PLANS  = new Set(['launch', 'scale', 'ai']);
 const ALLOWED_REGIONS = new Set(['AU', 'US']);

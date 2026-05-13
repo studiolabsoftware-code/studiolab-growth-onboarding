@@ -346,15 +346,27 @@
   </div>
 </div>
 
+<!-- Session-expired overlay. Only shown if the proactive JWT refresh
+     fails — the admin sees a clear "please sign in again" prompt instead
+     of a silently-emptied dashboard. -->
+<div id="admSessionExpired" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(19,16,46,.55);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:28px;box-shadow:0 12px 40px rgba(0,0,0,.18);text-align:center;font-family:Inter,sans-serif;">
+    <div style="width:48px;height:48px;border-radius:50%;background:#FEF3C7;color:#B45309;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;">⟳</div>
+    <h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:#13102E;">Your sign-in has expired</h2>
+    <p style="margin:0 0 18px;color:#555;font-size:14px;line-height:1.55;">For security, admin sessions auto-renew while you're active. We tried to renew yours and couldn't reach the auth service — sign in again to keep going.</p>
+    <button type="button" id="admSessionExpiredBtn" style="background:#13102E;color:#fff;border:0;border-radius:999px;padding:12px 28px;font-weight:600;font-size:14px;cursor:pointer;">Sign in again</button>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../js/supabase-config.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/modal.js"></script>
-<script src="js/dashboard.js"></script>
-<script src="js/detail.js"></script>
-<script src="js/change-request.js"></script>
-<script src="js/users.js"></script>
-<script src="js/catalog.js"></script>
-<script src="js/settings.js"></script>
+<script src="../js/supabase-config.js?v=20260513a"></script>
+<script src="js/auth.js?v=20260513a"></script>
+<script src="js/modal.js?v=20260513a"></script>
+<script src="js/dashboard.js?v=20260513a"></script>
+<script src="js/detail.js?v=20260513a"></script>
+<script src="js/change-request.js?v=20260513a"></script>
+<script src="js/users.js?v=20260513a"></script>
+<script src="js/catalog.js?v=20260513a"></script>
+<script src="js/settings.js?v=20260513a"></script>
 </body>
 </html>
