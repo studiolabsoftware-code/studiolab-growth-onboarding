@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/form.css?v=20260513c">
+<link rel="stylesheet" href="/css/form.css?v=20260513d">
 <script>window.PLAN = 'scale'; window.REGION = 'AU';</script>
 </head>
 <body>
@@ -486,14 +486,14 @@
 
     <div class="sum-grid">
       <div class="sum-sec">
-        <div class="sum-hdr"><span aria-hidden="true">📦</span> Plan and setup</div>
+        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">📦</span><span class="sum-hdr-title">Plan and setup</span><button type="button" class="sum-edit" data-edit-step="1">Edit</button></div>
         <div class="sum-body">
           <div class="sum-f"><div class="sum-k">Plan</div><div class="sum-v" id="sv-plan">Scale</div></div>
           <div class="sum-f"><div class="sum-k">Setup type</div><div class="sum-v" id="sv-setup">Not provided</div></div>
         </div>
       </div>
       <div class="sum-sec">
-        <div class="sum-hdr"><span aria-hidden="true">🏫</span> Studio details</div>
+        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">🏫</span><span class="sum-hdr-title">Studio details</span><button type="button" class="sum-edit" data-edit-step="2">Edit</button></div>
         <div class="sum-body">
           <div class="sum-f"><div class="sum-k">Studio name</div><div class="sum-v" id="sv-studio">Not provided</div></div>
           <div class="sum-f"><div class="sum-k">Country</div><div class="sum-v" id="sv-country">Not provided</div></div>
@@ -504,7 +504,7 @@
         </div>
       </div>
       <div class="sum-sec">
-        <div class="sum-hdr"><span aria-hidden="true">🎨</span> Branding</div>
+        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">🎨</span><span class="sum-hdr-title">Branding</span><button type="button" class="sum-edit" data-edit-step="3">Edit</button></div>
         <div class="sum-body">
           <div class="sum-f"><div class="sum-k">Logo</div><div class="sum-v" id="sv-logo">Not provided</div></div>
           <div class="sum-f"><div class="sum-k">Primary colour</div><div class="sum-v" id="sv-col1">Not provided</div></div>
@@ -513,7 +513,7 @@
         </div>
       </div>
       <div class="sum-sec">
-        <div class="sum-hdr"><span aria-hidden="true">✉️</span> Email setup</div>
+        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">✉️</span><span class="sum-hdr-title">Email setup</span><button type="button" class="sum-edit" data-edit-step="3">Edit</button></div>
         <div class="sum-body">
           <div class="sum-f"><div class="sum-k">From name</div><div class="sum-v" id="sv-fromname">Not provided</div></div>
           <div class="sum-f"><div class="sum-k">Reply-to</div><div class="sum-v" id="sv-replyto">Not provided</div></div>
@@ -521,7 +521,7 @@
         </div>
       </div>
       <div class="sum-sec">
-        <div class="sum-hdr"><span aria-hidden="true">⚡</span> Automations</div>
+        <div class="sum-hdr sum-hdr-static"><span class="sum-hdr-ico" aria-hidden="true">⚡</span><span class="sum-hdr-title">Automations</span></div>
         <div class="sum-body">
           <div class="sum-f"><div class="sum-k">Included</div><div class="sum-v" id="sv-automations">All Scale automations will be activated during setup</div></div>
         </div>
@@ -567,7 +567,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
-<script src="/js/form.js?v=20260513c"></script>
+<script src="/js/form.js?v=20260513d"></script>
 
 </div><!-- /formWrap -->
 </body>

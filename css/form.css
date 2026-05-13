@@ -356,16 +356,26 @@ select {
 .tier-section-title::after  { content: ''; flex: 1; height: 1px; background: var(--g2); }
 
 /* ── Summary cards ─────────────────────────────────── */
+/* Review summary — distinct section cards with strong headers, key/value
+   rows, and an Edit affordance that jumps the studio back to the matching
+   step. */
 .sum-grid { display: grid; gap: 14px; }
 .sum-sec { background: #fff; border: 1px solid var(--g2); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
-.sum-hdr { background: var(--g1); border-bottom: 1px solid var(--g2); padding: 10px 14px; font-size: 10px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase; color: var(--g6); display: flex; align-items: center; gap: 6px; }
-.sum-body { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sum-hdr { background: var(--in-l); border-bottom: 1px solid var(--g2); padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+.sum-hdr-ico { width: 30px; height: 30px; border-radius: 8px; background: #fff; border: 1px solid var(--g2); display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.sum-hdr-title { flex: 1; font-size: 13px; font-weight: 700; color: var(--in-d); letter-spacing: -0.1px; }
+.sum-edit { background: #fff; border: 1px solid var(--in); border-radius: 999px; padding: 5px 14px; font-size: 11px; font-weight: 600; color: var(--in); cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; min-height: 28px; }
+.sum-edit:hover { background: var(--in); color: #fff; }
+.sum-edit:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+.sum-hdr-static { background: var(--g1); }
+.sum-hdr-static .sum-hdr-title { color: var(--g6); }
+.sum-body { padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 480px) { .sum-body { grid-template-columns: 1fr; } }
 .sum-f { display: flex; flex-direction: column; gap: 2px; }
 .sum-f.full { grid-column: 1 / -1; }
-.sum-k { font-size: 10px; font-weight: 600; color: var(--g4); text-transform: uppercase; letter-spacing: 0.4px; }
-.sum-v { font-size: 12px; color: var(--g8); font-weight: 500; word-break: break-word; }
-.sum-v.emp { color: var(--g4); font-style: italic; }
+.sum-k { font-size: 10px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.6px; }
+.sum-v { font-size: 13px; color: var(--in-d); font-weight: 500; word-break: break-word; }
+.sum-v.emp { color: var(--g4); font-style: italic; font-weight: 400; }
 
 /* ── Submit error banner ───────────────────────────── */
 .submit-err {

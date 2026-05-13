@@ -1821,6 +1821,14 @@
         return;
       }
 
+      // Review-step Edit buttons jump back to the matching step.
+      const editBtn = e.target.closest('[data-edit-step]');
+      if (editBtn) {
+        const target = parseInt(editBtn.dataset.editStep, 10);
+        if (target && target >= 1 && target <= totalSteps()) goTo(target);
+        return;
+      }
+
       const stepPill = e.target.closest('.sp');
       if (stepPill && !stepPill.disabled) {
         const target = parseInt(stepPill.dataset.s, 10);
