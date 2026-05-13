@@ -955,19 +955,26 @@
     setSum('sv-phone', val('contactPhone'));
     setSum('sv-website', val('website'));
     setSum('sv-logo', state.logoUrl ? 'Uploaded' : 'Not provided');
-    // Primary colour: render an inline swatch beside the hex so the studio
-    // can visually confirm the colour they picked.
-    const svCol1 = document.getElementById('sv-col1');
-    if (svCol1) {
-      const hex = (val('col1t') || '').trim();
-      if (hex) {
-        svCol1.innerHTML = `<span class="sum-swatch" style="background:${escapeForHtml(hex)}" aria-hidden="true"></span><span>${escapeForHtml(hex.toUpperCase())}</span>`;
+    // Primary and Secondary colours: inline swatch beside the hex so the
+    // studio can visually confirm the colours they picked.
+    function paintSwatch(elId, hex) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const v = (hex || '').trim();
+      if (v) {
+        el.innerHTML = `<span class="sum-swatch" style="background:${escapeForHtml(v)}" aria-hidden="true"></span><span>${escapeForHtml(v.toUpperCase())}</span>`;
       } else {
-        svCol1.textContent = 'Not provided';
+        el.textContent = 'Not provided';
       }
     }
+    paintSwatch('sv-col1', val('col1t'));
+    paintSwatch('sv-col2', val('col2t'));
+    // Brand reference screenshot: status only — bucket is private and we
+    // don't round-trip a signed URL just for the summary.
+    setSum('sv-brandref', state.brandReferenceUrl ? 'Screenshot uploaded' : 'None');
     setSum('sv-signoff', val('signOff'));
-    setSum('sv-tone', val('tone'));
+    // Tone field was removed when Branding and Email merged into Voice
+    // and email; the Review section no longer renders it.
     setSum('sv-fromname', val('fromName'));
     setSum('sv-replyto', val('replyEmail'));
     const dns = state.yn.dns;
