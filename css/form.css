@@ -610,17 +610,16 @@ body.pay-modal-open { overflow: hidden; }
    SMS & leads). Studio logo card stays outside this wrapper so it spans
    the full width above. Each card sizes to its own content so the row
    height isn't dragged up by the tallest card. */
-/* Cards flow as a two-column masonry via CSS columns. Each card stays at
-   its natural height and a shorter card lets the next one start earlier
-   in the same column. No stretched empty space. */
-.cards-grid { column-count: 2; column-gap: 14px; margin-bottom: 14px; }
-.cards-grid > .card { break-inside: avoid; margin-bottom: 14px; display: block; }
-.cards-grid > .card:last-child { margin-bottom: 0; }
-/* Inside a column-flowed card, collapse inner two-up rows to a single
-   column so inputs don't get squeezed in the narrower card width. */
+/* Two-column grid where cards in the same row stretch to match the
+   taller card's height. Internal whitespace at the bottom of a shorter
+   card is preferred over an uneven, jagged row bottom. */
+.cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.cards-grid > .card { margin-bottom: 0; }
+/* Inside a narrow grid card, collapse inner two-up rows to a single
+   column so inputs don't get squeezed. */
 .cards-grid > .card .fr,
 .cards-grid > .card .sig-rows,
 .cards-grid > .card .brand-cols { grid-template-columns: 1fr; }
 @media (max-width: 720px) {
-  .cards-grid { column-count: 1; }
+  .cards-grid { grid-template-columns: 1fr; }
 }
