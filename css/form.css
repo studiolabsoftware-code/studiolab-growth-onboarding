@@ -580,7 +580,28 @@ body.pay-modal-open { overflow: hidden; }
 .pay-modal-ftr { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px; border-top: 1px solid var(--g2); background: var(--g1); border-radius: 0 0 18px 18px; flex-wrap: wrap; }
 .pay-modal-secondary { color: var(--g6); font-weight: 600; font-size: 12px; cursor: pointer; padding: 6px 8px; background: transparent; border: none; font-family: inherit; }
 .pay-modal-secondary:hover { color: var(--in-d); text-decoration: underline; }
-.pay-modal-pay { padding: 11px 24px; font-size: 14px; font-weight: 700; min-height: 44px; }
+.pay-modal-pay { padding: 11px 24px; font-size: 14px; font-weight: 700; min-height: 44px; border-radius: 10px; }
+
+/* Preview-mode Stripe-handoff simulation. Lives inside the pay modal when
+   ?preview=1 — no real Stripe traffic, just a visual walkthrough of the
+   redirect → checkout → processing → success sequence. */
+.pay-preview-eyebrow { color: var(--mg-h, #7C3AED); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.pay-preview-center { text-align: center; padding: 32px 24px; }
+.pay-preview-spinner { width: 44px; height: 44px; margin: 0 auto 18px; border: 3px solid var(--g2); border-top-color: var(--in); border-radius: 50%; animation: payPreviewSpin .9s linear infinite; }
+@keyframes payPreviewSpin { to { transform: rotate(360deg); } }
+.pay-preview-note { margin: 0; font-size: 13px; color: var(--g6); line-height: 1.55; }
+.pay-preview-success { margin: 0 0 8px; font-size: 16px; font-weight: 700; color: var(--in-d); }
+.pay-preview-tick { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 50%; background: var(--gr, #047857); color: #fff; font-size: 30px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.pay-preview-amount { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px; border: 1px solid var(--g2); border-radius: 10px; background: var(--g1); margin-bottom: 18px; }
+.pay-preview-amount-k { font-size: 13px; color: var(--g6); font-weight: 600; }
+.pay-preview-amount-v { font-size: 20px; color: var(--in-d); font-weight: 800; letter-spacing: -.3px; }
+.pay-preview-fields { display: flex; flex-direction: column; gap: 12px; }
+.pay-preview-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.pay-preview-field-row { display: flex; gap: 12px; }
+.pay-preview-label { font-size: 11px; font-weight: 600; color: var(--g6); text-transform: uppercase; letter-spacing: .04em; }
+.pay-preview-field input { width: 100%; padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--in-d); background: #fff; border: 1px solid var(--g2); border-radius: 8px; }
+.pay-preview-field input:focus { outline: 2px solid var(--in); outline-offset: 1px; }
+.pay-preview-ftr-single { justify-content: flex-end; }
 .pay-modal-foot { margin: 0; padding: 12px 24px 18px; font-size: 11px; color: var(--g6); text-align: center; line-height: 1.5; }
 .payblock-error { color: var(--rd, #B91C1C); font-weight: 600; padding: 8px 0; }
 

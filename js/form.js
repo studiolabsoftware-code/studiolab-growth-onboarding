@@ -1331,7 +1331,7 @@
 
   async function handlePayAndSubmit(btn) {
     if (PREVIEW_MODE) {
-      window.alert('Preview mode: payment is disabled.');
+      runPreviewPayFlow();
       return;
     }
     const hp = document.getElementById('hp-company');
@@ -1394,6 +1394,141 @@
       btn.innerHTML = originalLabel;
       if (errEl) errEl.classList.add('vis');
     }
+  }
+
+  // Preview-mode simulation of the Stripe handoff. Admins walking the form
+  // with ?preview=1 have no submission row to attach a real checkout session
+  // to, so we mock the full sequence — "Redirecting…", a Stripe-styled
+  // checkout panel with a pre-filled test card, processing, then success —
+  // entirely inside the existing pay modal. Nothing leaves the browser.
+  function runPreviewPayFlow() {
+    const modal = document.getElementById('payModal');
+    if (!modal) return;
+    const card = modal.querySelector('.pay-modal-card');
+    if (!card) return;
+    const originalHTML = card.innerHTML;
+
+    const pricing = pricingState.pricing || {};
+    const total = formatMoney(pricing.total_with_tax_cents || 0, pricing.currency || 'AUD');
+    const productName = pricing.product_name || 'StudioLAB Growth setup';
+    const postPayCopy = PLAN === 'ai'
+      ? 'You would now be redirected to /kb.html to set up your AI knowledge base.'
+      : 'Your setup would be queued and our team would email you shortly with next steps.';
+
+    const restore = () => {
+      card.innerHTML = originalHTML;
+      // Existing handlers were bound to the original elements; re-bind them on
+      // the restored DOM so the modal stays interactive.
+      const applyBtn = card.querySelector('#pay-code-apply');
+      const codeIn = card.querySelector('#pay-code');
+      const payBtn = card.querySelector('#payModalPayBtn');
+      const laterBtn = card.querySelector('#payModalLaterBtn');
+      if (applyBtn) applyBtn.addEventListener('click', applyDiscount);
+      if (codeIn) codeIn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); applyDiscount(); }
+      });
+      if (payBtn) payBtn.addEventListener('click', (e) => handlePayAndSubmit(e.currentTarget));
+      if (laterBtn) laterBtn.addEventListener('click', (e) => { closePayModal(); handleSaveLater(e.currentTarget); });
+      card.querySelectorAll('[data-pay-close]').forEach((el) => {
+        el.addEventListener('click', () => closePayModal());
+      });
+      refreshPricing();
+    };
+
+    const stageRedirecting = () => {
+      card.innerHTML = ''
+        + '<header class="pay-modal-hdr">'
+        +   '<div class="pay-modal-eyebrow pay-preview-eyebrow">Preview mode</div>'
+        +   '<h2 class="pay-modal-title">Redirecting to Stripe…</h2>'
+        + '</header>'
+        + '<div class="pay-modal-body pay-preview-center">'
+        +   '<div class="pay-preview-spinner" aria-hidden="true"></div>'
+        +   '<p class="pay-preview-note">In production this is where the browser navigates to Stripe Checkout.</p>'
+        + '</div>';
+      setTimeout(stageCheckout, 900);
+    };
+
+    const stageCheckout = () => {
+      card.innerHTML = ''
+        + '<header class="pay-modal-hdr">'
+        +   '<div class="pay-modal-eyebrow pay-preview-eyebrow">Preview mode · simulated Stripe Checkout</div>'
+        +   '<h2 class="pay-modal-title">' + escapeHtml(productName) + '</h2>'
+        +   '<button type="button" class="pay-modal-close" data-preview-cancel aria-label="Close">×</button>'
+        + '</header>'
+        + '<div class="pay-modal-body">'
+        +   '<div class="pay-preview-amount">'
+        +     '<span class="pay-preview-amount-k">Pay StudioLAB</span>'
+        +     '<span class="pay-preview-amount-v">' + escapeHtml(total) + '</span>'
+        +   '</div>'
+        +   '<div class="pay-preview-fields">'
+        +     '<label class="pay-preview-field">'
+        +       '<span class="pay-preview-label">Email</span>'
+        +       '<input type="text" value="preview@studiolabgrowth.com" readonly>'
+        +     '</label>'
+        +     '<label class="pay-preview-field">'
+        +       '<span class="pay-preview-label">Card number</span>'
+        +       '<input type="text" value="4242 4242 4242 4242" readonly>'
+        +     '</label>'
+        +     '<div class="pay-preview-field-row">'
+        +       '<label class="pay-preview-field">'
+        +         '<span class="pay-preview-label">Expiry</span>'
+        +         '<input type="text" value="12 / 34" readonly>'
+        +       '</label>'
+        +       '<label class="pay-preview-field">'
+        +         '<span class="pay-preview-label">CVC</span>'
+        +         '<input type="text" value="123" readonly>'
+        +       '</label>'
+        +     '</div>'
+        +     '<label class="pay-preview-field">'
+        +       '<span class="pay-preview-label">Name on card</span>'
+        +       '<input type="text" value="StudioLAB Preview" readonly>'
+        +     '</label>'
+        +   '</div>'
+        + '</div>'
+        + '<footer class="pay-modal-ftr">'
+        +   '<button type="button" class="btn-link pay-modal-secondary" data-preview-cancel>Cancel</button>'
+        +   '<button type="button" class="btn btn-ok pay-modal-pay" data-preview-pay>Pay ' + escapeHtml(total) + '</button>'
+        + '</footer>'
+        + '<p class="pay-modal-foot">Powered by Stripe · Test card pre-filled · No real charge.</p>';
+      card.querySelectorAll('[data-preview-cancel]').forEach((el) => {
+        el.addEventListener('click', restore);
+      });
+      const payBtn = card.querySelector('[data-preview-pay]');
+      if (payBtn) payBtn.addEventListener('click', stageProcessing);
+    };
+
+    const stageProcessing = () => {
+      card.innerHTML = ''
+        + '<header class="pay-modal-hdr">'
+        +   '<div class="pay-modal-eyebrow pay-preview-eyebrow">Preview mode</div>'
+        +   '<h2 class="pay-modal-title">Processing payment…</h2>'
+        + '</header>'
+        + '<div class="pay-modal-body pay-preview-center">'
+        +   '<div class="pay-preview-spinner" aria-hidden="true"></div>'
+        +   '<p class="pay-preview-note">Stripe is confirming the charge. The webhook would now stamp the submission as paid.</p>'
+        + '</div>';
+      setTimeout(stageSuccess, 1100);
+    };
+
+    const stageSuccess = () => {
+      card.innerHTML = ''
+        + '<header class="pay-modal-hdr">'
+        +   '<div class="pay-modal-eyebrow pay-preview-eyebrow">Preview mode</div>'
+        +   '<h2 class="pay-modal-title">Payment received</h2>'
+        + '</header>'
+        + '<div class="pay-modal-body pay-preview-center">'
+        +   '<div class="pay-preview-tick" aria-hidden="true">✓</div>'
+        +   '<p class="pay-preview-success">' + escapeHtml(total) + ' charged to the test card.</p>'
+        +   '<p class="pay-preview-note">' + escapeHtml(postPayCopy) + '</p>'
+        + '</div>'
+        + '<footer class="pay-modal-ftr pay-preview-ftr-single">'
+        +   '<button type="button" class="btn btn-ok pay-modal-pay" data-preview-done>Close preview</button>'
+        + '</footer>';
+      const done = card.querySelector('[data-preview-done]');
+      if (done) done.addEventListener('click', () => { restore(); closePayModal(); });
+    };
+
+    stageRedirecting();
   }
 
   async function handleSaveLater(btn) {
