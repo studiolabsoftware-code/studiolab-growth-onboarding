@@ -891,6 +891,13 @@
       voice_escalate: isAi ? valOrNull('voiceEscalate') : null,
 
       extra_notes: valOrNull('extraNotes'),
+
+      // Optional future-proof URLs (Launch only). Form skips them silently
+      // if the inputs don't exist on the current plan.
+      google_business_url: valOrNull('googleBusinessUrl'),
+      facebook_url:        valOrNull('facebookUrl'),
+      instagram_handle:    valOrNull('instagramHandle'),
+      booking_url:         valOrNull('bookingUrl'),
     };
   }
 
@@ -1564,6 +1571,7 @@
       'firstName','lastName','contactPhone','contactRole',
       'col1t','col2t','fromName','replyEmail','emailDomain',
       'smsType','portNum',
+      'googleBusinessUrl','facebookUrl','instagramHandle','bookingUrl',
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
     ].forEach((id) => setVal(id, sub[idToColumn(id)]));
@@ -1629,6 +1637,8 @@
       'kb-policies': 'kb_policies', 'kb-events': 'kb_events', 'kb-restricted': 'kb_restricted',
       'kb-tone': 'kb_tone', voiceHours: 'voice_hours', voiceEscalate: 'voice_escalate',
       extraNotes: 'extra_notes',
+      googleBusinessUrl: 'google_business_url', facebookUrl: 'facebook_url',
+      instagramHandle: 'instagram_handle', bookingUrl: 'booking_url',
     };
     return map[id] || id;
   }

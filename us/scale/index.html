@@ -366,27 +366,27 @@
       </div>
       <input type="hidden" id="signOff">
     </div>
+    </div>
 
-      <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">🌐</div>Custom email domain</div>
-      <div class="co co-amber"><strong>Strongly recommended.</strong> Sending from your own domain (e.g. @yourstudio.com) significantly improves deliverability and prevents emails landing in spam. Requires a DNS record change. We provide the exact records to add.</div>
-      <div class="f">
-        <span class="f-q-label" id="lbl-dns">Would you like to set up a custom sending domain?</span>
-        <div class="yn" id="dnsYN" role="radiogroup" aria-labelledby="lbl-dns">
-          <button type="button" class="yn-b" id="dnsY" data-yn="dns" data-val="true" role="radio" aria-checked="false">Yes, set it up</button>
-          <button type="button" class="yn-b" id="dnsN" data-yn="dns" data-val="false" role="radio" aria-checked="false">No, use built-in email for now</button>
+    <div class="card">
+    <div class="ct"><div class="ct-icon" aria-hidden="true">🌐</div>Custom email domain</div>
+    <div class="co co-amber"><strong>Strongly recommended.</strong> Sending from your own domain (e.g. @yourstudio.com) significantly improves deliverability and prevents emails landing in spam. Requires a DNS record change. We provide the exact records to add.</div>
+    <div class="f">
+      <span class="f-q-label" id="lbl-dns">Would you like to set up a custom sending domain?</span>
+      <div class="yn" id="dnsYN" role="radiogroup" aria-labelledby="lbl-dns">
+        <button type="button" class="yn-b" id="dnsY" data-yn="dns" data-val="true" role="radio" aria-checked="false">Yes, set it up</button>
+        <button type="button" class="yn-b" id="dnsN" data-yn="dns" data-val="false" role="radio" aria-checked="false">No, use built-in email for now</button>
+      </div>
+    </div>
+    <div class="cond" id="dnsCond">
+      <div class="fr x1">
+        <div class="f">
+          <label for="emailDomain">Your email domain <span class="req">*</span></label>
+          <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com">
+          <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
         </div>
       </div>
-      <div class="cond" id="dnsCond">
-        <div class="fr x1">
-          <div class="f">
-            <label for="emailDomain">Your email domain <span class="req">*</span></label>
-            <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com">
-            <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
-          </div>
-        </div>
-        <div class="co co-blue" style="margin-bottom:0; margin-top:8px;">We will generate DKIM and Return Path DNS records and send them to you with clear instructions. Propagation typically takes 1 to 48 hours after the records are added.</div>
-      </div>
+      <div class="co co-blue" style="margin-bottom:0; margin-top:8px;">We will generate DKIM and Return Path DNS records and send them to you with clear instructions. Propagation typically takes 1 to 48 hours after the records are added.</div>
     </div>
     </div>
 
@@ -405,7 +405,6 @@
       <div class="sh-desc">Required for SMS workflows and lead source tracking on your Scale plan.</div>
     </div>
 
-    <div class="cards-grid">
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">💬</div>SMS phone number</div>
       <div class="co co-blue">We purchase and configure an SMS-enabled phone number for your account. This number is used for outbound SMS automations. <strong>You don't need an existing number.</strong> We handle provisioning. A2P / 10DLC registration may be required depending on your region.</div>
@@ -449,7 +448,6 @@
           <div><div class="tg-lbl">Website chat widget</div><div class="tg-desc">Embeds a chat widget on your website. We install the code. Enquiries from the widget flow directly into StudioLAB Growth.</div></div>
         </label>
       </div>
-    </div>
     </div>
 
     <div class="fnav">

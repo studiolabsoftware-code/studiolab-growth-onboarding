@@ -24,6 +24,8 @@ const ALLOWED_FIELDS = new Set([
   'sms_tone','lead_sources','kb_profile','kb_classes',
   'kb_pricing','kb_price_quoting','kb_policies','kb_events','kb_faqs','kb_restricted',
   'kb_tone','voice_hours','voice_escalate','extra_notes',
+  // Optional future-proof URLs for studios planning to upgrade later.
+  'google_business_url','facebook_url','instagram_handle','booking_url',
 ]);
 
 function pickAllowed(payload: Record<string, unknown>): Record<string, unknown> {
