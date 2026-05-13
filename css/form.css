@@ -686,9 +686,18 @@ details.future-proof > .fr { padding-left: 22px; padding-right: 22px; }
 .brand-ref-text strong { color: #000; font-weight: 700; }
 
 /* Setup-conditional copy: .dfy-only is hidden unless Done-For-You is the
-   active setup type. Toggled via the body class in selectSetup(). */
-.dfy-only { display: none; }
+   active setup type, .guided-only is hidden unless Guided is active.
+   Toggled via the body class in selectSetup(). Both classes are inline
+   on text spans and block on standalone callout blocks. */
+.dfy-only, .guided-only { display: none; }
 body.setup-dfy .dfy-only { display: inline; }
+body.setup-guided .guided-only { display: inline; }
+/* Block-level callouts that use the dfy-only/guided-only class need to
+   render as block, not inline. */
+.co.dfy-only, .co.guided-only,
+div.dfy-only, div.guided-only { display: none; }
+body.setup-dfy .co.dfy-only, body.setup-dfy div.dfy-only { display: block; }
+body.setup-guided .co.guided-only, body.setup-guided div.guided-only { display: block; }
 .brand-ref-preview { display: flex; gap: 12px; align-items: center; }
 .brand-ref-img { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--g2); background: #fff; flex-shrink: 0; }
 .brand-ref-meta { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
