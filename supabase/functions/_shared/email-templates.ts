@@ -264,6 +264,18 @@ export function handoffEmail(opts: {
   return { subject, html: layout({ previewText: subject, body }), text };
 }
 
+export function kbAbandonmentNudge(opts: { studioName: string; resumeUrl: string }): { subject: string; html: string } {
+  const subject = `Your AI is almost ready, ${opts.studioName}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Just one step left</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
+    <p style="margin:0 0 14px;">Your payment is sorted and we have already pulled the content from your website into your AI knowledge base. The last thing we need from you is a quick five-minute review so your assistant sounds exactly like your studio.</p>
+    <p style="margin:0 0 14px;">Once you confirm the knowledge base, our team can finish wiring up your AI chat and voice assistant. Until then, we have hit pause on the build.</p>
+    ${cta('Finish my knowledge base', opts.resumeUrl)}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">If you have already finished this and are still seeing reminders, please ignore this email and we will sort it on our end.</p>`;
+  return { subject, html: layout({ previewText: 'Your AI knowledge base is waiting on a final five-minute review.', body }) };
+}
+
 function escape(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
 }
