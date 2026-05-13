@@ -177,6 +177,19 @@
     return label + ' · ' + p.amount + ' ' + p.currency + taxNote;
   }
 
+  // HTML-aware variant for the Review summary so the tax note can be
+  // styled smaller and lighter without dragging the headline value down.
+  function setupFeeSummaryHtml() {
+    const p = priceFor(state.setup);
+    const label = setupLabelFor(state.setup).label;
+    const head = escapeForHtml(`${label} · ${p.amount} ${p.currency}`);
+    if (!p.tax) return head;
+    return `${head} <span class="sum-v-meta">${escapeForHtml(p.tax)}</span>`;
+  }
+  function escapeForHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
   // ── Country and timezone smart defaults ───────────────────────────────────
   // The URL determines the studio's region. Pre-select country accordingly and
   // filter the timezone select so only that country's options appear. Studios
@@ -931,7 +944,9 @@
 
   function buildSummary() {
     setSum('sv-plan', PLAN_LABEL[state.plan] || state.plan);
-    setSum('sv-setup', setupFeeSummaryLine());
+    // sv-setup uses innerHTML so the tax note can be styled smaller / lighter.
+    const svSetup = document.getElementById('sv-setup');
+    if (svSetup) svSetup.innerHTML = setupFeeSummaryHtml();
     setSum('sv-studio', val('studioName'));
     setSum('sv-country', val('country'));
     const fn = val('firstName'), ln = val('lastName');
