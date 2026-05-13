@@ -583,8 +583,8 @@ body.pay-modal-open { overflow: hidden; }
 @media (max-width: 480px) { .logo-thumb { width: 100%; height: 140px; } }
 
 .logo-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
-.logo-meta-title { font-size: 13px; font-weight: 700; color: var(--in-d); }
-.logo-meta-desc { font-size: 12px; color: var(--g6); line-height: 1.55; }
+.logo-meta-title { font-size: 13px; font-weight: 700; color: #000; }
+.logo-meta-desc { font-size: 12px; color: #000; line-height: 1.55; }
 .logo-meta-actions { display: flex; gap: 8px; margin-top: 4px; }
 .btn-logo { background: #fff; border: 1px solid var(--g2); border-radius: 8px; padding: 7px 18px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; min-height: 34px; transition: border-color 0.15s, color 0.15s, background 0.15s; }
 .btn-logo-up { color: var(--in); border-color: var(--in); }
@@ -652,7 +652,7 @@ details.future-proof[open] { padding-bottom: 22px; }
 .future-proof-pill { display: inline-block; margin-left: 8px; padding: 2px 9px; background: var(--g1); color: var(--g6); border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
 .future-proof-toggle { width: 12px; height: 12px; border-right: 2px solid var(--g4); border-bottom: 2px solid var(--g4); transform: rotate(45deg); transition: transform 0.2s; flex-shrink: 0; margin-right: 4px; }
 details.future-proof[open] .future-proof-toggle { transform: rotate(-135deg); margin-top: 6px; }
-.future-proof-hint { padding: 0 22px 14px; margin: 0; font-size: 12px; color: var(--g6); line-height: 1.55; }
+.future-proof-hint { padding: 0 22px 14px; margin: 0; font-size: 12px; color: #000; line-height: 1.55; }
 details.future-proof > .fr { padding-left: 22px; padding-right: 22px; }
 
 /* Brand reference dropzone — inline inside the Brand colours card. Compact
@@ -663,8 +663,8 @@ details.future-proof > .fr { padding-left: 22px; padding-right: 22px; }
 .brand-ref-drag { border-color: var(--mg); background: var(--mg-l); }
 .brand-ref-empty { display: flex; gap: 12px; align-items: center; }
 .brand-ref-ico { font-size: 22px; flex-shrink: 0; }
-.brand-ref-text { font-size: 13px; color: var(--in-d); line-height: 1.55; font-weight: 500; }
-.brand-ref-text strong { color: var(--in-d); font-weight: 700; }
+.brand-ref-text { font-size: 12px; color: #000; line-height: 1.55; }
+.brand-ref-text strong { color: #000; font-weight: 700; }
 .brand-ref-preview { display: flex; gap: 12px; align-items: center; }
 .brand-ref-img { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--g2); background: #fff; flex-shrink: 0; }
 .brand-ref-meta { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
