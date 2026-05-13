@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>Payment received — StudioLAB Growth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/form.css?v=20260513a">
+<style>
+  .pc-wrap { max-width: 560px; margin: 64px auto; padding: 0 16px; }
+  .pc-card { background: #fff; border-radius: 14px; padding: 32px; box-shadow: 0 6px 28px rgba(19,16,46,.08); text-align: center; }
+  .pc-title { font-size: 22px; font-weight: 700; color: var(--in-d); margin: 0 0 10px; letter-spacing: -.3px; }
+  .pc-sub { color: var(--g6); font-size: 14px; line-height: 1.6; margin: 0 0 22px; }
+  .pc-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--in); color: #fff; border: 0; border-radius: 999px; padding: 12px 26px; font-weight: 600; font-size: 14px; text-decoration: none; cursor: pointer; }
+  .pc-btn:hover { background: var(--in-d); }
+  .pc-spinner { width: 36px; height: 36px; border: 3px solid var(--g2); border-top-color: var(--in); border-radius: 50%; animation: pcSpin .9s linear infinite; margin: 0 auto 18px; }
+  @keyframes pcSpin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-inner">
+    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth home">
+      <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
+    </a>
+    <div class="hdr-div" aria-hidden="true"></div>
+    <div class="hdr-sub" aria-hidden="true">Payment confirmation</div>
+  </div>
+</header>
+
+<main class="main">
+  <div class="pc-wrap">
+    <div class="pc-card" id="pc-card">
+      <div class="pc-spinner" id="pc-spinner"></div>
+      <h1 class="pc-title" id="pc-title">Confirming your payment…</h1>
+      <p class="pc-sub" id="pc-sub">Hang tight — we are just confirming things with our payment provider.</p>
+    </div>
+  </div>
+</main>
+
+<script src="js/supabase-config.js?v=20260513a"></script>
+<script>
+(function () {
+  const FN_BASE = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/';
+  const SESSION_KEY = 'sl-growth-session';
+
+  function readSession() {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); }
+    catch (_) { return null; }
+  }
+  async function callFn(name, body) {
+    const r = await fetch(FN_BASE + name, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    let data = null;
+    try { data = await r.json(); } catch (_) { /* ignore */ }
+    return { ok: r.ok, status: r.status, data: data || {} };
+  }
+  function setBtn(label, href) {
+    document.querySelectorAll('#pc-card .pc-btn').forEach((el) => el.remove());
+    if (label && href) {
+      document.getElementById('pc-card').insertAdjacentHTML('beforeend',
+        `<a class="pc-btn" href="${href}">${label}</a>`);
+    }
+  }
+  function show(opts) {
+    document.getElementById('pc-spinner').style.display = opts.spinner ? 'block' : 'none';
+    document.getElementById('pc-title').textContent = opts.title;
+    document.getElementById('pc-sub').innerHTML = opts.sub;
+    setBtn(opts.buttonLabel, opts.buttonHref);
+  }
+  function showBadSession() {
+    show({
+      spinner: false,
+      title: 'We need to verify it is you',
+      sub: 'Your payment is being confirmed, but the browser session has ended. Verify your email again and we will pick up where you left off.',
+      buttonLabel: 'Continue with email',
+      buttonHref: '/setup/',
+    });
+  }
+
+  async function poll() {
+    const session = readSession();
+    if (!session || !session.token) { showBadSession(); return; }
+
+    let tries = 0;
+    const max = 45; // ~90 seconds at 2s per tick. Webhook typically lands in <10s.
+    const tick = async () => {
+      tries++;
+      const r = await callFn('get-kb-status', { session_token: session.token });
+      if (!r.ok || !r.data || r.data.ok === false) {
+        if (r.status === 401) { showBadSession(); return; }
+        if (tries >= max) {
+          show({
+            spinner: false,
+            title: 'Still waiting on confirmation',
+            sub: 'This is taking longer than expected. Refresh the page or check your inbox — we will email you the moment the payment lands.',
+          });
+          return;
+        }
+        setTimeout(tick, 2000); return;
+      }
+      const s = r.data.submission || {};
+      const paid = s.payment_status === 'paid' || s.payment_status === 'authorised' || s.payment_status === 'card_saved';
+      if (paid) {
+        if (s.plan === 'ai') {
+          window.location.href = '/kb.html';
+          return;
+        }
+        show({
+          spinner: false,
+          title: 'You are all set',
+          sub: 'Payment received and your setup is in the queue. Our team will be in touch shortly with next steps.',
+          buttonLabel: 'Done',
+          buttonHref: '/',
+        });
+        return;
+      }
+      if (tries >= max) {
+        show({
+          spinner: false,
+          title: 'Still waiting on confirmation',
+          sub: 'This is taking longer than expected. Refresh the page or check your inbox — we will email you the moment the payment lands.',
+        });
+        return;
+      }
+      setTimeout(tick, 2000);
+    };
+    tick();
+  }
+
+  poll();
+})();
+</script>
+
+</body>
+</html>

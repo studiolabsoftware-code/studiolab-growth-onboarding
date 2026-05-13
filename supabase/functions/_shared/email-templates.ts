@@ -58,6 +58,108 @@ export function submissionConfirmation(opts: { studioName: string; ref: string }
   return { subject, html: layout({ previewText: 'We have your StudioLAB Growth onboarding details.', body }) };
 }
 
+// Mode-aware payment confirmation emails. Sent by the stripe-webhook function
+// when checkout.session.completed lands. The phrasing matches the three
+// timing modes documented in stripe-integration-plan.md so studios are not
+// surprised by a hold or a saved-card scenario showing up on their statement.
+function formatAmountDisplay(opts: { amountCents: number; currency: string; includesGst: boolean }): string {
+  const dollars = (opts.amountCents / 100).toFixed(2);
+  const gstNote = opts.includesGst ? ' (incl. GST)' : '';
+  return `${opts.currency} $${dollars}${gstNote}`;
+}
+
+export { formatAmountDisplay };
+
+export function paymentReceiptImmediate(opts: {
+  studioName: string;
+  ref: string;
+  amountCents: number;
+  currency: string;
+  includesGst: boolean;
+  invoiceUrl?: string | null;
+}): { subject: string; html: string } {
+  const amountDisplay = formatAmountDisplay(opts);
+  const subject = `Payment received — StudioLAB Growth setup for ${opts.studioName}`;
+  const invoiceLine = opts.invoiceUrl
+    ? `<p style="margin:0 0 14px;">A tax invoice is attached to the receipt Stripe sent you, and you can also <a href="${escape(opts.invoiceUrl)}" style="color:${COL.in};">view it online here</a>.</p>`
+    : `<p style="margin:0 0 14px;">A tax invoice is on its way to your inbox.</p>`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Payment received</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
+    <p style="margin:0 0 14px;">You have been charged <strong>${escape(amountDisplay)}</strong> for your StudioLAB Growth setup. Your onboarding details are locked in and our team will be in touch shortly to begin the work.</p>
+    ${invoiceLine}
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
+    <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
+    <p style="margin:0;">Speak soon,<br>The StudioLAB Growth team</p>`;
+  return { subject, html: layout({ previewText: `Payment received — ${amountDisplay}`, body }) };
+}
+
+export function paymentReceiptHold(opts: {
+  studioName: string;
+  ref: string;
+  amountCents: number;
+  currency: string;
+  includesGst: boolean;
+}): { subject: string; html: string } {
+  const amountDisplay = formatAmountDisplay(opts);
+  const subject = `Card authorised — StudioLAB Growth setup for ${opts.studioName}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your card has been authorised</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
+    <p style="margin:0 0 14px;">Your card has been authorised for <strong>${escape(amountDisplay)}</strong>. We have not taken the funds yet — we will only complete the charge once your setup begins. You may see a pending authorisation on your statement until then.</p>
+    <p style="margin:0 0 14px;">Your onboarding details are saved and our team will be in touch shortly to schedule the work.</p>
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
+    <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
+    <p style="margin:0;">Speak soon,<br>The StudioLAB Growth team</p>`;
+  return { subject, html: layout({ previewText: `Card authorised — ${amountDisplay}`, body }) };
+}
+
+export function paymentReceiptSaveCard(opts: {
+  studioName: string;
+  ref: string;
+  amountCents: number;
+  currency: string;
+  includesGst: boolean;
+}): { subject: string; html: string } {
+  const amountDisplay = formatAmountDisplay(opts);
+  const subject = `Card saved — StudioLAB Growth setup for ${opts.studioName}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your card has been saved securely</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
+    <p style="margin:0 0 14px;">Your card has been saved securely with our payment provider. We will charge <strong>${escape(amountDisplay)}</strong> when we begin your setup, and you will receive a tax invoice at that time. You will not see a pending charge on your statement until then.</p>
+    <p style="margin:0 0 14px;">Your onboarding details are saved and our team will be in touch shortly with timing.</p>
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
+    <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
+    <p style="margin:0;">Speak soon,<br>The StudioLAB Growth team</p>`;
+  return { subject, html: layout({ previewText: `Card saved — ${amountDisplay} will be charged when setup begins`, body }) };
+}
+
+export function adminPaymentLanded(opts: {
+  studioName: string;
+  plan: string;
+  setup: string;
+  mode: 'immediate' | 'hold' | 'save_card';
+  amountCents: number;
+  currency: string;
+  includesGst: boolean;
+  adminUrl: string;
+}): { subject: string; html: string } {
+  const modeLabel = opts.mode === 'immediate' ? 'paid (immediate capture)'
+    : opts.mode === 'hold' ? 'authorised (manual capture pending)'
+    : 'card saved (off-session charge pending)';
+  const amountDisplay = formatAmountDisplay(opts);
+  const subject = `Payment ${opts.mode === 'immediate' ? 'received' : opts.mode === 'hold' ? 'authorised' : 'card saved'}: ${opts.studioName} (${opts.plan})`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Payment landed</h1>
+    <p style="margin:0 0 6px;"><strong>Studio:</strong> ${escape(opts.studioName)}</p>
+    <p style="margin:0 0 6px;"><strong>Plan:</strong> ${escape(opts.plan)}</p>
+    <p style="margin:0 0 6px;"><strong>Setup:</strong> ${escape(opts.setup)}</p>
+    <p style="margin:0 0 6px;"><strong>Amount:</strong> ${escape(amountDisplay)}</p>
+    <p style="margin:0 0 18px;"><strong>Status:</strong> ${escape(modeLabel)}</p>
+    ${cta('Open in dashboard', opts.adminUrl)}`;
+  return { subject, html: layout({ previewText: `Payment ${modeLabel} for ${opts.studioName}`, body }) };
+}
+
 export function adminNewSubmission(opts: { studioName: string; plan: string; setup: string; adminUrl: string }): { subject: string; html: string } {
   const subject = `New Growth onboarding: ${opts.studioName} (${opts.plan})`;
   const body = `

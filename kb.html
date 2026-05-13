@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>Your AI knowledge base — StudioLAB Growth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/form.css?v=20260513a">
+<link rel="stylesheet" href="css/kb.css?v=20260513a">
+</head>
+<body>
+
+<a class="sr-only" href="#kb-main">Skip to knowledge base</a>
+
+<header class="hdr">
+  <div class="hdr-inner">
+    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth home">
+      <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
+    </a>
+    <div class="hdr-div" aria-hidden="true"></div>
+    <div class="hdr-sub" aria-hidden="true">Your AI knowledge base</div>
+  </div>
+</header>
+
+<main class="main" id="kb-main">
+
+  <!-- Loading state -->
+  <div id="kb-loading" class="kb-state" role="status" aria-live="polite">
+    <div class="kb-spin" aria-hidden="true"></div>
+    <div class="kb-state-title">Loading your setup…</div>
+  </div>
+
+  <!-- Unauthenticated state -->
+  <div id="kb-auth" class="kb-state bad" style="display:none" role="alert">
+    <div class="kb-state-title">We need to verify it is you</div>
+    <p>This step is locked to the person who paid. Verify your email again and we will pick up exactly where you left off.</p>
+    <a class="btn btn-p" href="/setup/">Continue with email</a>
+  </div>
+
+  <!-- Not paid yet -->
+  <div id="kb-unpaid" class="kb-state bad" style="display:none" role="alert">
+    <div class="kb-state-title">Payment hasn't confirmed yet</div>
+    <p>Once Stripe confirms your payment, this knowledge base step unlocks automatically. If you have already paid, refresh this page or check your inbox for the receipt.</p>
+  </div>
+
+  <!-- Wrong plan -->
+  <div id="kb-wrongplan" class="kb-state" style="display:none">
+    <div class="kb-state-title">This step is for Dominate AI studios only</div>
+    <p>Your plan is set up and ready — there is nothing else to do here.</p>
+    <a class="btn btn-p" href="/">Back to home</a>
+  </div>
+
+  <!-- Main form -->
+  <form id="kb-form" class="kb-form" style="display:none" novalidate>
+
+    <div class="kb-intro">
+      <div class="sh-tag">Dominate AI · Knowledge base</div>
+      <h1 class="kb-h1" id="kb-h1">Your AI knowledge base</h1>
+      <p class="kb-lede">We have pre-filled everything we could from your website. Read through each section, tweak anything that is not quite right, then hit confirm. Your AI agent goes live as soon as our team reviews this.</p>
+      <p class="kb-lede"><strong>Saved automatically</strong> as you go — close the tab and come back any time. <span id="kb-savestate" class="kb-savestate">All changes saved.</span></p>
+    </div>
+
+    <!-- Scrape-status banner -->
+    <div id="kb-scrape-banner" class="kb-banner" style="display:none"></div>
+
+    <!-- Add-website callout (only when scrape skipped) -->
+    <div id="kb-addsite" class="kb-callout" style="display:none">
+      <h2 class="kb-callout-title">Add your website to pre-fill everything</h2>
+      <p>You did not give us a website URL when you signed up. If you have one, drop it in here and we will scan it now to pre-fill your AI knowledge base. About 30 seconds.</p>
+      <div class="kb-addsite-row">
+        <input type="url" id="kb-addsite-input" placeholder="https://yourstudio.com" autocomplete="url">
+        <button type="button" id="kb-addsite-btn" class="btn btn-p">Scan now</button>
+      </div>
+      <p class="kb-addsite-skip">No website? <button type="button" class="kb-link" id="kb-addsite-skip">Skip this and edit by hand</button></p>
+    </div>
+
+    <!-- Section 1: Assistant persona -->
+    <section class="kb-section">
+      <h2 class="kb-h2">How should your AI introduce itself?</h2>
+      <p class="kb-help">Most studios use their studio name. Some prefer a personal-feeling assistant with a name — choose what feels right.</p>
+
+      <div class="kb-radio">
+        <label class="kb-radio-row">
+          <input type="radio" name="persona" value="studio" id="persona-studio" checked>
+          <span class="kb-radio-card">
+            <span class="kb-radio-title">As your studio (recommended)</span>
+            <span class="kb-radio-preview" id="persona-preview-studio">Hi! Welcome to {studio}…</span>
+          </span>
+        </label>
+        <label class="kb-radio-row">
+          <input type="radio" name="persona" value="named" id="persona-named">
+          <span class="kb-radio-card">
+            <span class="kb-radio-title">As a named assistant</span>
+            <input type="text" id="persona-name-input" placeholder="e.g. Casey" maxlength="40" autocomplete="off">
+            <span class="kb-radio-preview" id="persona-preview-named">Hi, I'm Casey, the AI assistant for {studio}…</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="kb-field">
+        <label for="kb_greeting">Greeting message <span class="kb-badge" data-badge-for="kb_greeting"></span></label>
+        <textarea id="kb_greeting" rows="3" maxlength="500"></textarea>
+        <p class="kb-help kb-help-sm">Change the wording if you want to. The greeting auto-updates when you switch between the options above.</p>
+      </div>
+    </section>
+
+    <!-- Section 2: Studio profile -->
+    <section class="kb-section">
+      <h2 class="kb-h2">About your studio</h2>
+      <div class="kb-field">
+        <label for="kb_profile">Studio profile <span class="kb-badge" data-badge-for="kb_profile"></span></label>
+        <textarea id="kb_profile" rows="6"></textarea>
+        <p class="kb-help kb-help-sm">Who you are, what you teach, what makes you different. Two to three sentences usually does it.</p>
+      </div>
+    </section>
+
+    <!-- Section 3: Classes & dress code -->
+    <section class="kb-section">
+      <h2 class="kb-h2">Classes and what to wear</h2>
+      <div class="kb-field">
+        <label for="kb_classes">Class info and dress code <span class="kb-badge" data-badge-for="kb_classes"></span></label>
+        <textarea id="kb_classes" rows="10"></textarea>
+        <p class="kb-help kb-help-sm">Include the first-class / trial guidance, then the per-discipline dress code. Mention anything specific like hair, shoes, or uniforms.</p>
+      </div>
+    </section>
+
+    <!-- Section 4: Policies -->
+    <section class="kb-section">
+      <h2 class="kb-h2">Studio policies</h2>
+      <div class="kb-field">
+        <label for="kb_policies">Cancellations, refunds, behaviour <span class="kb-badge" data-badge-for="kb_policies"></span></label>
+        <textarea id="kb_policies" rows="10"></textarea>
+        <p class="kb-help kb-help-sm">Keep wording soft and accurate — what families can expect when something changes. Edit anything that does not match how you run things.</p>
+      </div>
+    </section>
+
+    <!-- Section 5: Pricing -->
+    <section class="kb-section">
+      <h2 class="kb-h2">Pricing and packages</h2>
+      <div class="kb-field">
+        <label for="kb_pricing">Packages, discounts, billing notes <span class="kb-badge" data-badge-for="kb_pricing"></span></label>
+        <textarea id="kb_pricing" rows="8"></textarea>
+        <p class="kb-help kb-help-sm">Describe what is available without listing exact totals — the AI is instructed to send parents to your portal for live pricing (see below).</p>
+      </div>
+      <div class="kb-field">
+        <label for="kb_price_quoting">Pricing guardrail (do not change unless you know what you are doing)</label>
+        <textarea id="kb_price_quoting" rows="3"></textarea>
+        <p class="kb-help kb-help-sm">This tells the AI never to calculate combined prices for multi-class families — a hard rule we recommend leaving as-is.</p>
+      </div>
+    </section>
+
+    <!-- Section 6: Concerts -->
+    <section class="kb-section">
+      <h2 class="kb-h2">Concerts and performances</h2>
+      <div class="kb-field">
+        <label for="kb_events">Concerts, costumes, performances <span class="kb-badge" data-badge-for="kb_events"></span></label>
+        <textarea id="kb_events" rows="6"></textarea>
+        <p class="kb-help kb-help-sm">The annual concert, costume process, dress-rehearsal info — anything parents ask about regularly.</p>
+      </div>
+    </section>
+
+    <!-- Section 7: FAQs / location -->
+    <section class="kb-section">
+      <h2 class="kb-h2">FAQs and getting there</h2>
+      <div class="kb-field">
+        <label for="kb_faqs">Common questions, parking, public transport <span class="kb-badge" data-badge-for="kb_faqs"></span></label>
+        <textarea id="kb_faqs" rows="8"></textarea>
+      </div>
+    </section>
+
+    <!-- Section 8: Voice & escalation -->
+    <section class="kb-section">
+      <h2 class="kb-h2">Voice agent</h2>
+      <div class="kb-field">
+        <label for="voice_hours">Office hours the voice agent should mention <span class="kb-badge" data-badge-for="voice_hours"></span></label>
+        <textarea id="voice_hours" rows="3"></textarea>
+      </div>
+      <div class="kb-field">
+        <label for="voice_escalate">When the AI should escalate to a human</label>
+        <textarea id="voice_escalate" rows="3" placeholder="e.g. medical concerns, billing disputes, complaints, anything related to a specific child by name"></textarea>
+        <p class="kb-help kb-help-sm">Spell out the situations where the AI should stop trying to help and hand off to your team.</p>
+      </div>
+    </section>
+
+    <!-- Section 9: Tone & restricted -->
+    <section class="kb-section">
+      <h2 class="kb-h2">Voice, tone, and restricted topics</h2>
+      <div class="kb-field">
+        <label for="kb_tone">Tone of voice <span class="kb-badge" data-badge-for="kb_tone"></span></label>
+        <textarea id="kb_tone" rows="4"></textarea>
+      </div>
+      <div class="kb-field">
+        <label for="kb_restricted">Topics the AI must never discuss</label>
+        <textarea id="kb_restricted" rows="3" placeholder="e.g. teacher personal details, internal staffing matters, specific student incidents"></textarea>
+        <p class="kb-help kb-help-sm">Anything the AI should refuse to engage with and route to a human.</p>
+      </div>
+    </section>
+
+    <!-- Finalise -->
+    <div class="kb-final">
+      <button type="button" id="kb-finalize-btn" class="btn btn-ok kb-finalize">Confirm and finish</button>
+      <p class="kb-help kb-help-sm">Our team reviews your knowledge base, then activates your AI chat and voice agents. You can edit anything afterwards via the support link in your welcome email.</p>
+    </div>
+
+  </form>
+
+  <!-- Success state -->
+  <div id="kb-done" class="kb-state ok" style="display:none">
+    <div class="kb-done-ico">✓</div>
+    <div class="kb-state-title">Knowledge base saved</div>
+    <p>Thanks. Our team will review your AI knowledge base and have it live within a few business days. You will hear from us by email with confirmation and any tweaks we recommend.</p>
+    <a class="btn btn-p" href="/">Done</a>
+  </div>
+
+</main>
+
+<script src="js/supabase-config.js?v=20260513a"></script>
+<script src="js/kb.js?v=20260513a"></script>
+
+</body>
+</html>

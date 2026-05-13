@@ -1360,6 +1360,20 @@
       if (!saveR.ok || !saveR.data || saveR.data.ok === false) {
         throw new Error((saveR.data && saveR.data.error) || 'Could not save before payment.');
       }
+      // Dominate AI: kick off the website scrape + KB pre-fill in parallel
+      // with the Stripe checkout-session creation. Fire-and-forget — the
+      // function flips kb_scrape_status to 'pending' immediately so the
+      // post-payment KB page can show a "Reading your website…" state and
+      // poll until results land. Studios without a website on file are
+      // tolerated server-side (status -> 'skipped'); they get an "Add your
+      // website" callout on the KB page instead.
+      if (PLAN === 'ai') {
+        try {
+          callFn('scrape-and-extract', { session_token: session.token })
+            .catch((e) => console.warn('scrape dispatch failed (non-blocking):', e));
+        } catch (e) { console.warn('scrape dispatch failed (non-blocking):', e); }
+      }
+
       const co = await callFn('create-checkout-session', {
         session_token: session.token,
         discount_code: pricingState.discountCode || null,

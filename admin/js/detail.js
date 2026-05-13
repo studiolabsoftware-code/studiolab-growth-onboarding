@@ -151,19 +151,30 @@
           ])}
 
           ${isAi ? section('🤖 AI knowledge base', [
+            ['Greeting', fmtVal(sub.kb_greeting), undefined, 'kb_greeting'],
+            ['Assistant persona',
+              sub.kb_assistant_persona_type === 'named' && sub.kb_assistant_persona_name
+                ? `Named — ${ESC(sub.kb_assistant_persona_name)}`
+                : 'Studio name',
+              ''],
             ['Studio profile', fmtVal(sub.kb_profile), undefined, 'kb_profile'],
             ['Classes & timetable', fmtVal(sub.kb_classes), undefined, 'kb_classes'],
             ['Pricing', fmtVal(sub.kb_pricing), undefined, 'kb_pricing'],
-            ['AI can quote prices', fmtBool(sub.kb_price_quoting)],
+            ['Pricing guardrail', fmtVal(sub.kb_price_quoting), undefined, 'kb_price_quoting'],
             ['Policies', fmtVal(sub.kb_policies), undefined, 'kb_policies'],
             ['Events', fmtVal(sub.kb_events), undefined, 'kb_events'],
-            ['FAQs', Array.isArray(sub.kb_faqs) && sub.kb_faqs.length
-              ? `${sub.kb_faqs.length} Q&amp;A pairs`
-              : empty, ''],
+            ['FAQs', fmtVal(sub.kb_faqs), undefined, 'kb_faqs'],
             ['Restricted topics', fmtVal(sub.kb_restricted), undefined, 'kb_restricted'],
             ['AI tone', fmtVal(sub.kb_tone), undefined, 'kb_tone'],
             ['Voice agent hours', fmtVal(sub.voice_hours), undefined, 'voice_hours'],
             ['Voice escalation', fmtVal(sub.voice_escalate), undefined, 'voice_escalate'],
+            ['Website scrape', sub.kb_scrape_status
+              ? `${ESC(sub.kb_scrape_status)}${sub.kb_scrape_completed_at ? ' · ' + ESC(fmtDate(sub.kb_scrape_completed_at)) : ''}${sub.kb_scrape_pages_count ? ' · ' + sub.kb_scrape_pages_count + ' pages' : ''}`
+              : empty, ''],
+            ['KB intake completed', sub.kb_completed_at ? fmtDate(sub.kb_completed_at) : empty, ''],
+            ['Copy for GHL',
+              `<button type="button" class="btn btn-p" data-kb-copy="${ESC(sub.id)}" style="margin-top:6px">Copy KB as Markdown</button><span id="kb-copy-state" style="margin-left:10px;color:var(--g6);font-size:12px;"></span>`,
+              ''],
           ]) : planNotice('AI knowledge base', isLaunch ? 'Launch' : 'Scale')}
 
           ${section('📝 Additional notes', [
@@ -219,7 +230,48 @@
     const syncOne = document.getElementById('detSheetSync');
     if (syncOne) syncOne.addEventListener('click', syncThisToSheet);
 
+    document.querySelectorAll('[data-kb-copy]').forEach((btn) => {
+      btn.addEventListener('click', () => copyKbForGhl(btn.getAttribute('data-kb-copy'), btn));
+    });
+
     hydrateLogos();
+  }
+
+  async function copyKbForGhl(submissionId, btn) {
+    if (!submissionId) return;
+    const stateEl = document.getElementById('kb-copy-state');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+    if (stateEl) stateEl.textContent = '';
+    try {
+      const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/copy-kb-for-ghl';
+      const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': jwt ? `Bearer ${jwt}` : '',
+        },
+        body: JSON.stringify({ submission_id: submissionId }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok || !data.markdown) {
+        throw new Error(data.error || `Failed (${resp.status})`);
+      }
+      await navigator.clipboard.writeText(data.markdown);
+      btn.textContent = 'Copied ✓';
+      if (stateEl) stateEl.textContent = 'Markdown copied to clipboard, ready to paste into GHL.';
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }, 2200);
+    } catch (err) {
+      console.error('copy KB failed:', err);
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+      if (stateEl) stateEl.textContent = 'Could not copy: ' + (err && err.message ? err.message : 'unknown error');
+    }
   }
 
   async function handleDelete() {
