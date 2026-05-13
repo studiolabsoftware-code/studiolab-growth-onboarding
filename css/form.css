@@ -93,6 +93,13 @@ body {
 /* ── Section heading ───────────────────────────────── */
 .sh { margin-bottom: 24px; }
 .sh-tag { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--mg); margin-bottom: 5px; }
+
+/* Plan banner — anchored on the Welcome step so the studio always sees
+   which plan they are setting up. */
+.plan-banner { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 12px; }
+.plan-banner-launch { background: var(--in-l); color: var(--in); }
+.plan-banner-scale { background: var(--mg-l); color: var(--mg-d); }
+.plan-banner-ai { background: var(--in-d); color: #fff; }
 .sh-title { font-size: 22px; font-weight: 700; color: var(--in-d); letter-spacing: -0.4px; line-height: 1.2; }
 .sh-desc { font-size: 13px; color: var(--g6); margin-top: 6px; line-height: 1.6; }
 
