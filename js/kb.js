@@ -7,6 +7,19 @@
   const FN_BASE = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/';
   const SESSION_KEY = 'sl-growth-session';
   const PREVIEW_MODE = new URLSearchParams(window.location.search).get('preview') === '1';
+  const RETURN_KEY = 'sl-kb-return';
+
+  // Resolve the URL we should send the studio back to when they save/close.
+  // form.js stashes this in sessionStorage when they cross over from the
+  // post-payment paybar; we fall back to a sensible default by mode.
+  function resolveReturnUrl() {
+    try {
+      const stashed = sessionStorage.getItem(RETURN_KEY);
+      if (stashed) return stashed;
+    } catch (_) { /* ignore */ }
+    if (PREVIEW_MODE) return '/au/ai/?preview=1';
+    return '/';
+  }
 
   // Mock submission used in preview mode so admins can walk the KB intake
   // without a real session_token, paid submission, or scrape worker run.
@@ -408,22 +421,25 @@
 
     // Save draft — flush every field as a draft save and show a confirmation
     // pill so the studio knows it's safe to leave and come back.
-    $('kb-savedraft-btn').addEventListener('click', async () => {
-      const btn = $('kb-savedraft-btn');
+    async function runSaveDraft(triggerBtn) {
       const msg = $('kb-savedraft-msg');
-      btn.disabled = true;
-      const originalLabel = btn.textContent;
-      btn.textContent = 'Saving…';
-      if (msg) { msg.textContent = ''; msg.className = 'kb-savedraft-msg'; }
-      // Push every tracked field + persona into the dirty set so saveNow
-      // sends the full current state rather than just recent edits.
+      const buttons = [
+        $('kb-savedraft-btn'),
+        $('kb-topbar-save'),
+      ].filter(Boolean);
+      const originals = buttons.map((b) => b.textContent);
+      buttons.forEach((b) => { b.disabled = true; b.textContent = 'Saving…'; });
+      if (msg) { msg.innerHTML = ''; msg.className = 'kb-savedraft-msg'; }
       TRACKED_FIELDS.forEach((f) => dirty.add(f));
       dirty.add('persona');
       try {
         await saveNow();
         if (msg) {
-          msg.textContent = 'Draft saved. You can close this page and come back any time.';
+          msg.innerHTML = 'Draft saved. '
+            + '<button type="button" class="kb-link-inline" data-return-now>Back to your summary →</button>';
           msg.className = 'kb-savedraft-msg ok';
+          const ret = msg.querySelector('[data-return-now]');
+          if (ret) ret.addEventListener('click', () => { window.location.href = resolveReturnUrl(); });
         }
       } catch (_) {
         if (msg) {
@@ -431,9 +447,30 @@
           msg.className = 'kb-savedraft-msg err';
         }
       } finally {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
+        buttons.forEach((b, i) => { b.disabled = false; b.textContent = originals[i]; });
       }
+    }
+    $('kb-savedraft-btn').addEventListener('click', () => runSaveDraft());
+    if ($('kb-topbar-save')) $('kb-topbar-save').addEventListener('click', () => {
+      runSaveDraft();
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    });
+
+    // Top-bar Back link uses the same resolveReturnUrl as save-draft.
+    if ($('kb-topbar-back')) $('kb-topbar-back').addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = resolveReturnUrl();
+    });
+    // Top-bar Submit just clicks the bottom Submit so the existing flow
+    // (flush dirty -> finalize -> success state) runs identically.
+    if ($('kb-topbar-submit')) $('kb-topbar-submit').addEventListener('click', () => {
+      $('kb-finalize-btn').click();
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    });
+    // kb-done success state — wire the Back-to-summary button.
+    if ($('kb-done-back')) $('kb-done-back').addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = resolveReturnUrl();
     });
 
     // Finalise.

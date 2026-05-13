@@ -73,6 +73,20 @@
 .kb-savedraft-msg { min-height: 18px; margin: 6px 0 14px; font-size: 13px; font-weight: 600; }
 .kb-savedraft-msg.ok { color: var(--gr, #047857); }
 .kb-savedraft-msg.err { color: var(--rd, #B91C1C); }
+.kb-savedraft-msg .kb-link-inline { color: inherit; text-decoration: underline; margin-left: 8px; cursor: pointer; background: none; border: none; font: inherit; padding: 0; }
+.kb-savedraft-msg .kb-link-inline:hover { text-decoration: none; }
+
+/* Top toolbar — subtle action row above the intro so studios can save or
+   close without scrolling. Mirrors the finalise actions at the bottom. */
+.kb-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.kb-topbar-link { color: var(--g6); font-size: 13px; font-weight: 600; text-decoration: none; padding: 6px 4px; }
+.kb-topbar-link:hover { color: var(--in-d); text-decoration: underline; }
+.kb-topbar-actions { display: flex; gap: 8px; }
+.kb-topbar-btn { padding: 7px 14px; font-size: 12px; font-weight: 600; font-family: inherit; border-radius: 8px; border: 1px solid var(--g2); background: #fff; color: var(--in-d); cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.kb-topbar-btn:hover:not(:disabled) { background: var(--g1); border-color: var(--g3, #d4d4d8); }
+.kb-topbar-btn:disabled { opacity: .55; cursor: not-allowed; }
+.kb-topbar-btn.primary { background: var(--gr, #047857); border-color: var(--gr, #047857); color: #fff; }
+.kb-topbar-btn.primary:hover:not(:disabled) { background: #065F46; border-color: #065F46; }
 
 textarea.kb-loading-shimmer { background: linear-gradient(90deg, var(--g1) 25%, #fff 50%, var(--g1) 75%); background-size: 200% 100%; animation: kbShim 1.4s linear infinite; color: transparent; }
 @keyframes kbShim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }

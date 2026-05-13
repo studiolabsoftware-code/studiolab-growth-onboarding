@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/form.css?v=20260513c">
-<link rel="stylesheet" href="css/kb.css?v=20260513c">
+<link rel="stylesheet" href="css/form.css?v=20260513d">
+<link rel="stylesheet" href="css/kb.css?v=20260513d">
 </head>
 <body>
 
@@ -56,6 +56,14 @@
 
   <!-- Main form -->
   <form id="kb-form" class="kb-form" style="display:none" novalidate>
+
+    <div class="kb-topbar" role="toolbar" aria-label="Knowledge base actions">
+      <a class="kb-topbar-link" id="kb-topbar-back" href="#">← Back to summary</a>
+      <div class="kb-topbar-actions">
+        <button type="button" id="kb-topbar-save" class="kb-topbar-btn">Save draft</button>
+        <button type="button" id="kb-topbar-submit" class="kb-topbar-btn primary">Submit</button>
+      </div>
+    </div>
 
     <div class="kb-intro">
       <div class="sh-tag">Dominate AI · Knowledge base</div>
@@ -217,13 +225,13 @@
     <div class="kb-done-ico">✓</div>
     <div class="kb-state-title">Knowledge base saved</div>
     <p>Thanks. Our team will review your AI knowledge base and have it live within a few business days. You will hear from us by email with confirmation and any tweaks we recommend.</p>
-    <a class="btn btn-p" href="/">Done</a>
+    <a class="btn btn-p" id="kb-done-back" href="/">Back to your summary</a>
   </div>
 
 </main>
 
-<script src="js/supabase-config.js?v=20260513c"></script>
-<script src="js/kb.js?v=20260513c"></script>
+<script src="js/supabase-config.js?v=20260513d"></script>
+<script src="js/kb.js?v=20260513d"></script>
 
 </body>
 </html>

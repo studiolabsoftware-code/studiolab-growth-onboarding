@@ -1225,8 +1225,9 @@
   function renderPostPaymentPaybar() {
     const bar = document.getElementById('payBar');
     if (!bar) return;
+    const kbHref = PREVIEW_MODE ? '/kb.html?preview=1' : '/kb.html';
     const kbBtn = PLAN === 'ai'
-      ? '<a class="btn btn-ok paybar-pay paybar-paid-cta" href="/kb.html?preview=1">Go to your knowledge base →</a>'
+      ? '<a class="btn btn-ok paybar-pay paybar-paid-cta" id="paybar-kb-link" href="' + kbHref + '">Go to your knowledge base →</a>'
       : '';
     const subtitle = PLAN === 'ai'
       ? 'Your knowledge base is now your working document — open it any time.'
@@ -1240,6 +1241,16 @@
       + '<div class="paybar-actions">'
       +   kbBtn
       + '</div>';
+    // Stash the current URL so the KB page knows where to send the studio
+    // when they save-and-close. Works for both preview and production
+    // because the KB link is always inside the form's final review step.
+    const kbLink = document.getElementById('paybar-kb-link');
+    if (kbLink) {
+      kbLink.addEventListener('click', () => {
+        try { sessionStorage.setItem('sl-kb-return', window.location.href); }
+        catch (_) { /* ignore */ }
+      });
+    }
   }
 
   function openPayModal() {
