@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/form.css?v=20260513r">
+<link rel="stylesheet" href="/css/form.css?v=20260513s">
 <script>window.PLAN = 'scale'; window.REGION = 'AU';</script>
 </head>
 <body>
@@ -459,25 +459,40 @@
     </div>
 
     <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">🔗</div>Lead source access</div>
-      <div class="co co-amber"><strong>We need admin access to connect these.</strong> For security, do not enter login credentials here. We will follow up with a secure method to collect access once your form is submitted.</div>
-      <div class="sub-lbl">Which lead sources do you want connected?</div>
-      <div class="tg-group">
-        <label class="tg" data-toggle>
-          <input type="checkbox" value="facebook" data-lead>
-          <div class="tg-box" aria-hidden="true"></div>
-          <div><div class="tg-lbl">Facebook Lead Ads</div><div class="tg-desc">Auto-creates contacts in StudioLAB Growth from Facebook lead form submissions and tracks the lead source.</div></div>
-        </label>
-        <label class="tg" data-toggle>
-          <input type="checkbox" value="google" data-lead>
-          <div class="tg-box" aria-hidden="true"></div>
-          <div><div class="tg-lbl">Google Business Messages</div><div class="tg-desc">Syncs messages from your Google Business Profile directly into StudioLAB Growth so no enquiry is missed.</div></div>
-        </label>
-        <label class="tg" data-toggle>
-          <input type="checkbox" value="website_chat" data-lead>
-          <div class="tg-box" aria-hidden="true"></div>
-          <div><div class="tg-lbl">Website chat widget</div><div class="tg-desc">Embeds a chat widget on your website. We install the code. Enquiries from the widget flow directly into StudioLAB Growth.</div></div>
-        </label>
+      <div class="ct"><div class="ct-icon" aria-hidden="true">🔗</div>Your social and business profiles</div>
+      <div class="co co-blue">Drop in the URLs or handles for any profiles you'd like connected. Nothing's mandatory — we'll work from whatever you provide. Connections happen via OAuth inside the platform during setup, so no passwords are ever entered here.</div>
+      <div class="co co-blue dfy-only" style="margin-top:8px;">As part of your Done-For-You setup we'll walk you through the OAuth step for each profile on a setup call. Have your social account credentials handy in case you need to sign in to authorise.</div>
+      <div class="co co-amber guided-only" style="margin-top:8px;"><strong>Guided setup:</strong> you'll click Connect on each profile yourself inside the platform during your guided steps. Make sure you have admin access to each one.</div>
+      <div class="fr">
+        <div class="f">
+          <label for="facebookUrl">Facebook business page URL</label>
+          <input type="text" id="facebookUrl" placeholder="https://facebook.com/yourstudio">
+          <span class="field-note">Must be a business page, not a personal profile. Used for Lead Ads, Page DMs, and Instagram (Instagram inherits the Facebook connection if linked).</span>
+        </div>
+        <div class="f">
+          <label for="instagramHandle">Instagram handle</label>
+          <input type="text" id="instagramHandle" placeholder="@yourstudio">
+          <span class="field-note">Business or Creator account. Auto-connected via your Facebook page when linked.</span>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="f">
+          <label for="googleBusinessUrl">Google Business Profile</label>
+          <input type="text" id="googleBusinessUrl" placeholder="https://maps.app.goo.gl/...">
+          <span class="field-note">Powers Google review automations and click-to-call.</span>
+        </div>
+        <div class="f">
+          <label for="tiktokHandle">TikTok handle</label>
+          <input type="text" id="tiktokHandle" placeholder="@yourstudio">
+          <span class="field-note">Used for TikTok Lead Ads when available.</span>
+        </div>
+      </div>
+      <div class="fr x1">
+        <div class="f">
+          <label for="youtubeUrl">YouTube channel URL</label>
+          <input type="text" id="youtubeUrl" placeholder="https://youtube.com/@yourstudio">
+          <span class="field-note">If you publish on YouTube and want it linked to your studio profile.</span>
+        </div>
       </div>
     </div>
 
@@ -580,7 +595,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
-<script src="/js/form.js?v=20260513r"></script>
+<script src="/js/form.js?v=20260513s"></script>
 
 </div><!-- /formWrap -->
 </body>

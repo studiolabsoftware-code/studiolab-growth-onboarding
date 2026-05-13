@@ -1022,6 +1022,12 @@
       sms_type: isScalePlus ? valOrNull('smsType') : null,
       has_twilio: isScalePlus ? !!(document.getElementById('hasTwilio') && document.getElementById('hasTwilio').checked) : null,
       twilio_number: isScalePlus ? valOrNull('twilioNumber') : null,
+
+      // Social and business handles. Launch collects these in the optional
+      // future-proof expander; Scale and AI collect them in the SMS step as
+      // first-class inputs. Form skips silently if the inputs don't exist.
+      tiktok_handle: valOrNull('tiktokHandle'),
+      youtube_url:   valOrNull('youtubeUrl'),
       area_code: isScalePlus ? valOrNull('areaCode') : null,
       port_number: isScalePlus ? valOrNull('portNum') : null,
       sms_tone: isScalePlus ? valOrNull('smsTone') : null,
@@ -1724,6 +1730,7 @@
       'col1t','col2t','fromName','replyEmail','emailDomain',
       'smsType','portNum','twilioNumber',
       'googleBusinessUrl','facebookUrl','instagramHandle','bookingUrl',
+      'tiktokHandle','youtubeUrl',
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
     ].forEach((id) => setVal(id, sub[idToColumn(id)]));
@@ -1800,6 +1807,7 @@
       extraNotes: 'extra_notes',
       googleBusinessUrl: 'google_business_url', facebookUrl: 'facebook_url',
       instagramHandle: 'instagram_handle', bookingUrl: 'booking_url',
+      tiktokHandle: 'tiktok_handle', youtubeUrl: 'youtube_url',
     };
     return map[id] || id;
   }
