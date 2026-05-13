@@ -369,12 +369,15 @@ select {
 .sum-edit:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
 .sum-hdr-static .sum-hdr-ico { background: var(--g1); }
 .sum-hdr-static .sum-hdr-title { color: var(--g6); }
-.sum-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+.sum-body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
 @media (max-width: 480px) { .sum-body { grid-template-columns: 1fr; } }
-.sum-f { display: flex; flex-direction: column; gap: 3px; }
+.sum-f { display: flex; flex-direction: column; gap: 4px; }
 .sum-f.full { grid-column: 1 / -1; }
-.sum-k { font-size: 10px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.6px; }
-.sum-v { font-size: 13px; color: var(--in-d); font-weight: 500; word-break: break-word; }
+/* Label: small, subdued, uppercase. Looks like a caption — should not
+   compete with the answer below it. */
+.sum-k { font-size: 10px; font-weight: 600; color: var(--g4); text-transform: uppercase; letter-spacing: 0.7px; }
+/* Answer: larger, weightier, darker. Clearly the primary content. */
+.sum-v { font-size: 14px; color: var(--in-d); font-weight: 600; word-break: break-word; line-height: 1.4; }
 .sum-v.emp { color: var(--g4); font-style: italic; font-weight: 400; }
 
 /* ── Submit error banner ───────────────────────────── */
