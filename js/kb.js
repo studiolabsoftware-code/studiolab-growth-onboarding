@@ -6,6 +6,55 @@
 (function () {
   const FN_BASE = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/';
   const SESSION_KEY = 'sl-growth-session';
+  const PREVIEW_MODE = new URLSearchParams(window.location.search).get('preview') === '1';
+
+  // Mock submission used in preview mode so admins can walk the KB intake
+  // without a real session_token, paid submission, or scrape worker run.
+  const PREVIEW_SUBMISSION = {
+    studio_name: 'Preview Dance Studio',
+    plan: 'ai',
+    payment_status: 'paid',
+    website: 'https://previewdance.example.com',
+    kb_scrape_status: 'complete',
+    kb_scrape_pages_count: 6,
+    kb_assistant_persona_type: 'studio',
+    kb_assistant_persona_name: '',
+    kb_greeting: 'Hi! Welcome to Preview Dance Studio. I can help you find a class, answer your questions, or help you get started. What can I help with?',
+    kb_profile: 'Preview Dance Studio is a community-focused dance school running classes for ages 3 through adult across ballet, jazz, contemporary, and hip-hop. Now in its 18th year, the studio is known for warm, experienced teachers and a strong focus on technique.',
+    kb_classes: 'First class is free — wear something comfortable you can move in.\n\nBallet: leotard, tights, hair in a bun, ballet shoes.\nJazz: fitted top, leggings or shorts, hair tied back, jazz shoes or bare feet.\nContemporary: fitted clothing, hair tied back, bare feet.\nHip-hop: comfortable streetwear, clean trainers (indoor use only).',
+    kb_pricing: 'Term-based pricing with multi-class and family discounts. New families receive a free trial class. Live pricing and packages are available in the parent portal — we direct enquiries there rather than quoting over chat.',
+    kb_price_quoting: 'Never calculate combined or multi-class pricing. Always direct parents to the portal for live totals tailored to their family.',
+    kb_policies: 'Term fees are non-refundable but classes can be made up within the term. We ask for two weeks\' notice before withdrawing from a class so we can manage the waitlist. Behaviour expectations are based on respect for teachers, peers, and the space.',
+    kb_events: 'Annual end-of-year concert held each December at a local theatre. Costume orders run from August. Dress rehearsals are the week before the concert — attendance is required.',
+    kb_faqs: 'Free on-site parking. Closest train station is a 6-minute walk. Viewing windows in each studio so parents can watch class. Water bottles encouraged; we have a refill station in the lobby.',
+    kb_restricted: 'Teacher personal contact details, internal staffing matters, specific student incidents, medical advice.',
+    kb_tone: 'Warm, encouraging, and clear. Speak like a friendly studio owner — never corporate, never pushy. Use plain language a busy parent can read in five seconds.',
+    voice_hours: 'Office hours: Tuesday–Friday 10am–6pm, Saturday 9am–1pm. Closed Sunday and Monday.',
+    voice_escalate: 'Medical concerns, billing disputes, complaints, anything related to a specific child by name, anything the parent describes as urgent.',
+    kb_scrape_sources: {
+      kb_profile: 'website',
+      kb_classes: 'website',
+      kb_pricing: 'website',
+      kb_policies: 'website',
+      kb_events: 'website',
+      kb_faqs: 'website',
+      kb_greeting: 'default',
+      kb_price_quoting: 'default',
+      kb_tone: 'default',
+      kb_restricted: 'default',
+      voice_hours: 'default',
+      voice_escalate: 'default',
+    },
+  };
+
+  function showPreviewBanner() {
+    if (document.getElementById('kb-preview-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'kb-preview-banner';
+    b.style.cssText = 'position:sticky;top:0;z-index:50;background:#7C3AED;color:#fff;padding:8px 14px;text-align:center;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;';
+    b.textContent = 'Preview mode · no changes are saved';
+    document.body.insertBefore(b, document.body.firstChild);
+  }
 
   // ----- Utilities ----------------------------------------------------------
   function $(id) { return document.getElementById(id); }
@@ -75,9 +124,26 @@
 
   // ----- Boot ---------------------------------------------------------------
   async function boot() {
+    if (PREVIEW_MODE) { previewBoot(); return; }
     state.session = readSession();
     if (!sessionValid(state.session)) { showOnly('kb-auth'); return; }
     await loadStatus({ initial: true });
+  }
+
+  // Preview-mode boot: skip the session check + get-kb-status call and seed
+  // the form straight from the mock submission so admins can walk the KB
+  // intake exactly as a paying studio would see it after a fresh scrape.
+  function previewBoot() {
+    showPreviewBanner();
+    state.session = { token: 'preview', expiresAt: new Date(Date.now() + 3600e3).toISOString() };
+    state.submission = PREVIEW_SUBMISSION;
+    state.studioName = PREVIEW_SUBMISSION.studio_name;
+    showOnly('kb-form');
+    $('kb-h1').textContent = `Your AI knowledge base for ${state.studioName}`;
+    updatePersonaPreviews();
+    renderScrapeStatus(PREVIEW_SUBMISSION);
+    fillFromSubmission(PREVIEW_SUBMISSION);
+    setSaveState('saved');
   }
 
   async function loadStatus(opts) {
@@ -248,6 +314,21 @@
     });
     dirty.clear();
 
+    if (PREVIEW_MODE) {
+      // Fake the round-trip so the save indicator and edited-badge flip
+      // behave exactly as in production.
+      await new Promise((res) => setTimeout(res, 350));
+      Object.keys(payload).forEach((k) => {
+        const b = document.querySelector(`[data-badge-for="${k}"]`);
+        if (!b) return;
+        if (['kb_assistant_persona_type', 'kb_assistant_persona_name'].indexOf(k) >= 0) return;
+        b.className = 'kb-badge edited';
+        b.textContent = 'Edited by you';
+      });
+      setSaveState('saved');
+      return;
+    }
+
     const r = await callFn('save-kb', { session_token: state.session.token, payload, finalize: false });
     if (!r.ok || !r.data || r.data.ok === false) {
       setSaveState('err');
@@ -332,6 +413,13 @@
       btn.textContent = 'Saving…';
       // Make sure any debounced changes flush first.
       if (dirty.size > 0) { await saveNow(); }
+      if (PREVIEW_MODE) {
+        await new Promise((res) => setTimeout(res, 600));
+        state.finalized = true;
+        showOnly('kb-done');
+        window.scrollTo(0, 0);
+        return;
+      }
       const r = await callFn('save-kb', { session_token: state.session.token, payload: {}, finalize: true });
       if (!r.ok || !r.data || r.data.ok === false) {
         btn.disabled = false;

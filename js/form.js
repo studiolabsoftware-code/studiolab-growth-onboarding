@@ -1511,6 +1511,9 @@
     };
 
     const stageSuccess = () => {
+      const continueHTML = PLAN === 'ai'
+        ? '<button type="button" class="btn btn-ok pay-modal-pay" data-preview-continue>Continue to knowledge base</button>'
+        : '<button type="button" class="btn btn-ok pay-modal-pay" data-preview-done>Close preview</button>';
       card.innerHTML = ''
         + '<header class="pay-modal-hdr">'
         +   '<div class="pay-modal-eyebrow pay-preview-eyebrow">Preview mode</div>'
@@ -1522,10 +1525,12 @@
         +   '<p class="pay-preview-note">' + escapeHtml(postPayCopy) + '</p>'
         + '</div>'
         + '<footer class="pay-modal-ftr pay-preview-ftr-single">'
-        +   '<button type="button" class="btn btn-ok pay-modal-pay" data-preview-done>Close preview</button>'
+        +   continueHTML
         + '</footer>';
       const done = card.querySelector('[data-preview-done]');
       if (done) done.addEventListener('click', () => { restore(); closePayModal(); });
+      const cont = card.querySelector('[data-preview-continue]');
+      if (cont) cont.addEventListener('click', () => { window.location.href = '/kb.html?preview=1'; });
     };
 
     stageRedirecting();
