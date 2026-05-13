@@ -53,6 +53,19 @@
     return '/' + r + '/' + plan + '/';
   }
 
+  // Decide where a returning studio lands after OTP. The default is the
+  // per-plan setup form, but a Dominate AI studio who has already paid
+  // belongs on /kb.html — the form is behind them at that point. kb.html
+  // itself handles the "KB already finalised" state, so we route there
+  // whether or not kb_completed_at is set.
+  const PAID_STATUSES = new Set(['paid', 'authorised', 'card_saved']);
+  function routeFor(submission, plan, region) {
+    if (submission && plan === 'ai' && PAID_STATUSES.has(submission.payment_status)) {
+      return '/kb.html';
+    }
+    return destinationUrl(plan, region);
+  }
+
   // ── Gate copy: plan-aware when URL specifies a plan ──────────────────────
   function applyPlanAwareCopy() {
     if (!ALLOWED_PLANS.has(URL_PLAN)) return;
@@ -131,7 +144,7 @@
 
     // Plan-specific verify succeeded — store session and redirect
     storeSession(r.data.session_token, r.data.session_expires_at, otpEmail);
-    window.location.href = destinationUrl(URL_PLAN, URL_REGION);
+    window.location.href = routeFor(r.data.submission, URL_PLAN, URL_REGION);
   }
 
   async function claimAndGo(verifiedToken, plan, region) {
@@ -141,7 +154,7 @@
       return;
     }
     storeSession(r.data.session_token, r.data.session_expires_at, otpEmail);
-    window.location.href = destinationUrl(plan, region);
+    window.location.href = routeFor(r.data.submission, plan, region);
   }
 
   // ── Plan + region picker (shown when no draft found in generic mode) ──────
