@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/form.css?v=20260513q">
+<link rel="stylesheet" href="/css/form.css?v=20260513r">
 <script>window.PLAN = 'ai'; window.REGION = 'AU';</script>
 </head>
 <body>
@@ -441,6 +441,17 @@
           </select>
         </div>
       </div>
+      <div class="sms-twilio">
+        <label class="sms-twilio-toggle">
+          <input type="checkbox" id="hasTwilio">
+          <span>I already have a Twilio number I want to connect instead</span>
+        </label>
+        <div class="f" id="twilioRow" style="display:none; margin-top:10px;">
+          <label for="twilioNumber">Your existing Twilio number</label>
+          <input type="tel" id="twilioNumber" placeholder="04XX XXX XXX">
+          <span class="field-note">We'll collect your Twilio account credentials via a secure link after you submit — never enter API keys in this form.</span>
+        </div>
+      </div>
       <div class="f" id="portRow" style="display:none; margin-top:10px;">
         <label for="portNum">Existing mobile number to port</label>
         <input type="tel" id="portNum" placeholder="04XX XXX XXX">
@@ -577,7 +588,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
-<script src="/js/form.js?v=20260513q"></script>
+<script src="/js/form.js?v=20260513r"></script>
 
 </div><!-- /formWrap -->
 </body>

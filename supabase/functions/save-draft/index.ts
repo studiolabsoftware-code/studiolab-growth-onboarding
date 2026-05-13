@@ -28,6 +28,8 @@ const ALLOWED_FIELDS = new Set([
   'google_business_url','facebook_url','instagram_handle','booking_url',
   // Optional brand-colour reference screenshot for hex matching.
   'brand_reference_url',
+  // Optional Twilio account connection (Scale and AI).
+  'has_twilio', 'twilio_number',
 ]);
 
 function pickAllowed(payload: Record<string, unknown>): Record<string, unknown> {

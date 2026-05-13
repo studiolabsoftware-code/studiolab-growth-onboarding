@@ -1020,6 +1020,8 @@
       dns_access: state.yn.dns ? valOrNull('dnsAccess') : null,
 
       sms_type: isScalePlus ? valOrNull('smsType') : null,
+      has_twilio: isScalePlus ? !!(document.getElementById('hasTwilio') && document.getElementById('hasTwilio').checked) : null,
+      twilio_number: isScalePlus ? valOrNull('twilioNumber') : null,
       area_code: isScalePlus ? valOrNull('areaCode') : null,
       port_number: isScalePlus ? valOrNull('portNum') : null,
       sms_tone: isScalePlus ? valOrNull('smsTone') : null,
@@ -1720,7 +1722,7 @@
       'studioName','legalName','country','timezone','studioType','address','website',
       'firstName','lastName','contactPhone','contactRole',
       'col1t','col2t','fromName','replyEmail','emailDomain',
-      'smsType','portNum',
+      'smsType','portNum','twilioNumber',
       'googleBusinessUrl','facebookUrl','instagramHandle','bookingUrl',
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
@@ -1755,6 +1757,14 @@
       const btn = document.querySelector('[data-yn="quotePrice"][data-val="' + (sub.kb_price_quoting ? 'true' : 'false') + '"]');
       if (btn) handleYn(btn);
     }
+    if (sub.has_twilio != null) {
+      const cb = document.getElementById('hasTwilio');
+      if (cb) {
+        cb.checked = !!sub.has_twilio;
+        const row = document.getElementById('twilioRow');
+        if (row) row.style.display = cb.checked ? '' : 'none';
+      }
+    }
     if (Array.isArray(sub.lead_sources)) {
       $$('input[data-lead]').forEach((cb) => {
         cb.checked = sub.lead_sources.indexOf(cb.value) >= 0;
@@ -1783,6 +1793,7 @@
       contactRole: 'role', col1t: 'primary_colour', col2t: 'secondary_colour',
       signOff: 'sign_off', fromName: 'from_name', replyEmail: 'reply_email',
       emailDomain: 'email_domain', smsType: 'sms_type', portNum: 'port_number',
+      twilioNumber: 'twilio_number',
       'kb-profile': 'kb_profile', 'kb-classes': 'kb_classes', 'kb-pricing': 'kb_pricing',
       'kb-policies': 'kb_policies', 'kb-events': 'kb_events', 'kb-restricted': 'kb_restricted',
       'kb-tone': 'kb_tone', voiceHours: 'voice_hours', voiceEscalate: 'voice_escalate',
@@ -1881,6 +1892,10 @@
       else if (t.id === 'smsType') {
         const row = document.getElementById('portRow');
         if (row) row.style.display = t.value === 'existing' ? '' : 'none';
+      }
+      else if (t.id === 'hasTwilio') {
+        const row = document.getElementById('twilioRow');
+        if (row) row.style.display = t.checked ? '' : 'none';
       }
       else if (t.id === 'country') applyCountryToTimezone();
     });

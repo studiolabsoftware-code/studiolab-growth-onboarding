@@ -706,3 +706,8 @@ body.setup-guided .co.guided-only, body.setup-guided div.guided-only { display: 
 .brand-ref-remove:hover { color: var(--rd, #B91C1C); background: #fff; }
 .brand-ref-spin { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.85); border-radius: 10px; }
 .brand-ref-err { margin-top: 8px; color: var(--rd, #B91C1C); font-size: 11px; font-weight: 600; }
+
+/* Twilio side note inside the SMS card */
+.sms-twilio { margin-top: 14px; padding: 12px 14px; background: var(--g1); border: 1px solid var(--g2); border-radius: 10px; }
+.sms-twilio-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--in-d); }
+.sms-twilio-toggle input { margin: 0; accent-color: var(--in); }
