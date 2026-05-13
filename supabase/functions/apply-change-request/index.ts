@@ -75,6 +75,18 @@ Deno.serve(async (req) => {
       details: { change_request_id: cr.id, fields_updated: Object.keys(patch) },
     });
 
+    try {
+      const { postSystemMessage } = await import('../_shared/inbox.ts');
+      const { data: subForName } = await sb.from('submissions').select('studio_name').eq('id', cr.submission_id).single();
+      const fieldsList = Object.keys(patch).join(', ');
+      await postSystemMessage(
+        sb,
+        cr.submission_id,
+        subForName?.studio_name || null,
+        `✏️ Studio submitted the requested updates (${fieldsList}).`,
+      );
+    } catch (e) { console.error('system message (change_request_completed) failed:', e); }
+
     // Notify admins (best-effort; do not fail the request if email fails).
     try {
       const { data: sub } = await sb.from('submissions').select('studio_name').eq('id', cr.submission_id).single();

@@ -1,0 +1,89 @@
+/* Studio portal — distinct chrome from the public onboarding form but
+   uses the same design tokens (form.css :root variables). */
+
+.portal-body { background: var(--g1); margin: 0; min-height: 100vh; font-family: 'Inter', Arial, sans-serif; color: var(--in-d); }
+
+/* Header */
+.portal-hdr { background: var(--in-d); color: #fff; }
+.portal-hdr-inner { max-width: 960px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 16px; }
+.portal-logo img { height: 28px; width: auto; display: block; }
+.portal-studio-name { font-size: 14px; font-weight: 600; opacity: 0.85; }
+.portal-spacer { flex: 1; }
+.portal-hdr .btn-link { color: rgba(255,255,255,0.85); font-size: 18px; padding: 4px 8px; }
+.portal-hdr .btn-link:hover { color: #fff; }
+
+/* Layout */
+.portal-main { max-width: 960px; margin: 0 auto; padding: 20px; }
+.portal-error { max-width: 560px; margin: 80px auto; padding: 20px; }
+.portal-card { background: #fff; border: 1px solid var(--g2); border-radius: 12px; padding: 28px; }
+.portal-card h1 { font-size: 20px; font-weight: 700; color: var(--in-d); margin: 0 0 12px; }
+.portal-card p { font-size: 14px; line-height: 1.6; margin: 0 0 12px; color: var(--g8); }
+.portal-card p.portal-muted { color: var(--g6); font-size: 13px; }
+.portal-card a { color: var(--in); }
+
+/* Tabs */
+.portal-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--g2); }
+.portal-tab { background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 10px 16px; font-size: 14px; font-weight: 600; color: var(--g6); cursor: pointer; font-family: inherit; }
+.portal-tab:hover { color: var(--in-d); }
+.portal-tab.active { color: var(--in-d); border-bottom-color: var(--in); }
+.portal-tab-badge { display: inline-block; min-width: 20px; padding: 1px 7px; margin-left: 6px; background: var(--mg); color: #fff; border-radius: 10px; font-size: 11px; font-weight: 700; }
+
+/* Thread card */
+.portal-thread-card { background: #fff; border: 1px solid var(--g2); border-radius: 12px; overflow: hidden; }
+.portal-thread-hdr { padding: 16px 20px; border-bottom: 1px solid var(--g2); }
+.portal-thread-title { font-size: 16px; font-weight: 700; color: var(--in-d); margin: 0 0 4px; }
+.portal-thread-sub { font-size: 12px; color: var(--g6); margin: 0; line-height: 1.55; }
+
+/* Message list */
+.portal-msgs { padding: 16px 20px; min-height: 200px; max-height: 60vh; overflow-y: auto; background: var(--g1); }
+.portal-loading, .portal-empty { padding: 24px 0; text-align: center; color: var(--g6); font-size: 13px; }
+
+.portal-msg { max-width: 82%; margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.55; background: #fff; border: 1px solid var(--g2); }
+.portal-msg-mine { margin-left: auto; background: var(--in-l); border-color: var(--in-l); }
+.portal-msg-them { margin-right: auto; background: #fff; }
+.portal-msg-meta { font-size: 11px; color: var(--g4); margin-bottom: 4px; }
+.portal-msg-meta strong { color: var(--in-d); font-weight: 600; }
+.portal-msg-body { color: var(--in-d); word-wrap: break-word; }
+.portal-msg-body p { margin: 0 0 8px; }
+.portal-msg-body p:last-child { margin-bottom: 0; }
+.portal-msg-body a { color: var(--in); }
+
+.portal-msg-system-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; padding: 6px 12px; font-size: 11px; color: var(--g4); }
+.portal-msg-system-dot { color: var(--g3); font-size: 8px; }
+.portal-msg-system-when { margin-left: auto; }
+
+.portal-msg-atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.portal-att { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: #fff; border: 1px solid var(--g2); border-radius: 999px; font-size: 11px; color: var(--in-d); text-decoration: none; cursor: pointer; }
+.portal-att:hover { border-color: var(--in); }
+.portal-att-size { color: var(--g4); }
+
+/* Compose */
+.portal-compose { padding: 14px 20px 18px; background: #fff; border-top: 1px solid var(--g2); }
+.portal-compose textarea { width: 100%; min-height: 90px; padding: 10px 12px; border: 1px solid var(--g2); border-radius: 8px; font-family: inherit; font-size: 13px; line-height: 1.55; color: var(--in-d); resize: vertical; box-sizing: border-box; }
+.portal-compose textarea:focus-visible { outline: none; border-color: var(--in); box-shadow: 0 0 0 3px rgba(74,63,138,0.18); }
+.portal-compose-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.portal-file { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 10px; background: var(--g1); border: 1px solid var(--g2); border-radius: 999px; font-size: 11px; color: var(--in-d); }
+.portal-file.oversize { background: #FEF2F2; border-color: #FCA5A5; color: var(--rd); }
+.portal-file-size { color: var(--g4); }
+.portal-file-warn { color: var(--rd); font-weight: 700; }
+.portal-file button { background: none; border: 0; cursor: pointer; color: var(--g4); font-size: 16px; padding: 0 0 0 2px; line-height: 1; }
+.portal-compose-bar { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.portal-attach { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border: 1px solid var(--g2); border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--g6); }
+.portal-attach:hover { border-color: var(--in); color: var(--in); }
+.portal-compose-err { color: var(--rd); font-size: 12px; }
+.portal-compose-spacer { flex: 1; }
+
+/* Setup fact grid */
+.portal-fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 20px; margin: 0; }
+.portal-fact { padding: 12px 14px; background: var(--g1); border: 1px solid var(--g2); border-radius: 8px; }
+.portal-fact dt { font-size: 11px; color: var(--g6); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 4px; }
+.portal-fact dd { font-size: 14px; color: var(--in-d); margin: 0; font-weight: 600; }
+.portal-fact-wide { grid-column: 1 / -1; background: #fff; }
+.portal-fact-wide dd { font-weight: 400; color: var(--g8); line-height: 1.55; }
+
+@media (max-width: 600px) {
+  .portal-hdr-inner { padding: 10px 14px; }
+  .portal-main { padding: 14px; }
+  .portal-msg { max-width: 92%; }
+  .portal-tabs { overflow-x: auto; }
+}

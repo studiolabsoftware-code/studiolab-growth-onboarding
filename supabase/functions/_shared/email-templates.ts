@@ -264,6 +264,24 @@ export function handoffEmail(opts: {
   return { subject, html: layout({ previewText: subject, body }), text };
 }
 
+// Inbox conversation notification. Used by notify-new-message. Caller passes
+// the body HTML already rendered (so it can include things like the
+// "internal note" banner) and a footer with the deep link.
+export function inboxMessageEmail(opts: {
+  studioName: string;
+  senderName: string;
+  bodyHtml: string;
+  footerHtml: string;
+  previewText: string;
+}): { subject: string; html: string } {
+  const body = `
+    <p style="margin:0 0 10px;color:${COL.g6};font-size:12px;letter-spacing:0.4px;text-transform:uppercase;">${escape(opts.studioName)} — message thread</p>
+    <p style="margin:0 0 14px;font-size:13px;color:${COL.g8};"><strong>${escape(opts.senderName)}</strong> wrote:</p>
+    <div style="background:${COL.g1};border:1px solid ${COL.g2};border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.55;color:${COL.g8};white-space:pre-wrap;">${opts.bodyHtml}</div>
+    ${opts.footerHtml}`;
+  return { subject: '', html: layout({ previewText: opts.previewText, body }) };
+}
+
 export function kbAbandonmentNudge(opts: { studioName: string; resumeUrl: string }): { subject: string; html: string } {
   const subject = `Your AI is almost ready, ${opts.studioName}`;
   const body = `

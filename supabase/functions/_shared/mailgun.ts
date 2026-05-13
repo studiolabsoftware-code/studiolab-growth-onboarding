@@ -13,6 +13,9 @@ interface SendArgs {
   text?: string;
   replyTo?: string;
   attachments?: Attachment[];
+  // Arbitrary RFC822 headers (Message-Id, In-Reply-To, References, etc).
+  // Mailgun expects them as form fields prefixed with `h:`.
+  headers?: Record<string, string>;
 }
 
 export async function sendEmail(args: SendArgs): Promise<void> {
@@ -29,6 +32,11 @@ export async function sendEmail(args: SendArgs): Promise<void> {
   form.append('html', args.html);
   if (args.text) form.append('text', args.text);
   if (args.replyTo) form.append('h:Reply-To', args.replyTo);
+  if (args.headers) {
+    for (const [name, value] of Object.entries(args.headers)) {
+      if (value) form.append(`h:${name}`, value);
+    }
+  }
   if (args.attachments) {
     for (const att of args.attachments) {
       const blob = new Blob([att.content], { type: att.contentType || 'application/octet-stream' });

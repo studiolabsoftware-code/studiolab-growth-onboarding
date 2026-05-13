@@ -32,9 +32,10 @@
     cancelled: 'Cancelled',
   };
 
-  async function open(id) {
+  async function open(id, opts) {
     const client = sb(); if (!client) return;
     window.AdminDashboard.showDetail();
+    const wantMessagesTab = opts && opts.tab === 'messages';
     const screen = document.getElementById('detailScreen');
     screen.innerHTML = '<div class="adm-empty" style="padding:60px">Loading...</div>';
 
@@ -59,6 +60,32 @@
     currentAssignment = assignment || null;
     currentAssignees = (assignees || []).filter((a) => a.role !== 'owner' || a.is_active);
     render(sub, notes || [], log || []);
+
+    // Hydrate the Messages panel (always-present at the top of det-main).
+    // AdminInbox creates the conversation on demand if it doesn't exist yet.
+    if (window.AdminInbox?.renderThreadInto) {
+      const host = document.getElementById('detMessagesHost');
+      if (host) {
+        window.AdminInbox.renderThreadInto(host, sub.id, { studioName: sub.studio_name || '' });
+      }
+    }
+    if (wantMessagesTab) {
+      // Deep-link from the cross-studio inbox list → scroll to messages.
+      setTimeout(() => {
+        const el = document.querySelector('.det-messages-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
+    }
+    // Wire the collapse toggle for the Messages section.
+    document.querySelectorAll('[data-act="toggle-messages"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const body = document.getElementById('detMessagesHost');
+        const open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : '';
+        btn.textContent = open ? 'Show' : 'Hide';
+        btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      });
+    });
 
     // Log a 'viewed' activity (best-effort)
     try {
@@ -98,6 +125,16 @@
 
       <div class="det-grid">
         <div class="det-main">
+
+          <section class="det-section det-messages-section">
+            <div class="det-section-hdr">
+              <h2 class="det-section-title">📬 Messages</h2>
+              <button type="button" class="btn-link det-msg-collapse" data-act="toggle-messages" aria-expanded="true">Hide</button>
+            </div>
+            <div class="det-section-body" id="detMessagesHost">
+              <div class="adm-empty" style="padding:24px 0;">Loading thread…</div>
+            </div>
+          </section>
 
           ${section('🏫 Studio details', [
             ['Studio name', fmtVal(sub.studio_name), undefined, 'studio_name'],

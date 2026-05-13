@@ -442,6 +442,21 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
       await sendEmail({ to: admins.map((a) => a.email), subject: t.subject, html: t.html });
     }
   } catch (e) { console.error('admin notification failed:', e); }
+
+  // Append a system event to the studio's conversation timeline.
+  try {
+    const { postSystemMessage } = await import('../_shared/inbox.ts');
+    const amountDisplay = `${currency || 'AUD'} $${(amountCents / 100).toFixed(2)}`;
+    const verb = paymentMode === 'immediate' ? 'Payment received'
+              : paymentMode === 'hold' ? 'Card authorised'
+              : 'Card saved';
+    await postSystemMessage(
+      sb,
+      submission.id as string,
+      (submission.studio_name as string) || null,
+      `💳 ${verb} — ${amountDisplay}`,
+    );
+  } catch (e) { console.error('system message (payment) failed:', e); }
 }
 
 async function handleCheckoutExpired(sb: Sb, session: CheckoutSession): Promise<void> {

@@ -147,6 +147,10 @@
     state.rows = (data || []).map((r) => ({ ...r, _assignment: assignmentMap[r.id] || null }));
     render();
     renderSheetSyncStatus();
+    // Surface inbox unread state on the cards. Cheap; cached in AdminInbox.
+    if (window.AdminInbox?.refreshUnreadMap) {
+      window.AdminInbox.refreshUnreadMap().then(render).catch(() => {});
+    }
   }
 
   function renderSheetSyncStatus() {
@@ -318,8 +322,16 @@
       asgnBadge = `<span class="bdg bdg-setup">Assigned: ${escapeHtml(r.assigned_to)}</span>`;
     }
 
+    // Unread messages indicator. The data lives on conversations.admin_unread_count
+    // and is loaded by AdminInbox. Cards that have nothing waiting stay quiet.
+    const unread = window.AdminInbox?.getUnreadForSubmission?.(r.id);
+    const unreadBadge = unread && unread.count > 0
+      ? `<span class="bdg bdg-unread" title="${unread.count} unread message${unread.count === 1 ? '' : 's'}">✉ ${unread.count} unread</span>`
+      : '';
+    const unreadRowClass = unread && unread.count > 0 ? ' has-unread' : '';
+
     return `
-      <div class="sub-card" data-id="${escapeHtml(r.id)}" tabindex="0" role="button" aria-label="${escapeHtml(r.studio_name || r.contact_email || 'Untitled')}">
+      <div class="sub-card${unreadRowClass}" data-id="${escapeHtml(r.id)}" tabindex="0" role="button" aria-label="${escapeHtml(r.studio_name || r.contact_email || 'Untitled')}">
         <div class="sc-row1">
           <span class="sc-name">${escapeHtml(r.studio_name || r.contact_email || 'Untitled')}</span>
           <span class="bdg bdg-plan-${r.plan || 'launch'}">${escapeHtml(planLabel)}</span>
@@ -328,6 +340,7 @@
         <div class="sc-badges">
           <span class="bdg bdg-st-${r.status}">${escapeHtml(STATUS_LABEL[r.status] || r.status)}</span>
           ${asgnBadge}
+          ${unreadBadge}
         </div>
       </div>`;
   }

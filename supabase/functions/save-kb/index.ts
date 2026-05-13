@@ -117,6 +117,11 @@ Deno.serve(async (req) => {
           details: { kind: 'kb_intake_completed' },
         });
       } catch (e) { console.error('activity_log insert failed:', e); }
+      try {
+        const { postSystemMessage } = await import('../_shared/inbox.ts');
+        await postSystemMessage(sb, row.id, row.studio_name || null,
+          '🤖 Studio confirmed their AI knowledge base — ready for the next step.');
+      } catch (e) { console.error('system message (kb_complete) failed:', e); }
     }
 
     return jsonResponse({ ok: true, finalized: finalize });

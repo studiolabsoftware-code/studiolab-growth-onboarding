@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>StudioLAB Growth: Studio Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/form.css">
+<link rel="stylesheet" href="css/portal.css?v=20260513a">
+</head>
+<body class="portal-body">
+
+<header class="portal-hdr">
+  <div class="portal-hdr-inner">
+    <a class="portal-logo" href="#" aria-label="StudioLAB Growth">
+      <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
+    </a>
+    <div class="portal-studio-name" id="portalStudioName"></div>
+    <div class="portal-spacer"></div>
+    <button type="button" class="btn-link" id="portalRefresh" title="Refresh">↻</button>
+  </div>
+</header>
+
+<!-- ── Missing/invalid link ──────────────────────────────────────────────── -->
+<section id="portalErrorView" class="portal-error" style="display:none">
+  <div class="portal-card">
+    <h1>This link is no longer valid</h1>
+    <p>The conversation link in your email may have expired or been revoked. Open the most recent email from us and tap the <strong>"Open studio portal"</strong> button again — it will always show your full conversation history.</p>
+    <p class="portal-muted">If you cannot find a recent email, reply to <a href="mailto:growth@studiolabgrowth.com">growth@studiolabgrowth.com</a> and we will send you a fresh link.</p>
+  </div>
+</section>
+
+<!-- ── Main dashboard ────────────────────────────────────────────────────── -->
+<main id="portalMain" class="portal-main" style="display:none">
+
+  <nav class="portal-tabs" role="tablist" aria-label="Studio sections">
+    <button type="button" class="portal-tab active" data-tab="messages" role="tab" aria-selected="true">
+      📬 Messages <span class="portal-tab-badge" id="portalUnreadBadge" style="display:none">0</span>
+    </button>
+    <button type="button" class="portal-tab" data-tab="setup" role="tab" aria-selected="false">🏗️ My setup</button>
+  </nav>
+
+  <!-- Messages tab — DEFAULT view -->
+  <section id="portalMessagesTab" class="portal-tab-panel" role="tabpanel" aria-labelledby="messages">
+    <div class="portal-thread-card">
+      <div class="portal-thread-hdr">
+        <div>
+          <h2 class="portal-thread-title" id="portalThreadTitle">Your conversation</h2>
+          <p class="portal-thread-sub">Anything you send here goes straight to our team. Replies arrive by email and live here too.</p>
+        </div>
+      </div>
+
+      <div class="portal-msgs" id="portalMsgs">
+        <div class="portal-loading">Loading your conversation…</div>
+      </div>
+
+      <form class="portal-compose" id="portalCompose" novalidate>
+        <textarea id="portalBody" rows="4" placeholder="Type your message… (Cmd/Ctrl-Enter to send)"></textarea>
+        <div class="portal-compose-files" id="portalFiles"></div>
+        <div class="portal-compose-bar">
+          <label class="portal-attach" title="Attach files (10 MB max each)">
+            📎 Attach
+            <input type="file" id="portalFileInput" multiple style="display:none">
+          </label>
+          <span class="portal-compose-err" id="portalErr" role="alert"></span>
+          <div class="portal-compose-spacer"></div>
+          <button type="submit" class="btn btn-p" id="portalSend">Send</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Setup tab — read-only summary of what they submitted -->
+  <section id="portalSetupTab" class="portal-tab-panel" role="tabpanel" style="display:none">
+    <div class="portal-thread-card">
+      <h2 class="portal-thread-title">Your setup details</h2>
+      <p class="portal-thread-sub">A quick recap of what you submitted. If anything needs updating, just send us a message on the Messages tab and we will sort it.</p>
+      <dl class="portal-fact-grid" id="portalSetupFacts">
+        <div class="portal-loading" style="grid-column:1/-1">Loading…</div>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<script src="js/portal.js?v=20260513a"></script>
+</body>
+</html>

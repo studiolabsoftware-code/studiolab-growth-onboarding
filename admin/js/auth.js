@@ -110,6 +110,7 @@
     applyRoleGating();
 
     if (window.AdminDashboard && window.AdminDashboard.init) window.AdminDashboard.init();
+    if (window.AdminInbox && window.AdminInbox.init) window.AdminInbox.init();
   }
 
   async function loadProfile() {
@@ -151,8 +152,12 @@
     } else if (name === 'catalog') {
       if (catalog) catalog.style.display = '';
       if (window.AdminCatalog && window.AdminCatalog.show) window.AdminCatalog.show();
+    } else if (name === 'inbox') {
+      if (window.AdminInbox && window.AdminInbox.openListScreen) window.AdminInbox.openListScreen();
     } else {
       if (list) list.style.display = '';
+      const inboxScreen = document.getElementById('inboxScreen');
+      if (inboxScreen) inboxScreen.style.display = 'none';
     }
     document.querySelectorAll('.adm-nav-link').forEach((b) => {
       b.classList.toggle('active', b.dataset.section === name);

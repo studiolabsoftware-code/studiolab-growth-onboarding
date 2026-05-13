@@ -175,6 +175,11 @@ async function runScrape(
 
     const { error: updErr } = await sb.from('submissions').update(update).eq('id', submissionId);
     if (updErr) throw updErr;
+    try {
+      const { postSystemMessage } = await import('../_shared/inbox.ts');
+      await postSystemMessage(sb, submissionId, studioName,
+        `🌐 Website scrape complete — ${pages.length} page${pages.length === 1 ? '' : 's'} analysed and added to the knowledge base.`);
+    } catch (e) { console.error('system message (scrape complete) failed:', e); }
   } catch (err) {
     console.error('scrape-and-extract worker error:', err);
     try {
