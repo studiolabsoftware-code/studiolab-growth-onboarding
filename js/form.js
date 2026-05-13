@@ -955,7 +955,17 @@
     setSum('sv-phone', val('contactPhone'));
     setSum('sv-website', val('website'));
     setSum('sv-logo', state.logoUrl ? 'Uploaded' : 'Not provided');
-    setSum('sv-col1', val('col1t'));
+    // Primary colour: render an inline swatch beside the hex so the studio
+    // can visually confirm the colour they picked.
+    const svCol1 = document.getElementById('sv-col1');
+    if (svCol1) {
+      const hex = (val('col1t') || '').trim();
+      if (hex) {
+        svCol1.innerHTML = `<span class="sum-swatch" style="background:${escapeForHtml(hex)}" aria-hidden="true"></span><span>${escapeForHtml(hex.toUpperCase())}</span>`;
+      } else {
+        svCol1.textContent = 'Not provided';
+      }
+    }
     setSum('sv-signoff', val('signOff'));
     setSum('sv-tone', val('tone'));
     setSum('sv-fromname', val('fromName'));

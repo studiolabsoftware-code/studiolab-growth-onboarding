@@ -382,6 +382,9 @@ select {
 /* Secondary detail inside a value, e.g. the tax breakdown after a price. */
 .sum-v-meta { font-size: 11px; font-weight: 400; color: var(--g6); white-space: nowrap; }
 @media (max-width: 480px) { .sum-v-meta { white-space: normal; } }
+/* Inline colour swatch beside a hex code in the summary. */
+.sum-swatch { display: inline-block; width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--g2); margin-right: 8px; vertical-align: -3px; flex-shrink: 0; }
+.sum-v:has(.sum-swatch) { display: inline-flex; align-items: center; }
 
 /* ── Submit error banner ───────────────────────────── */
 .submit-err {
