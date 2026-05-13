@@ -63,7 +63,7 @@
       const statusBdg = r.is_active
         ? '<span class="bdg bdg-active">Active</span>'
         : '<span class="bdg bdg-inactive">Inactive</span>';
-      const actions = canManage ? renderActions(r, isSelf) : '';
+      const actions = canManage ? renderActions(r, isSelf) : (isSelf ? `<button class="btn-link" data-user-action="edit" data-id="${r.id}">Edit my profile</button>` : '');
       return `
         <tr>
           <td class="studio-cell">${escapeHtml(r.name)}${isSelf ? ' <span class="user-you">(you)</span>' : ''}</td>
@@ -77,8 +77,9 @@
   }
 
   function renderActions(r, isSelf) {
-    if (isSelf) return '<span class="muted" style="font-size:11px;">—</span>';
     const parts = [];
+    parts.push(`<button class="btn-link" data-user-action="edit" data-id="${r.id}">Edit</button>`);
+    if (isSelf) return parts.join('');
     parts.push(`<button class="btn-link" data-user-action="resend" data-id="${r.id}">Resend invite</button>`);
     if (r.is_active) {
       parts.push(`<button class="btn-link" data-user-action="deactivate" data-id="${r.id}">Deactivate</button>`);
@@ -95,6 +96,8 @@
     if (!id) return;
     const row = rows.find((r) => r.id === id);
     if (!row) return;
+
+    if (action === 'edit') { await openEdit(row); return; }
 
     if (action === 'resend') {
       btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Sending...';
@@ -143,6 +146,77 @@
       if (!r.ok) { await window.AdminModal.alert({ title: 'Failed', message: escapeHtml(r.error || 'Unknown error.') }); return; }
       await load();
       return;
+    }
+  }
+
+  // Edit a single admin row. Owners can edit anyone (name/email/role);
+  // non-owners can only edit themselves (name/email — role is fixed). The
+  // role field is also disabled when editing yourself, matching the
+  // server-side guard that prevents self-role changes.
+  async function openEdit(row) {
+    const me = window.AdminAuth?.profile;
+    const canEditRole = me?.role === 'owner' && row.id !== me.id;
+    const formId = 'admEditUser_' + row.id.slice(0, 8);
+    const html = `
+      <div class="f"><label for="${formId}-name">Name</label>
+        <input type="text" id="${formId}-name" value="${escapeHtml(row.name || '')}" maxlength="80" style="width:100%;">
+      </div>
+      <div class="f" style="margin-top:10px;"><label for="${formId}-email">Email address</label>
+        <input type="email" id="${formId}-email" value="${escapeHtml(row.email || '')}" autocomplete="off" style="width:100%;">
+      </div>
+      ${canEditRole ? `
+        <div class="f" style="margin-top:10px;"><label for="${formId}-role">Role</label>
+          <select id="${formId}-role" style="width:100%;">
+            <option value="va"${row.role === 'va' ? ' selected' : ''}>VA — only sees assigned submissions</option>
+            <option value="admin"${row.role === 'admin' ? ' selected' : ''}>Admin — sees all submissions</option>
+            <option value="owner"${row.role === 'owner' ? ' selected' : ''}>Owner — full access, can manage users</option>
+          </select>
+        </div>` : `
+        <p style="font-size:12px;color:#6B7280;margin-top:10px;">Role: <strong>${escapeHtml(ROLE_LABEL[row.role] || row.role)}</strong>${row.id === me?.id ? ' (owners cannot change their own role — ask another owner)' : ''}</p>`}
+      <p id="${formId}-err" style="color:#B91C1C;font-size:12px;margin-top:8px;display:none;"></p>
+    `;
+    const ok = await window.AdminModal.confirm({
+      title: row.id === me?.id ? 'Edit my profile' : 'Edit ' + (row.name || 'user'),
+      message: html,
+      confirmLabel: 'Save changes',
+      cancelLabel: 'Cancel',
+    });
+    if (!ok) return;
+    const nameEl = document.getElementById(`${formId}-name`);
+    const emailEl = document.getElementById(`${formId}-email`);
+    const roleEl = document.getElementById(`${formId}-role`);
+    const errEl = document.getElementById(`${formId}-err`);
+    const name = (nameEl?.value || '').trim();
+    const email = (emailEl?.value || '').trim().toLowerCase();
+    const role = roleEl ? roleEl.value : row.role;
+    if (!name) {
+      await window.AdminModal.alert({ title: 'Name required', message: 'Please enter a name.' });
+      return openEdit(row);
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      await window.AdminModal.alert({ title: 'Invalid email', message: 'Please enter a valid email address.' });
+      return openEdit(row);
+    }
+    const payload = { action: 'update_user', id: row.id, name, email };
+    if (canEditRole) payload.role = role;
+    const r = await callFn('manage-admin-users', payload);
+    if (!r.ok) {
+      await window.AdminModal.alert({ title: 'Could not update', message: escapeHtml(r.error || 'Unknown error.') });
+      return;
+    }
+    const emailChanged = !!(r.data && r.data.email_changed);
+    const wasSelf = row.id === me?.id;
+    await load();
+    if (emailChanged && wasSelf) {
+      await window.AdminModal.alert({
+        title: 'Email updated',
+        message: `Your admin email is now <strong>${escapeHtml(email)}</strong>. Sign out and sign back in with the new address to refresh your session — the old sign-in keeps working until then.`,
+      });
+    } else if (emailChanged) {
+      await window.AdminModal.alert({
+        title: 'Email updated',
+        message: `<strong>${escapeHtml(row.name || row.email)}</strong> now signs in with <strong>${escapeHtml(email)}</strong>. Their next sign-in OTP will go to the new address.`,
+      });
     }
   }
 

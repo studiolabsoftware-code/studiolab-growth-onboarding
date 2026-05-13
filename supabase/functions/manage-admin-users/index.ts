@@ -141,6 +141,70 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true });
     }
 
+    if (action === 'update_user') {
+      const id = String(body.id || '');
+      if (!id) return jsonResponse({ ok: false, error: 'Missing user id.' }, 400);
+      const { data: target } = await sb.from('admin_users')
+        .select('id, email, name, role')
+        .eq('id', id)
+        .maybeSingle();
+      if (!target) return jsonResponse({ ok: false, error: 'User not found.' }, 404);
+
+      const targetIsSelf = (id === caller.id);
+      const updates: Record<string, unknown> = {};
+
+      if (typeof body.name === 'string') {
+        const n = body.name.trim();
+        if (!n) return jsonResponse({ ok: false, error: 'Name cannot be empty.' }, 400);
+        if (n !== target.name) updates.name = n;
+      }
+      if (typeof body.email === 'string') {
+        const e = body.email.trim().toLowerCase();
+        if (!isValidEmail(e)) return jsonResponse({ ok: false, error: 'Please enter a valid email.' }, 400);
+        if (e !== String(target.email).toLowerCase()) {
+          const { data: clash } = await sb.from('admin_users')
+            .select('id')
+            .ilike('email', e)
+            .maybeSingle();
+          if (clash && clash.id !== id) {
+            return jsonResponse({ ok: false, error: 'Another admin user already uses this email.' }, 400);
+          }
+          updates.email = e;
+        }
+      }
+      if (typeof body.role === 'string') {
+        if (targetIsSelf) {
+          return jsonResponse({ ok: false, error: 'You cannot change your own role.' }, 400);
+        }
+        if (!VALID_ROLES.has(body.role)) return jsonResponse({ ok: false, error: 'Invalid role.' }, 400);
+        if (body.role !== target.role) {
+          // Prevent demoting the last active owner.
+          if (body.role !== 'owner' && target.role === 'owner') {
+            const { count } = await sb.from('admin_users')
+              .select('id', { count: 'exact', head: true })
+              .eq('role', 'owner')
+              .eq('is_active', true);
+            if ((count || 0) <= 1) {
+              return jsonResponse({ ok: false, error: 'Cannot demote the last active owner.' }, 400);
+            }
+          }
+          updates.role = body.role;
+        }
+      }
+
+      if (!Object.keys(updates).length) {
+        return jsonResponse({ ok: true, no_changes: true });
+      }
+      const { error } = await sb.from('admin_users').update(updates).eq('id', id);
+      if (error) throw error;
+      return jsonResponse({
+        ok: true,
+        updated_fields: Object.keys(updates),
+        email_changed: 'email' in updates,
+        self: targetIsSelf,
+      });
+    }
+
     if (action === 'resend_invite') {
       const id = String(body.id || '');
       if (!id) return jsonResponse({ ok: false, error: 'Missing user id.' }, 400);

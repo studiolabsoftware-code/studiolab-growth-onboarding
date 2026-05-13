@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/form.css">
-<link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/admin.css?v=20260513b">
 </head>
 <body class="admin-body">
 
@@ -27,6 +27,7 @@
     <div class="hdr-sub" aria-hidden="true">Admin</div>
     <nav class="adm-nav" id="admNav" style="display:none" aria-label="Admin sections">
       <button type="button" class="adm-nav-link active" data-section="submissions">Submissions</button>
+      <button type="button" class="adm-nav-link" data-section="inbox" id="admNavInbox">Inbox<span class="adm-nav-badge" id="admNavInboxBadge" style="display:none">0</span></button>
       <button type="button" class="adm-nav-link" data-section="catalog" id="admNavCatalog">Catalog</button>
       <button type="button" class="adm-nav-link" data-section="users" id="admNavUsers" style="display:none">Users</button>
       <button type="button" class="adm-nav-link" data-section="settings" id="admNavSettings" style="display:none">Settings</button>
@@ -360,13 +361,14 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/supabase-config.js?v=20260513a"></script>
-<script src="js/auth.js?v=20260513a"></script>
+<script src="js/auth.js?v=20260513b"></script>
 <script src="js/modal.js?v=20260513a"></script>
-<script src="js/dashboard.js?v=20260513a"></script>
-<script src="js/detail.js?v=20260513a"></script>
+<script src="js/dashboard.js?v=20260513b"></script>
+<script src="js/detail.js?v=20260513b"></script>
 <script src="js/change-request.js?v=20260513a"></script>
-<script src="js/users.js?v=20260513a"></script>
+<script src="js/users.js?v=20260513b"></script>
 <script src="js/catalog.js?v=20260513a"></script>
 <script src="js/settings.js?v=20260513a"></script>
+<script src="js/inbox.js?v=20260513b"></script>
 </body>
 </html>
