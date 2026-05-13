@@ -602,6 +602,14 @@ body.pay-modal-open { overflow: hidden; }
 .pay-preview-field input { width: 100%; padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--in-d); background: #fff; border: 1px solid var(--g2); border-radius: 8px; }
 .pay-preview-field input:focus { outline: 2px solid var(--in); outline-offset: 1px; }
 .pay-preview-ftr-single { justify-content: flex-end; }
+
+/* Paybar in its paid-in-preview state — a working-document toolbar with
+   the KB entry point. The tick mirrors the success-modal one. */
+.paybar.paybar-paid { background: linear-gradient(135deg, rgba(4, 120, 87, .06), rgba(4, 120, 87, .02)); border: 1px solid rgba(4, 120, 87, .25); }
+.paybar-paid-label { font-size: 13px; font-weight: 700; color: var(--gr, #047857); display: flex; align-items: center; gap: 8px; }
+.paybar-paid-tick { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--gr, #047857); color: #fff; font-size: 12px; font-weight: 700; }
+.paybar-paid-sub { font-size: 12px; color: var(--g6); margin-top: 4px; line-height: 1.5; }
+.paybar-paid-cta { text-decoration: none; }
 .pay-modal-foot { margin: 0; padding: 12px 24px 18px; font-size: 11px; color: var(--g6); text-align: center; line-height: 1.5; }
 .payblock-error { color: var(--rd, #B91C1C); font-weight: 600; padding: 8px 0; }
 

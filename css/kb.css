@@ -69,6 +69,10 @@
 
 .kb-final { background: #fff; border-radius: 14px; padding: 28px; box-shadow: 0 6px 28px rgba(19,16,46,.06); text-align: center; }
 .kb-final .btn { padding: 14px 36px; font-size: 15px; }
+.kb-final-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
+.kb-savedraft-msg { min-height: 18px; margin: 6px 0 14px; font-size: 13px; font-weight: 600; }
+.kb-savedraft-msg.ok { color: var(--gr, #047857); }
+.kb-savedraft-msg.err { color: var(--rd, #B91C1C); }
 
 textarea.kb-loading-shimmer { background: linear-gradient(90deg, var(--g1) 25%, #fff 50%, var(--g1) 75%); background-size: 200% 100%; animation: kbShim 1.4s linear infinite; color: transparent; }
 @keyframes kbShim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }

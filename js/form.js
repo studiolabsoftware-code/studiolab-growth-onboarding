@@ -1196,6 +1196,50 @@
       payLater.dataset.bound = '1';
       payLater.addEventListener('click', (e) => handleSaveLater(e.currentTarget));
     }
+
+    // If preview-payment has already been simulated this session, swap the
+    // paybar to its post-payment state so the admin can re-enter the KB
+    // without re-running the pay flow.
+    if (PREVIEW_MODE && isPreviewPaid()) {
+      renderPostPaymentPaybar();
+    }
+  }
+
+  // ── Post-payment state (preview only) ────────────────────────────────────
+  // After the simulated Stripe handoff succeeds the paybar transforms into
+  // a working-document toolbar: it announces payment, exposes a link back
+  // into the KB intake, and stays visible across step navigation so the
+  // admin always has an access path. The flag lives in sessionStorage so
+  // refreshing the form keeps the post-payment view.
+  const PREVIEW_PAID_KEY = 'sl-preview-paid';
+  function setPreviewPaid(v) {
+    try {
+      if (v) sessionStorage.setItem(PREVIEW_PAID_KEY, '1');
+      else sessionStorage.removeItem(PREVIEW_PAID_KEY);
+    } catch (_) { /* ignore */ }
+  }
+  function isPreviewPaid() {
+    try { return sessionStorage.getItem(PREVIEW_PAID_KEY) === '1'; }
+    catch (_) { return false; }
+  }
+  function renderPostPaymentPaybar() {
+    const bar = document.getElementById('payBar');
+    if (!bar) return;
+    const kbBtn = PLAN === 'ai'
+      ? '<a class="btn btn-ok paybar-pay paybar-paid-cta" href="/kb.html?preview=1">Go to your knowledge base →</a>'
+      : '';
+    const subtitle = PLAN === 'ai'
+      ? 'Your knowledge base is now your working document — open it any time.'
+      : 'Your submission is in the queue. Our team will be in touch shortly.';
+    bar.classList.add('paybar-paid');
+    bar.innerHTML = ''
+      + '<div class="paybar-info">'
+      +   '<div class="paybar-label paybar-paid-label"><span class="paybar-paid-tick" aria-hidden="true">✓</span> Payment received (preview)</div>'
+      +   '<div class="paybar-paid-sub">' + subtitle + '</div>'
+      + '</div>'
+      + '<div class="paybar-actions">'
+      +   kbBtn
+      + '</div>';
   }
 
   function openPayModal() {
@@ -1511,9 +1555,11 @@
     };
 
     const stageSuccess = () => {
-      const continueHTML = PLAN === 'ai'
-        ? '<button type="button" class="btn btn-ok pay-modal-pay" data-preview-continue>Continue to knowledge base</button>'
-        : '<button type="button" class="btn btn-ok pay-modal-pay" data-preview-done>Close preview</button>';
+      // Mark the session as paid-in-preview and refresh the paybar behind
+      // the modal so closing reveals the post-payment toolbar with the KB
+      // entry point.
+      setPreviewPaid(true);
+      renderPostPaymentPaybar();
       card.innerHTML = ''
         + '<header class="pay-modal-hdr">'
         +   '<div class="pay-modal-eyebrow pay-preview-eyebrow">Preview mode</div>'
@@ -1525,12 +1571,10 @@
         +   '<p class="pay-preview-note">' + escapeHtml(postPayCopy) + '</p>'
         + '</div>'
         + '<footer class="pay-modal-ftr pay-preview-ftr-single">'
-        +   continueHTML
+        +   '<button type="button" class="btn btn-ok pay-modal-pay" data-preview-done>Close</button>'
         + '</footer>';
       const done = card.querySelector('[data-preview-done]');
       if (done) done.addEventListener('click', () => { restore(); closePayModal(); });
-      const cont = card.querySelector('[data-preview-continue]');
-      if (cont) cont.addEventListener('click', () => { window.location.href = '/kb.html?preview=1'; });
     };
 
     stageRedirecting();

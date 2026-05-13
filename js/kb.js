@@ -406,6 +406,36 @@
       $('kb-addsite').style.display = 'none';
     });
 
+    // Save draft — flush every field as a draft save and show a confirmation
+    // pill so the studio knows it's safe to leave and come back.
+    $('kb-savedraft-btn').addEventListener('click', async () => {
+      const btn = $('kb-savedraft-btn');
+      const msg = $('kb-savedraft-msg');
+      btn.disabled = true;
+      const originalLabel = btn.textContent;
+      btn.textContent = 'Saving…';
+      if (msg) { msg.textContent = ''; msg.className = 'kb-savedraft-msg'; }
+      // Push every tracked field + persona into the dirty set so saveNow
+      // sends the full current state rather than just recent edits.
+      TRACKED_FIELDS.forEach((f) => dirty.add(f));
+      dirty.add('persona');
+      try {
+        await saveNow();
+        if (msg) {
+          msg.textContent = 'Draft saved. You can close this page and come back any time.';
+          msg.className = 'kb-savedraft-msg ok';
+        }
+      } catch (_) {
+        if (msg) {
+          msg.textContent = 'Could not save right now — please try again.';
+          msg.className = 'kb-savedraft-msg err';
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    });
+
     // Finalise.
     $('kb-finalize-btn').addEventListener('click', async () => {
       const btn = $('kb-finalize-btn');

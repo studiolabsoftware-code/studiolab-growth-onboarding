@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/form.css?v=20260513b">
-<link rel="stylesheet" href="css/kb.css?v=20260513b">
+<link rel="stylesheet" href="css/form.css?v=20260513c">
+<link rel="stylesheet" href="css/kb.css?v=20260513c">
 </head>
 <body>
 
@@ -202,8 +202,12 @@
 
     <!-- Finalise -->
     <div class="kb-final">
-      <button type="button" id="kb-finalize-btn" class="btn btn-ok kb-finalize">Confirm and finish</button>
-      <p class="kb-help kb-help-sm">Our team reviews your knowledge base, then activates your AI chat and voice agents. You can edit anything afterwards via the support link in your welcome email.</p>
+      <div class="kb-final-actions">
+        <button type="button" id="kb-savedraft-btn" class="btn btn-g kb-savedraft">Save draft</button>
+        <button type="button" id="kb-finalize-btn" class="btn btn-ok kb-finalize">Submit knowledge base</button>
+      </div>
+      <p id="kb-savedraft-msg" class="kb-savedraft-msg" aria-live="polite"></p>
+      <p class="kb-help kb-help-sm">Save a draft any time — your knowledge base stays editable and you can return to it whenever you need. Submitting locks it in for our team to review and activate.</p>
     </div>
 
   </form>
@@ -218,8 +222,8 @@
 
 </main>
 
-<script src="js/supabase-config.js?v=20260513b"></script>
-<script src="js/kb.js?v=20260513b"></script>
+<script src="js/supabase-config.js?v=20260513c"></script>
+<script src="js/kb.js?v=20260513c"></script>
 
 </body>
 </html>
