@@ -381,6 +381,10 @@
       const radio = c.querySelector('input[type="radio"]');
       if (radio) radio.checked = isSel;
     });
+    // Setup-conditional UI: elements with .dfy-only are only visible when
+    // Done-For-You is selected. Mirrored on the body so CSS can target it.
+    document.body.classList.toggle('setup-dfy', setupName === 'dfy');
+    document.body.classList.toggle('setup-guided', setupName === 'guided');
   }
 
   // Show/hide plan-conditional sections.
