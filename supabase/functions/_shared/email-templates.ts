@@ -51,7 +51,7 @@ export function submissionConfirmation(opts: { studioName: string; ref: string }
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Thanks, we have everything we need</h1>
     <p style="margin:0 0 14px;">Hi from the StudioLAB Growth team. Your onboarding details have come through and we are getting started.</p>
-    <p style="margin:0 0 14px;">A team member will review what you sent and reach out within one business day to confirm next steps. If anything is missing, we will send you a quick link to add it without filling out the whole form again.</p>
+    <p style="margin:0 0 14px;">A team member will review what you sent and reach out shortly to confirm next steps. If anything is missing, we will send you a quick link to add it without filling out the whole form again.</p>
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
     <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
     <p style="margin:0;">Speak soon,<br>The StudioLAB Growth team</p>`;

@@ -95,15 +95,15 @@
   const SETUP_DISPLAY = {
     guided: {
       label: 'Guided (self-setup)',
-      desc:  'You configure your own account using our step-by-step checklist, with support available if you get stuck. Delivered within 3 to 5 business days.',
+      desc:  'You configure your own account using our step-by-step checklist, with support available if you get stuck. Typically 3 to 5 business days.',
     },
     dfy_default: {
       label: 'Done-For-You',
-      desc:  'Our team configures your entire account. You provide the information, we handle everything else. Delivered within 5 to 7 business days.',
+      desc:  'Our team configures your entire account. You provide the information, we handle everything else. Typically 5 to 7 business days.',
     },
     dfy_ai: {
       label: 'AI Activation Pack',
-      desc:  'Full Done-For-You configuration plus knowledge base build, AI chat setup, voice agent setup and testing, and a live walkthrough. Delivered within 7 to 10 business days.',
+      desc:  'Full Done-For-You configuration plus knowledge base build, AI chat setup, voice agent setup and testing, and a live walkthrough. Typically 7 to 10 business days.',
     },
   };
 
@@ -1067,7 +1067,7 @@
     setText('done-setup', setupFeeSummaryLine());
     setText('done-timeline', state.setup === 'guided'
       ? 'You complete setup at your own pace'
-      : '3 to 7 business days');
+      : 'Typically 3 to 7 business days');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
