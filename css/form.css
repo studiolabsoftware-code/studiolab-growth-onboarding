@@ -601,11 +601,12 @@ body.pay-modal-open { overflow: hidden; }
 .brand-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 480px) { .brand-cols { grid-template-columns: 1fr; } }
 .brand-col label { font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.6px; }
-/* Tight colour field: hex text input on the left as the primary value
-   the studio reads; small swatch sits beside it as the visual cue. */
+/* Tight colour field: hex text input on the left, small swatch on the
+   right as a visual cue. Soft styling — the field is just a hex input,
+   not a heading. */
 .cf-tight { gap: 8px; flex-direction: row-reverse; justify-content: flex-end; }
-.cf-tight input[type=color] { width: 34px; height: 36px; padding: 1px 2px; border-radius: 8px; flex: 0 0 auto; }
-.cf-tight input[type=text] { padding: 8px 12px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; flex: 1; }
+.cf-tight input[type=color] { width: 34px; height: 32px; padding: 1px 2px; border-radius: 8px; flex: 0 0 auto; }
+.cf-tight input[type=text] { padding: 7px 10px; font-size: 12px; flex: 1; }
 .brand-cols-hint { margin-top: 10px; font-size: 11px; color: var(--g6); line-height: 1.5; }
 
 /* Two-line signature with live preview */
