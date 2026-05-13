@@ -373,11 +373,11 @@ select {
 @media (max-width: 480px) { .sum-body { grid-template-columns: 1fr; } }
 .sum-f { display: flex; flex-direction: column; gap: 4px; }
 .sum-f.full { grid-column: 1 / -1; }
-/* Label: small, subdued, uppercase. Looks like a caption — should not
-   compete with the answer below it. */
-.sum-k { font-size: 10px; font-weight: 600; color: var(--g4); text-transform: uppercase; letter-spacing: 0.7px; }
-/* Answer: larger, weightier, darker. Clearly the primary content. */
-.sum-v { font-size: 14px; color: var(--in-d); font-weight: 600; word-break: break-word; line-height: 1.4; }
+/* Label: a quiet whisper above the answer — subdued caps in a light gray. */
+.sum-k { font-size: 10px; font-weight: 500; color: var(--g4); text-transform: uppercase; letter-spacing: 0.7px; }
+/* Answer: still clearly the primary content but at a lighter weight so the
+   page doesn't read as dense. */
+.sum-v { font-size: 14px; color: var(--in-d); font-weight: 500; word-break: break-word; line-height: 1.4; }
 .sum-v.emp { color: var(--g4); font-style: italic; font-weight: 400; }
 
 /* ── Submit error banner ───────────────────────────── */
