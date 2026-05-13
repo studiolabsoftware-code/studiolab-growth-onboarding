@@ -601,9 +601,11 @@ body.pay-modal-open { overflow: hidden; }
 .brand-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 480px) { .brand-cols { grid-template-columns: 1fr; } }
 .brand-col label { font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.6px; }
-.cf-tight { gap: 6px; }
-.cf-tight input[type=color] { width: 36px; height: 32px; padding: 1px 2px; border-radius: 8px; }
-.cf-tight input[type=text] { padding: 6px 10px; font-size: 12px; }
+/* Tight colour field: hex text input on the left as the primary value
+   the studio reads; small swatch sits beside it as the visual cue. */
+.cf-tight { gap: 8px; flex-direction: row-reverse; justify-content: flex-end; }
+.cf-tight input[type=color] { width: 34px; height: 36px; padding: 1px 2px; border-radius: 8px; flex: 0 0 auto; }
+.cf-tight input[type=text] { padding: 8px 12px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; flex: 1; }
 .brand-cols-hint { margin-top: 10px; font-size: 11px; color: var(--g6); line-height: 1.5; }
 
 /* Two-line signature with live preview */
@@ -619,9 +621,12 @@ body.pay-modal-open { overflow: hidden; }
    height isn't dragged up by the tallest card. */
 /* Two-column grid where cards in the same row stretch to match the
    taller card's height. Internal whitespace at the bottom of a shorter
-   card is preferred over an uneven, jagged row bottom. */
+   card is preferred over an uneven, jagged row bottom. An odd-count
+   last card automatically spans both columns so it doesn't sit alone
+   in a half-empty row. */
 .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
 .cards-grid > .card { margin-bottom: 0; }
+.cards-grid > .card:last-child:nth-child(odd) { grid-column: 1 / -1; }
 /* Inside a narrow grid card, collapse inner two-up rows to a single
    column so inputs don't get squeezed. */
 .cards-grid > .card .fr,
@@ -643,3 +648,22 @@ details.future-proof[open] { padding-bottom: 22px; }
 details.future-proof[open] .future-proof-toggle { transform: rotate(-135deg); margin-top: 6px; }
 .future-proof-hint { padding: 0 22px 14px; margin: 0; font-size: 12px; color: var(--g6); line-height: 1.55; }
 details.future-proof > .fr { padding-left: 22px; padding-right: 22px; }
+
+/* Brand reference dropzone — inline inside the Brand colours card. Compact
+   alternative for studios that don't know their hex codes. */
+.brand-ref { position: relative; margin-top: 14px; padding: 14px 16px; border: 1px dashed var(--g2); border-radius: 10px; background: var(--g1); cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.brand-ref:hover { border-color: var(--in); }
+.brand-ref:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+.brand-ref-drag { border-color: var(--mg); background: var(--mg-l); }
+.brand-ref-empty { display: flex; gap: 12px; align-items: center; }
+.brand-ref-ico { font-size: 22px; flex-shrink: 0; }
+.brand-ref-text { font-size: 12px; color: var(--g6); line-height: 1.55; }
+.brand-ref-text strong { color: var(--in-d); font-weight: 700; }
+.brand-ref-preview { display: flex; gap: 12px; align-items: center; }
+.brand-ref-img { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--g2); background: #fff; flex-shrink: 0; }
+.brand-ref-meta { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.brand-ref-name { font-size: 12px; color: var(--in-d); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-ref-remove { background: transparent; border: none; color: var(--g6); font-weight: 600; font-size: 12px; cursor: pointer; padding: 4px 10px; border-radius: 6px; font-family: inherit; }
+.brand-ref-remove:hover { color: var(--rd, #B91C1C); background: #fff; }
+.brand-ref-spin { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.85); border-radius: 10px; }
+.brand-ref-err { margin-top: 8px; color: var(--rd, #B91C1C); font-size: 11px; font-weight: 600; }

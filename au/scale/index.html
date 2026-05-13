@@ -325,7 +325,26 @@
           </div>
         </div>
       </div>
-      <div class="brand-cols-hint">Applied to email headers, buttons, and accents. Send a screenshot if you are unsure of your hex.</div>
+      <div class="brand-cols-hint">Applied to email headers, buttons, and accents.</div>
+        <div class="brand-ref" id="brandRefZone" tabindex="0" role="button" aria-label="Upload a brand reference screenshot. Drag a file here, or press to browse.">
+          <input type="file" id="brandRefFile" accept="image/png,image/jpeg" hidden>
+          <div class="brand-ref-empty" id="brandRefEmpty">
+            <div class="brand-ref-ico" aria-hidden="true">📎</div>
+            <div class="brand-ref-text">
+              <strong>Not sure of your hex codes?</strong><br>
+              Drop a screenshot or website image here and we will match the colours for you.
+            </div>
+          </div>
+          <div class="brand-ref-preview" id="brandRefPreview" hidden>
+            <img class="brand-ref-img" id="brandRefImg" alt="">
+            <div class="brand-ref-meta">
+              <span class="brand-ref-name" id="brandRefName"></span>
+              <button type="button" class="brand-ref-remove" id="brandRefRemove">Remove</button>
+            </div>
+          </div>
+          <div class="brand-ref-spin" id="brandRefSpin" hidden><span class="spinner"></span></div>
+        </div>
+        <div class="brand-ref-err" id="brandRefErr" hidden></div>
     </div>
 
       <div class="card">

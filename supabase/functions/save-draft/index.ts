@@ -26,6 +26,8 @@ const ALLOWED_FIELDS = new Set([
   'kb_tone','voice_hours','voice_escalate','extra_notes',
   // Optional future-proof URLs for studios planning to upgrade later.
   'google_business_url','facebook_url','instagram_handle','booking_url',
+  // Optional brand-colour reference screenshot for hex matching.
+  'brand_reference_url',
 ]);
 
 function pickAllowed(payload: Record<string, unknown>): Record<string, unknown> {

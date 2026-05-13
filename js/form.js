@@ -733,6 +733,117 @@
     return handleLogoFile(input.files && input.files[0]);
   }
 
+  // ── Brand reference image (optional) ──────────────────────────────────────
+  // Companion to the brand-colour pickers: studios that don't know their hex
+  // codes drop a screenshot here and the team matches the colours from it.
+
+  const BRAND_REF_MAX_BYTES = 5 * 1024 * 1024;
+  const BRAND_REF_MIME = new Set(['image/png', 'image/jpeg']);
+
+  function setBrandRefError(msg) {
+    const err = document.getElementById('brandRefErr');
+    if (!err) return;
+    if (msg) { err.textContent = msg; err.hidden = false; }
+    else { err.textContent = ''; err.hidden = true; }
+  }
+
+  function showBrandRefPreview(file, objectUrl) {
+    const empty = document.getElementById('brandRefEmpty');
+    const prev = document.getElementById('brandRefPreview');
+    const img = document.getElementById('brandRefImg');
+    const name = document.getElementById('brandRefName');
+    if (empty) empty.hidden = true;
+    if (prev) prev.hidden = false;
+    if (img) img.src = objectUrl;
+    if (name) name.textContent = `${file.name} · ${bytesToHuman(file.size)}`;
+  }
+
+  function resetBrandRefView() {
+    const empty = document.getElementById('brandRefEmpty');
+    const prev = document.getElementById('brandRefPreview');
+    const img = document.getElementById('brandRefImg');
+    if (empty) empty.hidden = false;
+    if (prev) prev.hidden = true;
+    if (img) { img.removeAttribute('src'); }
+    const input = document.getElementById('brandRefFile');
+    if (input) input.value = '';
+    state.brandReferenceUrl = null;
+    setBrandRefError('');
+  }
+
+  async function handleBrandRefFile(rawFile) {
+    if (!rawFile) return;
+    setBrandRefError('');
+    if (!BRAND_REF_MIME.has(rawFile.type)) {
+      setBrandRefError('Please upload a PNG or JPG screenshot.');
+      return;
+    }
+    if (rawFile.size > BRAND_REF_MAX_BYTES) {
+      setBrandRefError(`That file is ${bytesToHuman(rawFile.size)}. Please keep brand references under 5 MB.`);
+      return;
+    }
+    const spin = document.getElementById('brandRefSpin');
+    if (spin) spin.hidden = false;
+    state.uploading = true;
+    try {
+      if (!sb) {
+        state.brandReferenceUrl = null;
+        showBrandRefPreview(rawFile, URL.createObjectURL(rawFile));
+        setBrandRefError('Upload pending: Supabase is not configured.');
+        return;
+      }
+      const ext = rawFile.type === 'image/png' ? 'png' : 'jpg';
+      const path = 'brand-ref/' + crypto.randomUUID() + '.' + ext;
+      const bucket = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.logoBucket) || 'logos';
+      const { error } = await sb.storage.from(bucket).upload(path, rawFile, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: rawFile.type || undefined,
+      });
+      if (error) throw error;
+      state.brandReferenceUrl = bucket + '/' + path;
+      showBrandRefPreview(rawFile, URL.createObjectURL(rawFile));
+    } catch (err) {
+      console.error('Brand ref upload failed:', err);
+      state.brandReferenceUrl = null;
+      setBrandRefError('Upload failed. Please try again.');
+    } finally {
+      state.uploading = false;
+      if (spin) spin.hidden = true;
+    }
+  }
+
+  function bindBrandRefZone() {
+    const zone = document.getElementById('brandRefZone');
+    const input = document.getElementById('brandRefFile');
+    const removeBtn = document.getElementById('brandRefRemove');
+    if (!zone || !input || zone.dataset.bound === '1') return;
+    zone.dataset.bound = '1';
+
+    zone.addEventListener('click', (e) => {
+      if (e.target && e.target.tagName === 'INPUT') return;
+      if (e.target && e.target.closest && e.target.closest('#brandRefRemove')) return;
+      input.click();
+    });
+    zone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+    ['dragenter','dragover'].forEach((ev) => {
+      zone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); zone.classList.add('brand-ref-drag'); });
+    });
+    ['dragleave','drop'].forEach((ev) => {
+      zone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); zone.classList.remove('brand-ref-drag'); });
+    });
+    zone.addEventListener('drop', (e) => {
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) handleBrandRefFile(f);
+    });
+    input.addEventListener('change', () => handleBrandRefFile(input.files && input.files[0]));
+    if (removeBtn) removeBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation(); resetBrandRefView();
+    });
+  }
+
   function bindLogoZone() {
     const zone = document.getElementById('logoZone');
     const input = document.getElementById('logoFile');
@@ -898,6 +1009,9 @@
       facebook_url:        valOrNull('facebookUrl'),
       instagram_handle:    valOrNull('instagramHandle'),
       booking_url:         valOrNull('bookingUrl'),
+
+      // Optional brand-reference screenshot for hex matching.
+      brand_reference_url: state.brandReferenceUrl || null,
     };
   }
 
@@ -1757,6 +1871,7 @@
     bindEvents();
     bindAuthGate();
     bindLogoZone();
+    bindBrandRefZone();
     // Plan is locked by the URL the form is served from. No selectPlan call here.
     selectSetup('dfy');
     const c1 = document.getElementById('col1t');
