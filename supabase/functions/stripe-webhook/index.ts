@@ -499,13 +499,13 @@ async function sendPaymentReceiptsOnce(
           amountCents: args.amountCents, currency, includesGst,
           invoiceUrl: args.invoiceHostedUrl,
         });
-        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'growth@studiolabgrowth.com', intent: 'studio receipt (immediate)' });
+        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com', intent: 'studio receipt (immediate)' });
       } else if (args.paymentMode === 'hold') {
         const t = paymentReceiptHold({ studioName, ref, amountCents: args.amountCents, currency, includesGst });
-        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'growth@studiolabgrowth.com', intent: 'studio receipt (hold)' });
+        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com', intent: 'studio receipt (hold)' });
       } else {
         const t = paymentReceiptSaveCard({ studioName, ref, amountCents: args.amountCents, currency, includesGst });
-        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'growth@studiolabgrowth.com', intent: 'studio receipt (save card)' });
+        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com', intent: 'studio receipt (save card)' });
       }
     }
   } catch (e) { console.error('studio receipt email failed:', e); }

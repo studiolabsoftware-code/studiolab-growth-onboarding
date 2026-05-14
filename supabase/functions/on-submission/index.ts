@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       const t = submissionConfirmation({ studioName: row.studio_name || 'there', ref });
       await sendGated({
         to: row.contact_email, subject: t.subject, html: t.html,
-        replyTo: 'growth@studiolabgrowth.com',
+        replyTo: 'info@studiolabsoftware.com',
         intent: 'studio submission confirmation',
       });
     }

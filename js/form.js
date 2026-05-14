@@ -1558,7 +1558,7 @@
         +   '<div class="pay-preview-fields">'
         +     '<label class="pay-preview-field">'
         +       '<span class="pay-preview-label">Email</span>'
-        +       '<input type="text" value="preview@studiolabgrowth.com" readonly>'
+        +       '<input type="text" value="preview@studiolabsoftware.com" readonly>'
         +     '</label>'
         +     '<label class="pay-preview-field">'
         +       '<span class="pay-preview-label">Card number</span>'

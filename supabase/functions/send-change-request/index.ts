@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       message: message || '',
       expiresAt: new Date(expiresAt).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'medium', timeStyle: 'short' }),
     });
-    await sendEmail({ to: sub.contact_email, subject: t.subject, html: t.html, replyTo: 'growth@studiolabgrowth.com' });
+    await sendEmail({ to: sub.contact_email, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com' });
 
     return jsonResponse({ ok: true, change_request_id: cr.id });
   } catch (err) {

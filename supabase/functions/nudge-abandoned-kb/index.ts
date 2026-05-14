@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
           to: r.contact_email,
           subject: t.subject,
           html: t.html,
-          replyTo: 'growth@studiolabgrowth.com',
+          replyTo: 'info@studiolabsoftware.com',
         });
         const stampedAt = new Date().toISOString();
         await sb.from('submissions')

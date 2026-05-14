@@ -35,7 +35,7 @@ const MAX_PAGES = 10;
 const REQUEST_TIMEOUT_MS = 15_000;
 const REQUEST_DELAY_MS = 350;
 const MAX_TEXT_PER_PAGE = 5000;
-const USER_AGENT = 'StudioLAB-Growth-Bot/1.0 (knowledge-base extraction; contact support@studiolabgrowth.com)';
+const USER_AGENT = 'StudioLAB-Growth-Bot/1.0 (knowledge-base extraction; contact info@studiolabsoftware.com)';
 
 // URL pattern → page type label. First match wins.
 const PAGE_PATTERNS: Array<{ type: string; patterns: RegExp[] }> = [

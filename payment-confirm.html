@@ -32,7 +32,7 @@
 
 <header class="hdr">
   <div class="hdr-inner">
-    <a class="hdr-logo" href="https://studiolabgrowth.com" aria-label="StudioLAB Growth — main website">
+    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth — account setup">
       <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
     </a>
     <div class="hdr-div" aria-hidden="true"></div>
@@ -156,7 +156,6 @@
         const actions = [];
         if (reviewUrl) actions.push({ label: 'View my submission', href: reviewUrl });
         if (invoiceUrl) actions.push({ label: 'View invoice', href: invoiceUrl, external: true, secondary: true });
-        actions.push({ label: 'StudioLAB website', href: 'https://studiolabgrowth.com', external: true, secondary: true });
         show({
           spinner: false,
           title: studioName ? `Thanks, ${studioName} — you are all set` : 'You are all set',

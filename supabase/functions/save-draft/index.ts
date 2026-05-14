@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
           to: row.contact_email,
           subject: t.subject,
           html: t.html,
-          replyTo: 'growth@studiolabgrowth.com',
+          replyTo: 'info@studiolabsoftware.com',
         });
       } catch (e) { console.error('confirmation email failed:', e); }
 

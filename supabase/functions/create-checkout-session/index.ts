@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
     if (isAustralianFreeText(submission.country)) {
       return jsonResponse({
         ok: false,
-        error: 'Australian studios must use our AU onboarding form. Please email growth@studiolabgrowth.com if you reached this page in error.',
+        error: 'Australian studios must use our AU onboarding form. Please email info@studiolabsoftware.com if you reached this page in error.',
         code: 'au_must_use_au_flow',
       }, 400);
     }
@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
       });
       return jsonResponse({
         ok: false,
-        error: 'This plan is not available for checkout yet. Our team has been notified — please email growth@studiolabgrowth.com.',
+        error: 'This plan is not available for checkout yet. Our team has been notified — please email info@studiolabsoftware.com.',
         code: 'product_not_synced',
       }, 503);
     }
