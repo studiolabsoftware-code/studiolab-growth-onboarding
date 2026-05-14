@@ -1,6 +1,11 @@
 /* StudioLAB Growth: admin dashboard styles.
    Builds on form.css tokens. */
 
+/* HTML5 [hidden] should always force display:none. Class rules like
+   `display: flex` outrank the attribute's default, which silently breaks
+   any show/hide that uses .hidden = true on a flex/grid container. */
+[hidden] { display: none !important; }
+
 .admin-body { background: var(--g1); }
 
 /* ── Header ────────────────────────────────────────── */

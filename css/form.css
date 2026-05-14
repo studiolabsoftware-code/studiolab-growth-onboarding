@@ -6,6 +6,14 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* HTML5 [hidden] should always force display:none. Class rules like
+   `display: flex` outrank the attribute's default, which silently breaks
+   show/hide for elements like .logo-thumb-spin (the upload spinner overlay
+   left painting on top of the finished image) and .brand-ref-empty /
+   .brand-ref-preview (empty state still visible under the chosen image).
+   Honour the attribute everywhere. */
+[hidden] { display: none !important; }
+
 :root {
   /* Brand */
   --mg:    #E8197F;   /* magenta-500: primary CTA */
