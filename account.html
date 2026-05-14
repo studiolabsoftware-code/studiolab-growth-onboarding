@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>Your account — StudioLAB Growth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/form.css?v=20260514a">
+<style>
+  .acct-wrap { max-width: 880px; margin: 32px auto 80px; padding: 0 16px; }
+  .acct-hdr { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+  .acct-hdr h1 { font-size: 26px; font-weight: 800; color: var(--in-d); margin: 0 0 4px; letter-spacing: -0.4px; }
+  .acct-hdr .acct-sub { color: var(--g6); font-size: 14px; }
+  .acct-pills { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .acct-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; }
+  .acct-pill-plan { background: var(--in-l); color: var(--in-d); }
+  .acct-pill-status-paid { background: #D1FAE5; color: #047857; }
+  .acct-pill-status-authorised { background: #FEF3C7; color: #B45309; }
+  .acct-pill-status-card_saved { background: #DBEAFE; color: #1E40AF; }
+  .acct-pill-status-pending { background: var(--g2); color: var(--g6); }
+
+  .acct-card { background: #fff; border-radius: 14px; box-shadow: 0 4px 22px rgba(19,16,46,.06); padding: 22px 24px; margin-bottom: 18px; }
+  .acct-card h2 { font-size: 14px; font-weight: 700; color: var(--g6); margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .acct-card .acct-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--g1); font-size: 13px; }
+  .acct-card .acct-row:last-child { border-bottom: 0; }
+  .acct-card .acct-k { width: 160px; flex-shrink: 0; color: var(--g6); }
+  .acct-card .acct-v { color: var(--in-d); }
+  .acct-card .acct-v a { color: var(--in); text-decoration: none; font-weight: 600; }
+
+  .acct-next ol { margin: 0; padding-left: 20px; color: var(--in-d); }
+  .acct-next li { margin-bottom: 8px; line-height: 1.55; }
+
+  .acct-inv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .acct-inv-table th { text-align: left; font-weight: 600; color: var(--g6); padding: 8px 8px 8px 0; border-bottom: 1px solid var(--g2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .acct-inv-table td { padding: 12px 8px 12px 0; border-bottom: 1px solid var(--g1); vertical-align: middle; }
+  .acct-inv-table tr:last-child td { border-bottom: 0; }
+  .acct-inv-table .acct-actions { display: flex; gap: 12px; }
+  .acct-inv-table .acct-actions a { color: var(--in); font-weight: 600; text-decoration: none; font-size: 12px; }
+  .acct-inv-table .acct-actions a:hover { text-decoration: underline; }
+
+  .acct-msg { display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: var(--in-l); border-radius: 10px; }
+  .acct-msg-text { flex: 1; }
+  .acct-msg-text strong { color: var(--in-d); }
+  .acct-msg-text p { margin: 4px 0 0; color: var(--g6); font-size: 13px; line-height: 1.5; }
+  .acct-msg-unread { background: var(--mg); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; margin-left: 4px; }
+  .acct-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--in); color: #fff; text-decoration: none; border: 0; border-radius: 999px; padding: 10px 18px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .acct-btn:hover { background: var(--in-d); }
+  .acct-btn-secondary { background: transparent; color: var(--in); border: 1px solid var(--in); }
+  .acct-btn-secondary:hover { background: var(--in); color: #fff; }
+
+  .acct-loading, .acct-empty { color: var(--g6); font-style: italic; padding: 12px 0; }
+  .acct-error { background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; font-size: 13px; }
+  .acct-foot { text-align: center; margin-top: 28px; color: var(--g6); font-size: 12px; line-height: 1.6; }
+  .acct-foot a { color: var(--in); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-inner">
+    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth — account setup">
+      <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
+    </a>
+    <div class="hdr-div" aria-hidden="true"></div>
+    <div class="hdr-sub" aria-hidden="true">Your account</div>
+  </div>
+</header>
+
+<main>
+  <div class="acct-wrap" id="acctRoot">
+    <div class="acct-loading">Loading your account…</div>
+  </div>
+</main>
+
+<script src="js/supabase-config.js?v=20260514a"></script>
+<script>
+(function () {
+  'use strict';
+  const FN_BASE = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/';
+  const SESSION_KEY = 'sl-growth-session';
+  const PLAN_LABEL = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
+  const SETUP_LABEL = { dfy: 'Done-For-You', guided: 'Guided self-setup' };
+  const STATUS_PILL = {
+    paid: { cls: 'acct-pill-status-paid', label: 'Paid' },
+    authorised: { cls: 'acct-pill-status-authorised', label: 'Card authorised' },
+    card_saved: { cls: 'acct-pill-status-card_saved', label: 'Card saved' },
+    pending: { cls: 'acct-pill-status-pending', label: 'Awaiting payment' },
+    unpaid: { cls: 'acct-pill-status-pending', label: 'Awaiting payment' },
+    refunded: { cls: 'acct-pill-status-pending', label: 'Refunded' },
+  };
+
+  function readSession() {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); }
+    catch (_) { return null; }
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+  function money(cents, currency) {
+    if (cents == null) return '—';
+    return (cents / 100).toLocaleString('en-AU', { style: 'currency', currency: currency || 'AUD' });
+  }
+  function dateFmt(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-AU', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  function dateTimeFmt(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('en-AU', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function reviewUrlFor(sub) {
+    if (!sub || !sub.plan || !sub.region) return null;
+    return '/' + String(sub.region).toLowerCase() + '/' + sub.plan + '/';
+  }
+
+  function renderError(message) {
+    document.getElementById('acctRoot').innerHTML = `
+      <div class="acct-error">${esc(message)}</div>
+      <div class="acct-foot">
+        Need help? Email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a> and we'll sort it.
+      </div>`;
+  }
+
+  function renderNotPaidYet(sub) {
+    const reviewUrl = reviewUrlFor(sub);
+    document.getElementById('acctRoot').innerHTML = `
+      <div class="acct-hdr">
+        <div>
+          <h1>Welcome ${sub.studio_name ? 'back, ' + esc(sub.studio_name) : 'back'}</h1>
+          <div class="acct-sub">Your setup is in progress. Pick up where you left off.</div>
+        </div>
+        <div class="acct-pills">
+          <span class="acct-pill acct-pill-plan">${esc(PLAN_LABEL[sub.plan] || sub.plan || 'Setup')}</span>
+          <span class="acct-pill acct-pill-status-pending">${esc(STATUS_PILL[sub.payment_status]?.label || 'In progress')}</span>
+        </div>
+      </div>
+      <div class="acct-card">
+        <h2>Pick up your setup</h2>
+        <p style="margin:0 0 14px;color:var(--g6);font-size:13px;line-height:1.55;">
+          Your progress is saved. Continue from where you left off — you won't lose anything.
+        </p>
+        ${reviewUrl ? `<a class="acct-btn" href="${esc(reviewUrl)}">Continue setup →</a>` : ''}
+      </div>
+      <div class="acct-foot">
+        Need help? Email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a> with your studio name.
+      </div>`;
+  }
+
+  function renderAccount(data) {
+    const sub = data.submission;
+    const invoices = data.invoices || [];
+    const conv = data.conversation || {};
+    const reviewUrl = reviewUrlFor(sub);
+    const statusPill = STATUS_PILL[sub.payment_status] || STATUS_PILL.pending;
+    const fullName = [sub.first_name, sub.last_name].filter(Boolean).join(' ');
+    const isPaid = sub.payment_status === 'paid'
+      || sub.payment_status === 'authorised'
+      || sub.payment_status === 'card_saved';
+
+    if (!isPaid) {
+      renderNotPaidYet(sub);
+      return;
+    }
+
+    const nextSteps = sub.plan === 'ai'
+      ? [
+        'Our team reviews your knowledge base and tunes the AI voice + chat agents.',
+        'We test everything against your studio profile and let you know when it\'s ready.',
+        'Your account typically goes live 7–10 business days after KB approval.',
+      ]
+      : [
+        'Our team confirms your details and starts your setup, usually within 1–2 business days.',
+        'We email you the moment your account is ready to go live.',
+        'If we need anything from you in the meantime, you\'ll hear from us by email.',
+      ];
+
+    const invoiceRows = invoices.map((inv) => `
+      <tr>
+        <td>${esc(inv.number || '—')}</td>
+        <td>${esc(inv.kind === 'setup_invoice' ? 'Setup' : inv.kind === 'custom_charge' ? 'Add-on' : inv.kind === 'quote_invoice' ? 'Quote' : 'Credit')}</td>
+        <td><span class="acct-pill ${inv.status === 'paid' ? 'acct-pill-status-paid' : 'acct-pill-status-pending'}">${esc(inv.status === 'paid' ? 'Paid' : inv.status === 'voided' ? 'Voided' : inv.status === 'refunded' ? 'Refunded' : 'Open')}</span></td>
+        <td>${esc(money(inv.total_cents, inv.currency))}</td>
+        <td>${esc(dateFmt(inv.issued_at))}</td>
+        <td class="acct-actions">
+          ${inv.hosted_url ? `<a href="${esc(inv.hosted_url)}" target="_blank" rel="noopener">View invoice</a>` : ''}
+          ${inv.pdf_url ? `<a href="${esc(inv.pdf_url)}" target="_blank" rel="noopener">PDF</a>` : ''}
+        </td>
+      </tr>
+    `).join('');
+
+    const messagesBlock = conv.portal_url
+      ? `<div class="acct-msg">
+           <div class="acct-msg-text">
+             <strong>Messages with our team</strong>${conv.unread ? `<span class="acct-msg-unread">${esc(conv.unread)} new</span>` : ''}
+             <p>Reply to your confirmation email, or open the full thread to send attachments and see system events.</p>
+           </div>
+           <a class="acct-btn" href="${esc(conv.portal_url)}">Open messages →</a>
+         </div>`
+      : `<p style="margin:0;color:var(--g6);font-size:13px;line-height:1.55;">
+           Reply to your confirmation email to send our team a message. We'll set up your conversation thread here once the first message is exchanged.
+         </p>`;
+
+    document.getElementById('acctRoot').innerHTML = `
+      <div class="acct-hdr">
+        <div>
+          <h1>${sub.studio_name ? esc(sub.studio_name) : 'Your account'}</h1>
+          <div class="acct-sub">${esc(fullName || sub.contact_email || '')}</div>
+        </div>
+        <div class="acct-pills">
+          <span class="acct-pill acct-pill-plan">${esc(PLAN_LABEL[sub.plan] || sub.plan)}</span>
+          <span class="acct-pill ${statusPill.cls}">${esc(statusPill.label)}</span>
+        </div>
+      </div>
+
+      <div class="acct-card">
+        <h2>What happens next</h2>
+        <div class="acct-next">
+          <ol>${nextSteps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
+        </div>
+      </div>
+
+      <div class="acct-card">
+        <h2>Messages</h2>
+        ${messagesBlock}
+      </div>
+
+      <div class="acct-card">
+        <h2>Invoices</h2>
+        ${invoices.length === 0
+          ? '<div class="acct-empty">No invoices yet. Your setup invoice will appear here shortly after payment.</div>'
+          : `<table class="acct-inv-table">
+              <thead>
+                <tr><th>Number</th><th>Kind</th><th>Status</th><th>Amount</th><th>Issued</th><th>Actions</th></tr>
+              </thead>
+              <tbody>${invoiceRows}</tbody>
+            </table>`
+        }
+      </div>
+
+      <div class="acct-card">
+        <h2>Your submission</h2>
+        <div class="acct-row"><div class="acct-k">Plan</div><div class="acct-v">${esc(PLAN_LABEL[sub.plan] || sub.plan)} · ${esc(SETUP_LABEL[sub.setup_type] || sub.setup_type)}</div></div>
+        <div class="acct-row"><div class="acct-k">Studio name</div><div class="acct-v">${esc(sub.studio_name || '—')}</div></div>
+        <div class="acct-row"><div class="acct-k">Primary contact</div><div class="acct-v">${esc(fullName || '—')}${sub.contact_email ? ' · <a href="mailto:' + esc(sub.contact_email) + '">' + esc(sub.contact_email) + '</a>' : ''}</div></div>
+        <div class="acct-row"><div class="acct-k">Country / timezone</div><div class="acct-v">${esc(sub.country || '—')}${sub.timezone ? ' · ' + esc(sub.timezone) : ''}</div></div>
+        <div class="acct-row"><div class="acct-k">Submitted</div><div class="acct-v">${esc(dateTimeFmt(sub.submitted_at))}</div></div>
+        ${reviewUrl ? `<div class="acct-row"><div class="acct-k">Full submission</div><div class="acct-v"><a href="${esc(reviewUrl)}">Review or update your details →</a></div></div>` : ''}
+      </div>
+
+      <div class="acct-foot">
+        Need to reach us? Email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a> or reply to any email from our team.
+      </div>`;
+  }
+
+  async function load() {
+    const session = readSession();
+    if (!session || !session.token) {
+      renderError('You will need to verify your email again to see your account. Open your most recent email from us and click the setup link.');
+      return;
+    }
+
+    try {
+      const resp = await fetch(FN_BASE + 'get-studio-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_token: session.token }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        renderError((data && data.error) || 'Could not load your account. Please try again in a moment.');
+        return;
+      }
+      renderAccount(data);
+    } catch (err) {
+      console.error('account load failed', err);
+      renderError('We could not reach the server. Check your connection and refresh the page.');
+    }
+  }
+
+  load();
+})();
+</script>
+
+</body>
+</html>

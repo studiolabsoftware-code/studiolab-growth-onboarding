@@ -23,6 +23,22 @@
   </div>
 </header>
 
+<script>
+  // If the studio already has a valid local session, jump them straight
+  // to their account page — no point showing them "find your link" copy
+  // when they have a live session in this browser.
+  (function () {
+    try {
+      var raw = localStorage.getItem('sl-growth-session');
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      if (s && s.token && s.expiresAt && new Date(s.expiresAt) > new Date()) {
+        window.location.replace('/account.html');
+      }
+    } catch (_) { /* ignore */ }
+  })();
+</script>
+
 <div class="main" id="fmain">
   <div class="panel active" id="landing">
     <div class="sh">

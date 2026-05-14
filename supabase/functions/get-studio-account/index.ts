@@ -1,0 +1,92 @@
+// Studio account view — used by /account.html post-payment to render the
+// studio's submission summary, status, invoices, and a portal-thread link.
+// Auth: studio's session_token in localStorage (same anchor used by
+// save-draft / get-kb-status). Anon-callable (deployed --no-verify-jwt).
+
+import { preflight, jsonResponse } from '../_shared/cors.ts';
+import { adminClient, sha256Hex } from '../_shared/supabase.ts';
+
+Deno.serve(async (req) => {
+  const pf = preflight(req); if (pf) return pf;
+
+  try {
+    const body = await req.json().catch(() => ({}));
+    const sessionToken = typeof body.session_token === 'string' ? body.session_token : '';
+    if (!sessionToken) return jsonResponse({ ok: false, error: 'Missing session token.' }, 401);
+
+    const sb = adminClient();
+    const sessionHash = await sha256Hex(sessionToken);
+
+    const { data: submission, error: subErr } = await sb.from('submissions')
+      .select(
+        'id, plan, region, setup_type, status, ' +
+        'studio_name, contact_email, first_name, last_name, country, timezone, ' +
+        'payment_status, paid_at, captured_at, card_saved_at, ' +
+        'amount_paid_cents, currency, tax_amount_cents, ' +
+        'invoice_hosted_url, invoice_pdf_url, ' +
+        'submitted_at, last_saved_at, session_expires_at',
+      )
+      .eq('session_token_hash', sessionHash)
+      .maybeSingle();
+    if (subErr) throw subErr;
+    if (!submission) return jsonResponse({ ok: false, error: 'Session not found.' }, 401);
+    if (!submission.session_expires_at || new Date(submission.session_expires_at) < new Date()) {
+      return jsonResponse({ ok: false, error: 'Session expired.' }, 401);
+    }
+
+    // Invoice ledger — every Stripe document we have for this submission.
+    // Sorted newest-first so the most recent receipt sits at the top.
+    const { data: invoices } = await sb.from('invoices')
+      .select('id, number, kind, status, currency, total_cents, tax_cents, amount_paid_cents, amount_refunded_cents, issued_at, paid_at, due_at, hosted_url, pdf_url, description')
+      .eq('submission_id', submission.id)
+      .order('issued_at', { ascending: false, nullsFirst: false });
+
+    // Conversation token — for the in-portal Messages tab. The studio_token
+    // is the magic-link we already email; surfacing it here lets the
+    // account page link to portal.html without a separate email round-trip.
+    const { data: conversation } = await sb.from('conversations')
+      .select('id, studio_token, studio_unread_count')
+      .eq('submission_id', submission.id)
+      .maybeSingle();
+
+    const portalUrl = conversation && conversation.studio_token
+      ? `/portal.html?conv=${conversation.id}&t=${encodeURIComponent(conversation.studio_token)}`
+      : null;
+
+    return jsonResponse({
+      ok: true,
+      submission: {
+        id: submission.id,
+        plan: submission.plan,
+        region: submission.region,
+        setup_type: submission.setup_type,
+        status: submission.status,
+        studio_name: submission.studio_name,
+        contact_email: submission.contact_email,
+        first_name: submission.first_name,
+        last_name: submission.last_name,
+        country: submission.country,
+        timezone: submission.timezone,
+        payment_status: submission.payment_status,
+        paid_at: submission.paid_at,
+        captured_at: submission.captured_at,
+        card_saved_at: submission.card_saved_at,
+        amount_paid_cents: submission.amount_paid_cents,
+        currency: submission.currency,
+        tax_amount_cents: submission.tax_amount_cents,
+        invoice_hosted_url: submission.invoice_hosted_url,
+        invoice_pdf_url: submission.invoice_pdf_url,
+        submitted_at: submission.submitted_at,
+      },
+      invoices: invoices || [],
+      conversation: {
+        id: conversation?.id || null,
+        unread: conversation?.studio_unread_count || 0,
+        portal_url: portalUrl,
+      },
+    });
+  } catch (err) {
+    console.error('get-studio-account error:', err);
+    return jsonResponse({ ok: false, error: String(err) }, 500);
+  }
+});

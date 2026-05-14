@@ -148,29 +148,11 @@
           window.location.href = '/kb.html';
           return;
         }
-        // Success state — give the studio a meaningful set of next steps
-        // and somewhere useful to go, NOT the public gate page.
-        const reviewUrl = reviewUrlFor(s);
-        const invoiceUrl = s.invoice_hosted_url || null;
-        const studioName = s.studio_name || '';
-        const actions = [];
-        if (reviewUrl) actions.push({ label: 'View my submission', href: reviewUrl });
-        if (invoiceUrl) actions.push({ label: 'View invoice', href: invoiceUrl, external: true, secondary: true });
-        show({
-          spinner: false,
-          title: studioName ? `Thanks, ${studioName} — you are all set` : 'You are all set',
-          sub: 'Your payment landed and your setup is now in our queue. A copy of the receipt is on its way to your inbox.',
-          next: `
-            <strong>What happens next</strong>
-            <ol>
-              <li>Our team confirms your details and starts your setup, usually within 1–2 business days.</li>
-              <li>We email you the moment your account is ready to go live.</li>
-              <li>If we need anything from you in the meantime, you will get a tap on the shoulder by email.</li>
-            </ol>
-            Need to talk to us? Reply to your confirmation email — it threads straight to our team.
-          `,
-          actions,
-        });
+        // Success — bounce to the studio account page so they land on a
+        // real, navigable view of their account (status, invoices,
+        // messages, what happens next) rather than dead-ending here.
+        // The account page reads the same localStorage session token.
+        window.location.href = '/account.html';
         return;
       }
       if (tries >= max) {
