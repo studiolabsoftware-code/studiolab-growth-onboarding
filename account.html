@@ -249,7 +249,7 @@
         <div class="acct-row"><div class="acct-k">Primary contact</div><div class="acct-v">${esc(fullName || '—')}${sub.contact_email ? ' · <a href="mailto:' + esc(sub.contact_email) + '">' + esc(sub.contact_email) + '</a>' : ''}</div></div>
         <div class="acct-row"><div class="acct-k">Country / timezone</div><div class="acct-v">${esc(sub.country || '—')}${sub.timezone ? ' · ' + esc(sub.timezone) : ''}</div></div>
         <div class="acct-row"><div class="acct-k">Submitted</div><div class="acct-v">${esc(dateTimeFmt(sub.submitted_at))}</div></div>
-        ${reviewUrl ? `<div class="acct-row"><div class="acct-k">Full submission</div><div class="acct-v"><a href="${esc(reviewUrl)}">Review or update your details →</a></div></div>` : ''}
+        <div class="acct-row"><div class="acct-k">Need to update something?</div><div class="acct-v">Reply to your confirmation email and ask — we'll send you a secure link to update only the fields that need changing.</div></div>
       </div>
 
       <div class="acct-foot">
