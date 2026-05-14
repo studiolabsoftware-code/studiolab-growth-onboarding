@@ -68,12 +68,36 @@ function formatAmountDisplay(opts: { amountCents: number; currency: string; incl
   return `${opts.currency} $${dollars}${gstNote}`;
 }
 
-export { formatAmountDisplay };
+// Optional GST-breakdown block. Shown only when we know the tax portion
+// separately from the total (i.e. session.total_details.amount_tax was
+// populated). Falls back to the simple amount display when tax info is
+// not available.
+function formatPaymentBreakdown(opts: {
+  amountCents: number;          // Total paid (incl. GST for AU)
+  taxCents: number | null;
+  currency: string;
+}): string {
+  if (!opts.taxCents || opts.taxCents <= 0) {
+    return `<p style="margin:0 0 14px;font-size:14px;">Total paid: <strong>${opts.currency} $${(opts.amountCents / 100).toFixed(2)}</strong></p>`;
+  }
+  const subtotal = opts.amountCents - opts.taxCents;
+  const tax = opts.taxCents;
+  const total = opts.amountCents;
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 18px;font-size:13px;">
+      <tr><td style="padding:4px 0;color:#666;">Subtotal</td><td style="padding:4px 0;text-align:right;">${opts.currency} $${(subtotal / 100).toFixed(2)}</td></tr>
+      <tr><td style="padding:4px 0;color:#666;">GST (10%)</td><td style="padding:4px 0;text-align:right;">${opts.currency} $${(tax / 100).toFixed(2)}</td></tr>
+      <tr><td style="padding:6px 0;border-top:1px solid #ddd;font-weight:700;">Total paid</td><td style="padding:6px 0;border-top:1px solid #ddd;text-align:right;font-weight:700;">${opts.currency} $${(total / 100).toFixed(2)}</td></tr>
+    </table>`;
+}
+
+export { formatAmountDisplay, formatPaymentBreakdown };
 
 export function paymentReceiptImmediate(opts: {
   studioName: string;
   ref: string;
-  amountCents: number;
+  amountCents: number;            // GST-inclusive total for AU
+  taxCents?: number | null;       // GST portion only (when known)
   currency: string;
   includesGst: boolean;
   invoiceUrl?: string | null;
@@ -83,10 +107,16 @@ export function paymentReceiptImmediate(opts: {
   const invoiceLine = opts.invoiceUrl
     ? `<p style="margin:0 0 14px;">A tax invoice is attached to the receipt Stripe sent you, and you can also <a href="${escape(opts.invoiceUrl)}" style="color:${COL.in};">view it online here</a>.</p>`
     : `<p style="margin:0 0 14px;">A tax invoice is on its way to your inbox.</p>`;
+  const breakdown = formatPaymentBreakdown({
+    amountCents: opts.amountCents,
+    taxCents: opts.taxCents ?? null,
+    currency: opts.currency,
+  });
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Payment received</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
-    <p style="margin:0 0 14px;">You have been charged <strong>${escape(amountDisplay)}</strong> for your StudioLAB Growth setup. Your onboarding details are locked in and our team will be in touch shortly to begin the work.</p>
+    <p style="margin:0 0 14px;">Thanks for your StudioLAB Growth setup payment. Your onboarding details are locked in and our team will be in touch shortly to begin the work.</p>
+    ${breakdown}
     ${invoiceLine}
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
     <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>

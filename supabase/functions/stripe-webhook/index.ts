@@ -414,6 +414,7 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
     submissionId: submission.id as string,
     paymentMode,
     amountCents,
+    taxCents,
     currency,
     stripeMode,
     contactEmail: submission.contact_email as string | null,
@@ -438,6 +439,7 @@ async function sendPaymentReceiptsOnce(
     submissionId: string;
     paymentMode: PaymentMode;
     amountCents: number;
+    taxCents?: number | null;
     currency: string;
     stripeMode: StripeMode;
     contactEmail: string | null;
@@ -496,7 +498,7 @@ async function sendPaymentReceiptsOnce(
       if (args.paymentMode === 'immediate') {
         const t = paymentReceiptImmediate({
           studioName, ref,
-          amountCents: args.amountCents, currency, includesGst,
+          amountCents: args.amountCents, taxCents: args.taxCents ?? null, currency, includesGst,
           invoiceUrl: args.invoiceHostedUrl,
         });
         await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com', intent: 'studio receipt (immediate)' });

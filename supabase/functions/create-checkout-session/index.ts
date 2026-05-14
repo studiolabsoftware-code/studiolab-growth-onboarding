@@ -43,6 +43,59 @@ function isoCountryForStripe(stored: string | null | undefined): string | null {
   return null;
 }
 
+// AU GST is collected via a manual Stripe Tax Rate object, not via
+// automatic_tax. Manual rates work in any Stripe environment (sandbox or
+// live) without requiring the account to have business address + tax
+// registration set up first — which we cannot reliably guarantee in a
+// sandbox. The rate is created on first use and cached for the function's
+// lifetime; Stripe deduplicates by display_name + percentage + country if we
+// somehow create twice. Returns null if we cannot create/find one, in which
+// case the caller falls back to embedding GST in the unit_amount so AU
+// studios always pay the GST-inclusive total no matter what.
+let cachedAuGstRateId: string | null = null;
+async function getAuGstTaxRateId(secretKey: string): Promise<string | null> {
+  if (cachedAuGstRateId) return cachedAuGstRateId;
+  // Try to find an existing active rate first
+  const list = await stripeRequest<{ data: Array<{ id: string; country: string | null; percentage: number; inclusive: boolean; active: boolean; display_name: string }> }>(
+    'GET',
+    'tax_rates?active=true&limit=100',
+    null,
+    secretKey,
+  );
+  if (list.ok && list.body.data && list.body.data.length) {
+    const found = list.body.data.find((tr) =>
+      tr.country === 'AU' && Math.abs(tr.percentage - 10) < 0.001 && !tr.inclusive
+    );
+    if (found) {
+      cachedAuGstRateId = found.id;
+      return cachedAuGstRateId;
+    }
+  }
+  // Create a new one
+  const create = await stripeRequest<{ id: string }>(
+    'POST',
+    'tax_rates',
+    {
+      display_name: 'GST',
+      description: 'Australian Goods and Services Tax',
+      percentage: '10',
+      country: 'AU',
+      jurisdiction: 'AU',
+      inclusive: 'false',
+      tax_type: 'gst',
+      active: 'true',
+    },
+    secretKey,
+    'studiolab-au-gst-rate-v1',
+  );
+  if (create.ok && create.body.id) {
+    cachedAuGstRateId = create.body.id;
+    return cachedAuGstRateId;
+  }
+  console.error('Failed to create AU GST tax rate:', create.error);
+  return null;
+}
+
 // Patch our metadata + country onto an existing Stripe Customer. Used when we
 // link to a Customer that was created elsewhere (GHL SaaS Configurator) — we
 // augment rather than overwrite so GHL's own metadata keys survive untouched.
@@ -245,6 +298,13 @@ Deno.serve(async (req) => {
     // are snapshotted from our catalog at this moment. The Product itself is
     // currency-specific (one row per plan × setup × currency) so AU studios
     // hit the AUD Product and US/Intl studios hit the USD Product.
+    //
+    // GST handling for AUD: we attach a manual Stripe Tax Rate (10% AU GST,
+    // exclusive) to the line item. This guarantees AU studios always see
+    // the GST as a separate line on Stripe Checkout and pay the GST-
+    // inclusive total ($99 + $9.90 = $108.90), regardless of whether the
+    // Stripe account has automatic_tax fully configured. The catalog price
+    // is and stays ex-GST; the tax rate adds the GST line at checkout time.
     const lineItem: Record<string, unknown> = {
       quantity: 1,
       price_data: {
@@ -254,17 +314,28 @@ Deno.serve(async (req) => {
         tax_behavior: 'exclusive',
       },
     };
+    if (pricing.currency === 'AUD') {
+      const auGstId = await getAuGstTaxRateId(secretKey);
+      if (auGstId) {
+        lineItem.tax_rates = [auGstId];
+      } else {
+        // Fallback if the tax-rate API call failed: bake GST into the unit
+        // amount so the studio still pays the GST-inclusive total. The
+        // breakdown will not appear on the Stripe Checkout but the total
+        // is correct, which is the load-bearing requirement.
+        console.warn('AU GST tax rate unavailable; baking 10% into unit_amount as fallback');
+        const baked = Math.round(pricing.final_amount_cents * 1.10);
+        (lineItem.price_data as Record<string, unknown>).unit_amount = baked;
+      }
+    }
 
     const isSetup = paymentMode === 'save_card';
-    // Stripe Tax automatic calculation requires a fully-configured business
-    // origin address + tax registrations on the Stripe account. In a sandbox
-    // those checks are flaky regardless of how the Tax UI looks (Stripe
-    // surfaces "must have a valid head office address" even when the
-    // dashboard reports complete). Skip automatic_tax in test mode so the
-    // sandbox flow is unblocked; keep it on for live where the account is
-    // fully onboarded. The live-cutover checklist must verify the live
-    // account has its registered office address + GST registration set.
-    const enableAutomaticTax = mode === 'live';
+    // Tax handling is now via manual tax_rates on the line item (above) —
+    // disable automatic_tax everywhere. This works identically in sandbox
+    // and live, removes the dependency on Stripe Tax account configuration,
+    // and gives studios a deterministic GST line. (Live mode can switch
+    // back to automatic_tax later for compliance reporting; see memory
+    // project_live_cutover_stripe_tax.)
     const sessionPayload: Record<string, unknown> = {
       mode: isSetup ? 'setup' : 'payment',
       customer: customer.id,
@@ -278,17 +349,9 @@ Deno.serve(async (req) => {
         currency: pricing.currency,
         country: submission.country || '',
       },
-      automatic_tax: { enabled: enableAutomaticTax },
-      // Force Stripe to confirm a billing address (and update the Customer
-      // record with whatever the studio enters) so Stripe Tax always has a
-      // jurisdiction once it's on. Without this, automatic_tax returns 0 in
-      // live mode if the address fields don't round-trip back to the Customer.
+      automatic_tax: { enabled: false },
       billing_address_collection: 'required',
       customer_update: { address: 'auto', name: 'auto' },
-      // tax_id_collection is only sensible when automatic_tax is on — in test
-      // mode we skip both so the sandbox flow does not stall on missing
-      // jurisdiction. Re-enabled automatically on the live cutover.
-      ...(enableAutomaticTax ? { tax_id_collection: { enabled: true } } : {}),
     };
     if (!isSetup) {
       sessionPayload.line_items = [lineItem];
