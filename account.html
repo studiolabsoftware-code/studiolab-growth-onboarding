@@ -67,6 +67,8 @@
     </a>
     <div class="hdr-div" aria-hidden="true"></div>
     <div class="hdr-sub" aria-hidden="true">Your account</div>
+    <div style="flex:1;"></div>
+    <button type="button" id="acctSignOut" style="background:transparent;border:1px solid rgba(255,255,255,0.35);color:#fff;border-radius:999px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Sign out</button>
   </div>
 </header>
 
@@ -82,6 +84,19 @@
   'use strict';
   const FN_BASE = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/';
   const SESSION_KEY = 'sl-growth-session';
+
+  // Sign out — clears the studio session from localStorage and bounces to
+  // a fresh /. Bound before any async loads so it works even if the
+  // account fetch hangs.
+  const signOutBtn = document.getElementById('acctSignOut');
+  if (signOutBtn) {
+    signOutBtn.addEventListener('click', function () {
+      try { localStorage.removeItem(SESSION_KEY); } catch (_) { /* ignore */ }
+      // Use href (not replace) so the studio can use the browser back
+      // button to return if they signed out by mistake.
+      window.location.href = '/';
+    });
+  }
   const PLAN_LABEL = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
   const SETUP_LABEL = { dfy: 'Done-For-You', guided: 'Guided self-setup' };
   const STATUS_PILL = {
