@@ -331,6 +331,132 @@
   </div>
 </div>
 
+<!-- New invoice modal: studio + external recipient modes -->
+<div class="adm-modal" id="invoiceModal" hidden>
+  <div class="adm-modal-backdrop" data-act="close-invoice"></div>
+  <div class="adm-modal-card" role="dialog" aria-modal="true" aria-labelledby="invoiceTitle" style="max-width:680px;">
+    <div class="adm-modal-hdr">
+      <h2 id="invoiceTitle" class="adm-modal-title">New invoice</h2>
+      <button type="button" class="adm-modal-close" data-act="close-invoice" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <div class="adm-modal-body">
+      <div id="invForm">
+        <div class="f">
+          <span class="f-q-label">Recipient</span>
+          <label style="display:flex;gap:8px;align-items:center;margin-bottom:6px;cursor:pointer;">
+            <input type="radio" name="invRecipient" id="invRecipientStudio" checked> This studio
+          </label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;">
+            <input type="radio" name="invRecipient" id="invRecipientExternal"> External recipient (one-off)
+          </label>
+        </div>
+
+        <div id="invStudioBlock" class="f">
+          <div style="background:var(--g1);border:1px solid var(--g2);border-radius:8px;padding:10px 12px;">
+            <div id="invStudioName" style="font-weight:600;"></div>
+            <div id="invStudioMeta" style="color:var(--g6);font-size:12px;margin-top:2px;"></div>
+          </div>
+        </div>
+
+        <div id="invExternalBlock" hidden>
+          <div class="f">
+            <label for="invExtEmail">Recipient email</label>
+            <input type="email" id="invExtEmail" autocomplete="email" placeholder="client@example.com">
+          </div>
+          <div class="f">
+            <label for="invExtName">Recipient name <span class="hint">(optional)</span></label>
+            <input type="text" id="invExtName" placeholder="Their full name or business name">
+          </div>
+          <div class="f">
+            <label for="invExtCountry">Country</label>
+            <select id="invExtCountry">
+              <option value="">Select</option>
+              <option value="AU">Australia (AUD, GST applies)</option>
+              <option value="US">United States</option>
+              <option value="CA">Canada</option>
+              <option value="UK">United Kingdom</option>
+              <option value="NZ">New Zealand</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="f">
+          <label for="invCurrency">Currency</label>
+          <select id="invCurrency">
+            <option value="AUD">AUD — Australian Dollars (GST 10%)</option>
+            <option value="USD">USD — US Dollars (no GST)</option>
+          </select>
+        </div>
+
+        <div class="f">
+          <span class="f-q-label" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Line items</span>
+            <button type="button" class="btn-link" data-act="add-line">+ Add line</button>
+          </span>
+          <div id="invItems"></div>
+        </div>
+
+        <div class="f" style="background:var(--g1);border:1px solid var(--g2);border-radius:8px;padding:10px 12px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;">
+            <span style="color:var(--g6);">Subtotal</span><span id="invSubtotal">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--g6);margin-top:2px;">
+            <span>Tax</span><span id="invTax">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:6px;border-top:1px solid var(--g2);padding-top:6px;">
+            <span>Total (estimated)</span><span id="invTotal">—</span>
+          </div>
+        </div>
+
+        <div class="f">
+          <label for="invCollection">Payment collection</label>
+          <select id="invCollection">
+            <option value="send_invoice">Email recipient a hosted Pay link (recommended)</option>
+            <option value="charge_automatically">Charge saved card on file (requires saved card)</option>
+          </select>
+        </div>
+
+        <div class="f" id="invDueDaysRow">
+          <label for="invDueDays">Due in</label>
+          <select id="invDueDays">
+            <option value="7">7 days</option>
+            <option value="14" selected>14 days</option>
+            <option value="30">30 days</option>
+          </select>
+        </div>
+
+        <div class="f">
+          <label for="invMemo">Memo on the invoice <span class="hint">(shown to recipient)</span></label>
+          <textarea id="invMemo" rows="2" placeholder="Thanks for choosing StudioLAB. Reply to this email if you have any questions."></textarea>
+        </div>
+
+        <div class="f">
+          <label for="invDescription">Internal note <span class="hint">(admin only)</span></label>
+          <input type="text" id="invDescription" placeholder="What is this for? — visible to admins only">
+        </div>
+
+        <div class="submit-err" id="invErr" role="alert">Could not create invoice. Please try again.</div>
+      </div>
+
+      <div id="invSuccess" hidden style="text-align:center;padding:8px 0;">
+        <div style="font-size:36px;line-height:1;margin-bottom:8px;">✅</div>
+        <h3 style="margin:0 0 4px;font-size:18px;">Invoice created</h3>
+        <div style="color:var(--g6);font-size:13px;margin-bottom:14px;">
+          <strong id="invSuccessNumber"></strong> for <strong id="invSuccessAmount"></strong> has been issued. The recipient will receive it via email.
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+          <a id="invSuccessLink" target="_blank" rel="noopener" class="btn btn-p">Open hosted invoice</a>
+          <a id="invSuccessPdf" target="_blank" rel="noopener" class="btn btn-g">Download PDF</a>
+        </div>
+      </div>
+    </div>
+    <div class="adm-modal-ftr">
+      <button type="button" class="btn btn-g" data-act="close-invoice">Close</button>
+      <button type="button" class="btn btn-p" id="invSendBtn" data-act="send">Create and send</button>
+    </div>
+  </div>
+</div>
+
 <!-- Reusable confirm / alert modal -->
 <div class="adm-modal" id="admConfirmModal" hidden>
   <div class="adm-modal-backdrop" data-mod-backdrop></div>
@@ -364,7 +490,8 @@
 <script src="js/auth.js?v=20260513b"></script>
 <script src="js/modal.js?v=20260513a"></script>
 <script src="js/dashboard.js?v=20260513b"></script>
-<script src="js/detail.js?v=20260513b"></script>
+<script src="js/detail.js?v=20260514a"></script>
+<script src="js/invoice.js?v=20260514a"></script>
 <script src="js/change-request.js?v=20260513a"></script>
 <script src="js/users.js?v=20260513b"></script>
 <script src="js/catalog.js?v=20260513a"></script>

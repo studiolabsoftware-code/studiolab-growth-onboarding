@@ -118,6 +118,7 @@
           </div>
         </div>
         <div class="det-actions">
+          <button type="button" class="btn btn-p" id="detNewInvoice">+ Invoice</button>
           <button type="button" class="btn btn-p" id="detChangeReq">Request changes</button>
           <button type="button" class="btn btn-danger" id="detDelete" title="Delete this submission">Delete</button>
         </div>
@@ -133,6 +134,16 @@
             </div>
             <div class="det-section-body" id="detMessagesHost">
               <div class="adm-empty" style="padding:24px 0;">Loading thread…</div>
+            </div>
+          </section>
+
+          <section class="det-section">
+            <div class="det-section-hdr">
+              <h2 class="det-section-title">🧾 Invoices</h2>
+              <button type="button" class="btn-link" id="detNewInvoiceInline">+ New invoice</button>
+            </div>
+            <div class="det-section-body" id="studioInvoicesHost">
+              <div class="adm-empty" style="padding:16px 0;">Loading invoices…</div>
             </div>
           </section>
 
@@ -262,6 +273,17 @@
     bindAssignmentControls();
     document.getElementById('detAddNote').addEventListener('click', addNote);
     document.getElementById('detChangeReq').addEventListener('click', () => window.AdminChangeRequest.open(sub));
+    // Invoice creation: both entry points (header button + inline section button) open the same modal.
+    const openInvoiceModal = () => window.AdminInvoice && window.AdminInvoice.openForStudio(sub);
+    const newInvHeader = document.getElementById('detNewInvoice');
+    const newInvInline = document.getElementById('detNewInvoiceInline');
+    if (newInvHeader) newInvHeader.addEventListener('click', openInvoiceModal);
+    if (newInvInline) newInvInline.addEventListener('click', openInvoiceModal);
+    // Hydrate the per-studio Invoices panel from the live ledger.
+    if (window.AdminInvoice) {
+      const host = document.getElementById('studioInvoicesHost');
+      if (host) window.AdminInvoice.renderStudioInvoicesPanel(sub.id, host);
+    }
     const delBtn = document.getElementById('detDelete');
     if (delBtn) delBtn.addEventListener('click', handleDelete);
     const syncOne = document.getElementById('detSheetSync');

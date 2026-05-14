@@ -471,3 +471,14 @@ body.role-va .adm-preview-link { display: none !important; }
 .compose-file button { background: none; border: 0; cursor: pointer; color: var(--g4); font-size: 16px; padding: 0 0 0 2px; line-height: 1; }
 .compose-file button:hover { color: var(--in-d); }
 
+
+/* ── Invoice modal: line-item rows + invoices table on studio detail ── */
+.inv-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.inv-row input { padding: 6px 8px; border: 1px solid var(--g2); border-radius: 6px; font-family: inherit; font-size: 13px; }
+.inv-row input[data-fld="description"] { flex: 1; min-width: 0; }
+.inv-row .btn-link { white-space: nowrap; }
+.inv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.inv-table th { text-align: left; font-weight: 600; color: var(--g6); padding: 8px 8px 8px 0; border-bottom: 1px solid var(--g2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+.inv-table td { padding: 10px 8px 10px 0; border-bottom: 1px solid var(--g1); vertical-align: middle; }
+.inv-table tr:last-child td { border-bottom: 0; }
+.inv-table .btn-link { font-size: 13px; }
