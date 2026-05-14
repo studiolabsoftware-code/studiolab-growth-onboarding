@@ -15,6 +15,16 @@
   const SETUP_LABEL = { dfy: 'Done for you', guided: 'Guided' };
   const SETUP_ORDER = ['dfy', 'guided'];
 
+  // Sign-up URLs are scoped per region × plan (setup type is picked inside
+  // the form, so it doesn't appear in the URL). AUD pricebox → AU URL,
+  // USD pricebox → US URL. Used by the per-card "Copy URL" action so VAs
+  // can grab the right link for snapshot/onboarding emails without typing.
+  const SIGNUP_BASE = 'https://app.studiolabgrowth.com';
+  function signupUrlFor(currency, plan) {
+    const region = currency === 'AUD' ? 'au' : 'us';
+    return `${SIGNUP_BASE}/${region}/${plan}/`;
+  }
+
   let products = [];
   let codes = [];
   let bound = false;
@@ -164,6 +174,7 @@
         ${taxNote}
         <div class="cat-pricebox-chips">${activeChip}${stripeChip}</div>
         <div class="cat-pricebox-acts">
+          <button class="btn-link" data-cat-action="copy-url" data-url="${escapeHtml(signupUrlFor(p.currency, plan))}" title="Copy sign-up URL for ${p.currency === 'AUD' ? 'AU' : 'US/Intl'} ${PLAN_LABEL[plan]}">Copy URL</button>
           <button class="btn-link" data-cat-action="toggle-active" data-id="${p.id}" data-active="${p.active}">${p.active ? 'Disable' : 'Enable'}</button>
           <button class="btn-link" data-cat-action="sync" data-id="${p.id}">${p.stripe_product_id ? 'Re-sync' : 'Sync to Stripe'}</button>
           <button class="btn-link" data-cat-action="history" data-id="${p.id}">History</button>
@@ -222,8 +233,44 @@
     if (action === 'history') return showHistory(id);
     if (action === 'toggle-active') return toggleActive(id, btn.dataset.active !== 'true');
     if (action === 'sync') return syncToStripe(id, btn);
+    if (action === 'copy-url') return copyUrl(btn);
     if (action === 'edit-code') return openCodeModal(codes.find((c) => c.id === id));
     if (action === 'toggle-code') return toggleCode(id, btn.dataset.active !== 'true');
+  }
+
+  // Copies the sign-up URL to the clipboard and gives the button a brief
+  // "Copied!" state so the VA gets visual confirmation. Falls back to a
+  // hidden textarea + execCommand for environments where the modern
+  // clipboard API is unavailable (e.g. older Safari, http://localhost).
+  async function copyUrl(btn) {
+    const url = btn.dataset.url || '';
+    if (!url) return;
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+        ok = true;
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      }
+    } catch (e) {
+      console.error('copy-url failed:', e);
+    }
+    const orig = btn.textContent;
+    btn.textContent = ok ? 'Copied ✓' : 'Copy failed';
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.disabled = false;
+    }, 1400);
   }
 
   async function editDetails(plan, setup) {

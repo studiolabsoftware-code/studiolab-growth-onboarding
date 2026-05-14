@@ -460,6 +460,141 @@
   </div>
 </div>
 
+<!-- New quote modal: studio + external recipient modes -->
+<div class="adm-modal" id="quoteModal" hidden>
+  <div class="adm-modal-backdrop" data-act="close-quote"></div>
+  <div class="adm-modal-card" role="dialog" aria-modal="true" aria-labelledby="quoteTitle" style="max-width:680px;">
+    <div class="adm-modal-hdr">
+      <h2 id="quoteTitle" class="adm-modal-title">New quote</h2>
+      <button type="button" class="adm-modal-close" data-act="close-quote" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <div class="adm-modal-body">
+      <div id="qForm">
+        <div class="f">
+          <span class="f-q-label">Recipient</span>
+          <label style="display:flex;gap:8px;align-items:center;margin-bottom:6px;cursor:pointer;">
+            <input type="radio" name="qRecipient" id="qRecipientStudio" checked> This studio
+          </label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;">
+            <input type="radio" name="qRecipient" id="qRecipientExternal"> External recipient (one-off)
+          </label>
+        </div>
+
+        <div id="qStudioBlock" class="f">
+          <div style="background:var(--g1);border:1px solid var(--g2);border-radius:8px;padding:10px 12px;">
+            <div id="qStudioName" style="font-weight:600;"></div>
+            <div id="qStudioMeta" style="color:var(--g6);font-size:12px;margin-top:2px;"></div>
+          </div>
+        </div>
+
+        <div id="qExternalBlock" hidden>
+          <div class="f">
+            <label for="qExtEmail">Recipient email</label>
+            <input type="email" id="qExtEmail" autocomplete="email" placeholder="client@example.com">
+          </div>
+          <div class="f">
+            <label for="qExtName">Recipient name <span class="hint">(optional)</span></label>
+            <input type="text" id="qExtName" placeholder="Their full name or business name">
+          </div>
+          <div class="f">
+            <label for="qExtCountry">Country</label>
+            <select id="qExtCountry">
+              <option value="">Select</option>
+              <option value="AU">Australia (AUD, GST applies)</option>
+              <option value="US">United States</option>
+              <option value="CA">Canada</option>
+              <option value="UK">United Kingdom</option>
+              <option value="NZ">New Zealand</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="f">
+          <label for="qCurrency">Currency</label>
+          <select id="qCurrency">
+            <option value="AUD">AUD — Australian Dollars (GST 10%)</option>
+            <option value="USD">USD — US Dollars (no GST)</option>
+          </select>
+        </div>
+
+        <div class="f">
+          <span class="f-q-label" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Line items</span>
+            <button type="button" class="btn-link" data-act="add-q-line">+ Add line</button>
+          </span>
+          <div id="qItems"></div>
+        </div>
+
+        <div class="f" style="background:var(--g1);border:1px solid var(--g2);border-radius:8px;padding:10px 12px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;">
+            <span style="color:var(--g6);">Subtotal</span><span id="qSubtotal">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--g6);margin-top:2px;">
+            <span>Tax</span><span id="qTax">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:6px;border-top:1px solid var(--g2);padding-top:6px;">
+            <span>Total (estimated)</span><span id="qTotal">—</span>
+          </div>
+        </div>
+
+        <div class="f">
+          <span class="f-q-label">Acceptance mode</span>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;cursor:pointer;">
+            <input type="radio" name="qAcceptanceMode" id="qAcceptPayOnAccept" value="pay_on_accept" checked style="margin-top:2px;">
+            <span>
+              <strong>Pay on accept</strong> <span class="hint">(default)</span><br>
+              <span style="color:var(--g6);font-size:12px;">Recipient pays via Stripe-hosted page as soon as they accept. Best for fast-turn engagements.</span>
+            </span>
+          </label>
+          <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;">
+            <input type="radio" name="qAcceptanceMode" id="qAcceptPayOnInvoice" value="pay_on_invoice" style="margin-top:2px;">
+            <span>
+              <strong>Pay on invoice</strong><br>
+              <span style="color:var(--g6);font-size:12px;">Accepting creates an invoice with a 14-day window. Use for larger engagements that need internal sign-off.</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="f">
+          <label for="qExpiresIn">Quote expires in</label>
+          <select id="qExpiresIn">
+            <option value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="60">60 days</option>
+          </select>
+        </div>
+
+        <div class="f">
+          <label for="qCoverNote">Cover note <span class="hint">(shown on the quote)</span></label>
+          <textarea id="qCoverNote" rows="3" placeholder="A short note for the recipient — what's included, scope notes, timing, etc."></textarea>
+        </div>
+
+        <div class="f">
+          <label for="qDescription">Internal note <span class="hint">(admin only)</span></label>
+          <input type="text" id="qDescription" placeholder="What is this for? — visible to admins only">
+        </div>
+
+        <div class="submit-err" id="qErr" role="alert">Could not create quote. Please try again.</div>
+      </div>
+
+      <div id="qSuccess" hidden style="text-align:center;padding:8px 0;">
+        <div style="font-size:36px;line-height:1;margin-bottom:8px;">✅</div>
+        <h3 style="margin:0 0 4px;font-size:18px;">Quote sent</h3>
+        <div style="color:var(--g6);font-size:13px;line-height:1.55;">
+          <strong id="qSuccessNumber"></strong> for <strong id="qSuccessAmount"></strong> has been issued.
+          The recipient is receiving a view-and-accept email from Stripe now.
+          The quote will appear on this studio's page with live status as it's viewed, accepted, or declined.
+        </div>
+      </div>
+    </div>
+    <div class="adm-modal-ftr">
+      <button type="button" class="btn btn-g" data-act="close-quote">Close</button>
+      <button type="button" class="btn btn-p" id="qSendBtn" data-act="send-quote">Create and send</button>
+    </div>
+  </div>
+</div>
+
 <!-- Reusable confirm / alert modal -->
 <div class="adm-modal" id="admConfirmModal" hidden>
   <div class="adm-modal-backdrop" data-mod-backdrop></div>
@@ -493,11 +628,12 @@
 <script src="js/auth.js?v=20260513b"></script>
 <script src="js/modal.js?v=20260513a"></script>
 <script src="js/dashboard.js?v=20260513b"></script>
-<script src="js/detail.js?v=20260514a"></script>
-<script src="js/invoice.js?v=20260514a"></script>
+<script src="js/detail.js?v=20260514c"></script>
+<script src="js/invoice.js?v=20260514b"></script>
+<script src="js/quote.js?v=20260514c"></script>
 <script src="js/change-request.js?v=20260513a"></script>
 <script src="js/users.js?v=20260513b"></script>
-<script src="js/catalog.js?v=20260513a"></script>
+<script src="js/catalog.js?v=20260515a"></script>
 <script src="js/settings.js?v=20260513a"></script>
 <script src="js/inbox.js?v=20260513b"></script>
 </body>
