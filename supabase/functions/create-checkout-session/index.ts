@@ -256,6 +256,15 @@ Deno.serve(async (req) => {
     };
 
     const isSetup = paymentMode === 'save_card';
+    // Stripe Tax automatic calculation requires a fully-configured business
+    // origin address + tax registrations on the Stripe account. In a sandbox
+    // those checks are flaky regardless of how the Tax UI looks (Stripe
+    // surfaces "must have a valid head office address" even when the
+    // dashboard reports complete). Skip automatic_tax in test mode so the
+    // sandbox flow is unblocked; keep it on for live where the account is
+    // fully onboarded. The live-cutover checklist must verify the live
+    // account has its registered office address + GST registration set.
+    const enableAutomaticTax = mode === 'live';
     const sessionPayload: Record<string, unknown> = {
       mode: isSetup ? 'setup' : 'payment',
       customer: customer.id,
@@ -269,14 +278,17 @@ Deno.serve(async (req) => {
         currency: pricing.currency,
         country: submission.country || '',
       },
-      automatic_tax: { enabled: true },
+      automatic_tax: { enabled: enableAutomaticTax },
       // Force Stripe to confirm a billing address (and update the Customer
       // record with whatever the studio enters) so Stripe Tax always has a
-      // jurisdiction. Without this, automatic_tax silently returns 0 if the
-      // address fields don't round-trip back to the Customer.
+      // jurisdiction once it's on. Without this, automatic_tax returns 0 in
+      // live mode if the address fields don't round-trip back to the Customer.
       billing_address_collection: 'required',
       customer_update: { address: 'auto', name: 'auto' },
-      tax_id_collection: { enabled: true },
+      // tax_id_collection is only sensible when automatic_tax is on — in test
+      // mode we skip both so the sandbox flow does not stall on missing
+      // jurisdiction. Re-enabled automatically on the live cutover.
+      ...(enableAutomaticTax ? { tax_id_collection: { enabled: true } } : {}),
     };
     if (!isSetup) {
       sessionPayload.line_items = [lineItem];
