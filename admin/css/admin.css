@@ -341,7 +341,7 @@ body.role-va .adm-preview-link { display: none !important; }
 .cat-card-prices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 480px) { .cat-card-prices { grid-template-columns: 1fr; } }
 
-.cat-pricebox { background: var(--g1); border: 1px solid var(--g2); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.cat-pricebox { background: var(--g1); border: 1px solid var(--g2); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-height: 168px; }
 .cat-pricebox-empty { opacity: 0.5; }
 .cat-pricebox-empty-msg { font-size: 11px; color: var(--g4); font-style: italic; }
 .cat-pricebox-row { display: flex; align-items: center; justify-content: space-between; }
@@ -350,10 +350,16 @@ body.role-va .adm-preview-link { display: none !important; }
 .cat-pricebox-edit:hover { color: var(--in); background: var(--in-l); }
 .cat-pricebox-edit:focus-visible { outline: 2px solid var(--in); outline-offset: 1px; }
 .cat-pricebox-amt { font-size: 20px; font-weight: 800; color: var(--in-d); letter-spacing: -0.4px; line-height: 1.1; }
-.cat-pricebox-tax { font-size: 10px; color: var(--g6); margin-top: -2px; }
-.cat-pricebox-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
-.cat-pricebox-acts { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
-.cat-pricebox-acts .btn-link { color: var(--in); padding: 2px 4px; font-size: 11px; }
+/* AUD gets the "ex GST · $X inc GST" line. USD has no equivalent — reserve
+   the same vertical slot via min-height so chips + actions align across
+   currencies in side-by-side AUD/USD pricebox pairs. */
+.cat-pricebox-tax { font-size: 10px; color: var(--g6); margin-top: -2px; min-height: 14px; }
+/* margin-top: auto on chips pushes the chips + acts cluster to the bottom
+   of the pricebox flex column, so the Copy URL / Disable / Sync / History
+   row anchors flush at the bottom regardless of the GST line above. */
+.cat-pricebox-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: auto; align-items: center; min-height: 18px; }
+.cat-pricebox-acts { display: flex; gap: 6px 10px; flex-wrap: wrap; align-items: center; }
+.cat-pricebox-acts .btn-link { color: var(--in); padding: 2px 4px; font-size: 11px; white-space: nowrap; }
 .cat-pricebox-acts .btn-link:hover { color: var(--in-d); text-decoration: underline; background: transparent; }
 
 .cat-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; }
