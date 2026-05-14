@@ -2240,6 +2240,22 @@
         finalize: false,
       });
       if (r.ok && r.data && r.data.ok && r.data.submission) {
+        // If the studio has already paid (or authorised / card saved), they
+        // should not see the form's Pay-with-Stripe step again — bounce them
+        // to the account view which is the real post-payment landing.
+        // The /kb.html exception still applies for Dominate AI studios who
+        // need to finish their knowledge base before the account page is
+        // useful.
+        const ps = r.data.submission.payment_status;
+        const isPaid = ps === 'paid' || ps === 'authorised' || ps === 'card_saved';
+        if (isPaid) {
+          if (r.data.submission.plan === 'ai' && !r.data.submission.kb_completed_at) {
+            window.location.replace('/kb.html');
+          } else {
+            window.location.replace('/account.html');
+          }
+          return;
+        }
         hydrateFromSubmission(r.data.submission);
         const target = Math.max(1, Math.min(totalSteps(), r.data.submission.last_step_completed || 1));
         goTo(target);
