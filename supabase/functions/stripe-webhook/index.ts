@@ -408,10 +408,36 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
     });
   } catch (e) { console.error('activity_log insert failed:', e); }
 
-  // Studio confirmation email — mode-specific copy.
+  // Studio confirmation + admin notification emails. Gate on stripe_mode:
+  // in test/sandbox mode we DO NOT send to the real recipient addresses
+  // (would spam real studios and admins during testing). Instead, if
+  // STRIPE_TEST_EMAIL_RECIPIENT is set we redirect all payment emails to
+  // that address with a [TEST] prefix on the subject so the rendering can
+  // be reviewed without affecting real inboxes. If unset, we skip entirely
+  // and just log what would have been sent.
   const studioName = (submission.studio_name as string) || 'there';
   const ref = refFor(submission.id as string);
   const includesGst = (currency || '').toUpperCase() === 'AUD';
+  const isLive = stripeMode === 'live';
+  const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+
+  async function sendGated(args: { to: string | string[]; subject: string; html: string; replyTo?: string; intent: string }) {
+    if (isLive) {
+      await sendEmail({ to: args.to, subject: args.subject, html: args.html, replyTo: args.replyTo });
+      return;
+    }
+    // Test mode: optionally redirect to a single test recipient
+    if (testRecipient) {
+      await sendEmail({
+        to: testRecipient,
+        subject: `[TEST · ${args.intent}] ${args.subject}`,
+        html: args.html,
+        replyTo: args.replyTo,
+      });
+    } else {
+      console.log(`stripe-webhook: skipping ${args.intent} email in test mode (would send to ${Array.isArray(args.to) ? args.to.join(', ') : args.to})`);
+    }
+  }
 
   try {
     if (paymentMode === 'immediate') {
@@ -423,27 +449,30 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
         includesGst,
         invoiceUrl: (submission.invoice_hosted_url as string | null) || null,
       });
-      await sendEmail({
+      await sendGated({
         to: submission.contact_email as string,
         subject: t.subject,
         html: t.html,
         replyTo: 'growth@studiolabgrowth.com',
+        intent: 'studio receipt (immediate)',
       });
     } else if (paymentMode === 'hold') {
       const t = paymentReceiptHold({ studioName, ref, amountCents, currency: currency || 'AUD', includesGst });
-      await sendEmail({
+      await sendGated({
         to: submission.contact_email as string,
         subject: t.subject,
         html: t.html,
         replyTo: 'growth@studiolabgrowth.com',
+        intent: 'studio receipt (hold)',
       });
     } else {
       const t = paymentReceiptSaveCard({ studioName, ref, amountCents, currency: currency || 'AUD', includesGst });
-      await sendEmail({
+      await sendGated({
         to: submission.contact_email as string,
         subject: t.subject,
         html: t.html,
         replyTo: 'growth@studiolabgrowth.com',
+        intent: 'studio receipt (save card)',
       });
     }
   } catch (e) { console.error('studio receipt email failed:', e); }
@@ -462,7 +491,12 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
         includesGst,
         adminUrl: adminUrlFor(submission.id as string),
       });
-      await sendEmail({ to: admins.map((a) => a.email), subject: t.subject, html: t.html });
+      await sendGated({
+        to: admins.map((a) => a.email),
+        subject: t.subject,
+        html: t.html,
+        intent: 'admin notification',
+      });
     }
   } catch (e) { console.error('admin notification failed:', e); }
 

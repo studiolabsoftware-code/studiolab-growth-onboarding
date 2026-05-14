@@ -1,6 +1,11 @@
 // Triggered by a Supabase Database Webhook on INSERT to submissions.
 // Sends a confirmation email to the studio and a notification to all admins,
 // and inserts a 'submitted' row in activity_log.
+//
+// Email gating in test mode: reads payment_settings.stripe_mode. When 'test'
+// we either redirect emails to STRIPE_TEST_EMAIL_RECIPIENT (if set) with a
+// [TEST] prefix on the subject, or skip sending entirely. This prevents
+// sandbox test submissions from spamming the real studio + admin inboxes.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
@@ -30,10 +35,37 @@ Deno.serve(async (req) => {
     const appUrl = Deno.env.get('ADMIN_APP_URL') || '';
     const ref = String(row.id).replace(/-/g, '').substring(0, 8).toUpperCase();
 
+    // Read stripe_mode for email gating in test mode.
+    const { data: settings } = await sb.from('payment_settings')
+      .select('stripe_mode').eq('id', 1).maybeSingle();
+    const isLive = (settings?.stripe_mode || 'test') === 'live';
+    const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+
+    async function sendGated(args: { to: string | string[]; subject: string; html: string; replyTo?: string; intent: string }) {
+      if (isLive) {
+        await sendEmail({ to: args.to, subject: args.subject, html: args.html, replyTo: args.replyTo });
+        return;
+      }
+      if (testRecipient) {
+        await sendEmail({
+          to: testRecipient,
+          subject: `[TEST · ${args.intent}] ${args.subject}`,
+          html: args.html,
+          replyTo: args.replyTo,
+        });
+      } else {
+        console.log(`on-submission: skipping ${args.intent} email in test mode (would send to ${Array.isArray(args.to) ? args.to.join(', ') : args.to})`);
+      }
+    }
+
     // Confirmation to studio
     if (row.contact_email) {
       const t = submissionConfirmation({ studioName: row.studio_name || 'there', ref });
-      await sendEmail({ to: row.contact_email, subject: t.subject, html: t.html, replyTo: 'growth@studiolabgrowth.com' });
+      await sendGated({
+        to: row.contact_email, subject: t.subject, html: t.html,
+        replyTo: 'growth@studiolabgrowth.com',
+        intent: 'studio submission confirmation',
+      });
     }
 
     // Notify all active admins
@@ -45,7 +77,10 @@ Deno.serve(async (req) => {
         setup: SETUP_LABEL[row.setup_type] || row.setup_type,
         adminUrl: `${appUrl}?id=${row.id}`,
       });
-      await sendEmail({ to: admins.map((a) => a.email), subject: t.subject, html: t.html });
+      await sendGated({
+        to: admins.map((a) => a.email), subject: t.subject, html: t.html,
+        intent: 'admin new submission',
+      });
     }
 
     await sb.from('activity_log').insert({
