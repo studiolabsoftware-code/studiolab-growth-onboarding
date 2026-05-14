@@ -19,7 +19,8 @@ Deno.serve(async (req) => {
     const sessionHash = await sha256Hex(sessionToken);
     const { data, error } = await sb.from('submissions')
       .select(
-        'id, plan, payment_status, studio_name, website, ' +
+        'id, plan, region, payment_status, studio_name, website, ' +
+        'invoice_hosted_url, ' +
         'kb_assistant_persona_type, kb_assistant_persona_name, kb_greeting, ' +
         'kb_profile, kb_classes, kb_pricing, kb_price_quoting, kb_policies, ' +
         'kb_events, kb_faqs, kb_restricted, kb_tone, voice_hours, voice_escalate, ' +
@@ -39,9 +40,11 @@ Deno.serve(async (req) => {
       submission: {
         id: data.id,
         plan: data.plan,
+        region: data.region,
         payment_status: data.payment_status,
         studio_name: data.studio_name,
         website: data.website,
+        invoice_hosted_url: data.invoice_hosted_url,
         kb_assistant_persona_type: data.kb_assistant_persona_type,
         kb_assistant_persona_name: data.kb_assistant_persona_name,
         kb_greeting: data.kb_greeting,

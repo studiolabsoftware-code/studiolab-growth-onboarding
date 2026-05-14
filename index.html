@@ -15,7 +15,7 @@
 
 <header class="hdr">
   <div class="hdr-inner">
-    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth home">
+    <a class="hdr-logo" href="https://studiolabgrowth.com" aria-label="StudioLAB Growth — main website">
       <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
     </a>
     <div class="hdr-div" aria-hidden="true"></div>
@@ -36,12 +36,45 @@
     </div>
 
     <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">✅</div>Already submitted?</div>
+      <p style="margin:0; color:var(--g6); line-height:1.55;">You'll receive a confirmation email at the contact address you provided. Replies to that email reach our team directly — that's the fastest way to reach us once your setup is in the queue.</p>
+    </div>
+
+    <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🔍</div>Can't find it?</div>
       <p style="margin:0 0 12px; color:var(--g6); line-height:1.55;">Email us at <a href="mailto:growth@studiolabgrowth.com" style="color:var(--in); font-weight:600;">growth@studiolabgrowth.com</a> with your studio name and we'll resend it within the same business day.</p>
-      <p style="margin:0; color:var(--g6); line-height:1.55;">If you've already submitted your setup form, you'll receive a confirmation email at the contact address you provided. Replies to that email reach our team directly.</p>
+      <p style="margin:0; color:var(--g6); line-height:1.55; font-size:12px;">Mailto link not opening? <button type="button" id="copyEmailBtn" style="background:none; border:none; color:var(--in); font-weight:600; cursor:pointer; padding:0; font-size:12px; text-decoration:underline;">Copy email address</button> instead — then paste it into Gmail, Outlook, or whichever mail tool you use.</p>
+    </div>
+
+    <div style="text-align:center; margin-top:24px;">
+      <a href="https://studiolabgrowth.com" style="display:inline-flex; align-items:center; gap:6px; color:var(--g6); font-size:13px; text-decoration:none;">← Back to StudioLAB website</a>
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  'use strict';
+  var btn = document.getElementById('copyEmailBtn');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var email = 'growth@studiolabgrowth.com';
+    var done = function () {
+      var orig = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      btn.disabled = true;
+      setTimeout(function () { btn.textContent = orig; btn.disabled = false; }, 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(email).then(done).catch(function () {
+        window.prompt('Copy this email address:', email);
+      });
+    } else {
+      window.prompt('Copy this email address:', email);
+    }
+  });
+})();
+</script>
 
 </body>
 </html>

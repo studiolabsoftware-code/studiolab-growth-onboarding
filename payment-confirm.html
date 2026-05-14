@@ -17,6 +17,13 @@
   .pc-sub { color: var(--g6); font-size: 14px; line-height: 1.6; margin: 0 0 22px; }
   .pc-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--in); color: #fff; border: 0; border-radius: 999px; padding: 12px 26px; font-weight: 600; font-size: 14px; text-decoration: none; cursor: pointer; }
   .pc-btn:hover { background: var(--in-d); }
+  .pc-btn-secondary { background: transparent; color: var(--in); border: 1px solid var(--in); }
+  .pc-btn-secondary:hover { background: var(--in); color: #fff; }
+  .pc-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 6px; }
+  .pc-next { text-align: left; background: var(--g1); border: 1px solid var(--g2); border-radius: 10px; padding: 14px 16px; margin: 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--in-d); }
+  .pc-next strong { font-weight: 700; }
+  .pc-next ol { margin: 8px 0 0; padding-left: 18px; }
+  .pc-next li { margin-bottom: 4px; }
   .pc-spinner { width: 36px; height: 36px; border: 3px solid var(--g2); border-top-color: var(--in); border-radius: 50%; animation: pcSpin .9s linear infinite; margin: 0 auto 18px; }
   @keyframes pcSpin { to { transform: rotate(360deg); } }
 </style>
@@ -25,7 +32,7 @@
 
 <header class="hdr">
   <div class="hdr-inner">
-    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth home">
+    <a class="hdr-logo" href="https://studiolabgrowth.com" aria-label="StudioLAB Growth — main website">
       <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
     </a>
     <div class="hdr-div" aria-hidden="true"></div>
@@ -63,18 +70,45 @@
     try { data = await r.json(); } catch (_) { /* ignore */ }
     return { ok: r.ok, status: r.status, data: data || {} };
   }
-  function setBtn(label, href) {
-    document.querySelectorAll('#pc-card .pc-btn').forEach((el) => el.remove());
-    if (label && href) {
-      document.getElementById('pc-card').insertAdjacentHTML('beforeend',
-        `<a class="pc-btn" href="${href}">${label}</a>`);
-    }
+  function setActions(actions) {
+    // Clear any previous actions / button containers
+    document.querySelectorAll('#pc-card .pc-actions, #pc-card .pc-btn, #pc-card .pc-next').forEach((el) => el.remove());
+    if (!actions || !actions.length) return;
+    const html = '<div class="pc-actions">' + actions.map((a) => {
+      const cls = a.secondary ? 'pc-btn pc-btn-secondary' : 'pc-btn';
+      const target = a.external ? ' target="_blank" rel="noopener"' : '';
+      return `<a class="${cls}" href="${a.href}"${target}>${a.label}</a>`;
+    }).join('') + '</div>';
+    document.getElementById('pc-card').insertAdjacentHTML('beforeend', html);
+  }
+  function setNext(html) {
+    document.querySelectorAll('#pc-card .pc-next').forEach((el) => el.remove());
+    if (!html) return;
+    // Insert the "what happens next" block BEFORE the actions row so the
+    // primary CTAs are last, easiest to find at the bottom of the card.
+    const card = document.getElementById('pc-card');
+    const actions = card.querySelector('.pc-actions');
+    const block = document.createElement('div');
+    block.className = 'pc-next';
+    block.innerHTML = html;
+    if (actions) card.insertBefore(block, actions);
+    else card.appendChild(block);
   }
   function show(opts) {
     document.getElementById('pc-spinner').style.display = opts.spinner ? 'block' : 'none';
     document.getElementById('pc-title').textContent = opts.title;
     document.getElementById('pc-sub').innerHTML = opts.sub;
-    setBtn(opts.buttonLabel, opts.buttonHref);
+    setActions(opts.actions || (opts.buttonLabel && opts.buttonHref ? [{ label: opts.buttonLabel, href: opts.buttonHref }] : []));
+    setNext(opts.next || '');
+  }
+
+  // Build the URL the studio can use to come back and review their
+  // submission. The form auto-resumes from the session token in localStorage,
+  // so this works without re-OTP.
+  function reviewUrlFor(submission) {
+    if (!submission || !submission.plan || !submission.region) return null;
+    const region = String(submission.region).toLowerCase();
+    return '/' + region + '/' + submission.plan + '/';
   }
   function showBadSession() {
     show({
@@ -114,12 +148,29 @@
           window.location.href = '/kb.html';
           return;
         }
+        // Success state — give the studio a meaningful set of next steps
+        // and somewhere useful to go, NOT the public gate page.
+        const reviewUrl = reviewUrlFor(s);
+        const invoiceUrl = s.invoice_hosted_url || null;
+        const studioName = s.studio_name || '';
+        const actions = [];
+        if (reviewUrl) actions.push({ label: 'View my submission', href: reviewUrl });
+        if (invoiceUrl) actions.push({ label: 'View invoice', href: invoiceUrl, external: true, secondary: true });
+        actions.push({ label: 'StudioLAB website', href: 'https://studiolabgrowth.com', external: true, secondary: true });
         show({
           spinner: false,
-          title: 'You are all set',
-          sub: 'Payment received and your setup is in the queue. Our team will be in touch shortly with next steps.',
-          buttonLabel: 'Done',
-          buttonHref: '/',
+          title: studioName ? `Thanks, ${studioName} — you are all set` : 'You are all set',
+          sub: 'Your payment landed and your setup is now in our queue. A copy of the receipt is on its way to your inbox.',
+          next: `
+            <strong>What happens next</strong>
+            <ol>
+              <li>Our team confirms your details and starts your setup, usually within 1–2 business days.</li>
+              <li>We email you the moment your account is ready to go live.</li>
+              <li>If we need anything from you in the meantime, you will get a tap on the shoulder by email.</li>
+            </ol>
+            Need to talk to us? Reply to your confirmation email — it threads straight to our team.
+          `,
+          actions,
         });
         return;
       }
