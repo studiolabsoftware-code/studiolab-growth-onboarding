@@ -170,12 +170,7 @@
           <div class="f">
             <label for="country">Country <span class="req">*</span></label>
             <select id="country" data-required>
-              <option value="">Select</option>
-              <option value="AU">Australia</option>
-              <option value="US">United States</option>
-              <option value="CA">Canada</option>
-              <option value="NZ">New Zealand</option>
-              <option value="UK">United Kingdom</option>
+              <option value="AU" selected>Australia</option>
             </select>
             <span class="field-err">Please select your country.</span>
           </div>
@@ -188,22 +183,6 @@
                 <option value="Australia/Brisbane">Brisbane (AEST no DST)</option>
                 <option value="Australia/Perth">Perth (AWST)</option>
                 <option value="Australia/Adelaide">Adelaide (ACST)</option>
-              </optgroup>
-              <optgroup label="United States">
-                <option value="America/New_York">Eastern Time (ET)</option>
-                <option value="America/Chicago">Central Time (CT)</option>
-                <option value="America/Denver">Mountain Time (MT)</option>
-                <option value="America/Los_Angeles">Pacific Time (PT)</option>
-              </optgroup>
-              <optgroup label="Canada">
-                <option value="America/Toronto">Toronto (ET)</option>
-                <option value="America/Vancouver">Vancouver (PT)</option>
-              </optgroup>
-              <optgroup label="United Kingdom">
-                <option value="Europe/London">London (GMT / BST)</option>
-              </optgroup>
-              <optgroup label="New Zealand">
-                <option value="Pacific/Auckland">Auckland (NZST / NZDT)</option>
               </optgroup>
             </select>
             <span class="field-err">Please select your time zone.</span>

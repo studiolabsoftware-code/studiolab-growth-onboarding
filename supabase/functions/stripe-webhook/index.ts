@@ -121,10 +121,12 @@ Deno.serve(async (req) => {
         break;
       case 'invoice.finalized':
       case 'invoice.payment_succeeded':
-        await handleInvoiceUpdate(sb, event.data.object as InvoiceObj);
+      case 'invoice.voided':
+      case 'invoice.payment_failed':
+        await handleInvoiceUpdate(sb, event.data.object as InvoiceObj, event.type, event.id, event);
         break;
       case 'charge.refunded':
-        await handleChargeRefunded(sb, event.data.object as ChargeObj);
+        await handleChargeRefunded(sb, event.data.object as ChargeObj, event.id, event);
         break;
       case 'payment_method.detached':
         await handlePaymentMethodDetached(sb, event.data.object as PaymentMethodObj);
@@ -184,19 +186,40 @@ interface SetupIntent {
 
 interface InvoiceObj {
   id: string;
+  number: string | null;
+  status: string | null;            // 'draft' | 'open' | 'paid' | 'void' | 'uncollectible'
   hosted_invoice_url: string | null;
   invoice_pdf: string | null;
   payment_intent: string | null;
   customer: string | null;
+  subscription: string | null;      // PRESENT on subscription invoices (GHL SaaS)
+  currency: string | null;
+  subtotal: number | null;
+  total: number | null;
+  tax: number | null;
+  amount_paid: number | null;
+  amount_remaining: number | null;
+  amount_due: number | null;
+  total_discount_amounts?: Array<{ amount: number }> | null;
+  due_date: number | null;          // unix seconds
+  collection_method: string | null; // 'charge_automatically' | 'send_invoice'
   metadata?: Record<string, string> | null;
+  status_transitions?: {
+    finalized_at?: number | null;
+    paid_at?: number | null;
+    voided_at?: number | null;
+    marked_uncollectible_at?: number | null;
+  } | null;
 }
 
 interface ChargeObj {
   id: string;
   payment_intent: string | null;
+  invoice: string | null;
   customer: string | null;
   amount_refunded: number;
   refunded: boolean;
+  metadata?: Record<string, string> | null;
 }
 
 interface PaymentMethodObj {
@@ -616,10 +639,161 @@ async function handleSetupIntentFailed(sb: Sb, si: SetupIntent): Promise<void> {
   } catch (e) { console.error('activity_log insert failed:', e); }
 }
 
-async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj): Promise<void> {
-  // Match invoice → submission via either the linked payment_intent or an
-  // already-stored stripe_invoice_id. Metadata is empty on invoices created
-  // by Checkout, so we cannot rely on it here.
+// ============================================================================
+// Separation filter — see memory: project_billing_separation_rules
+// ============================================================================
+// The Stripe account is shared with GHL's SaaS Configurator. Every invoice
+// event hits this webhook regardless of origin, so we filter every invoice-
+// scoped action through this gate before writing to our ledger or mutating
+// any submission. Conservative by default: if we can't prove the invoice is
+// ours, we leave it alone.
+async function classifyInvoice(
+  sb: Sb,
+  invoice: InvoiceObj,
+): Promise<{ ours: true; source: 'studiolab-growth-setup' | 'studiolab-growth-custom' | 'studiolab-growth-quote' } | { ours: false; reason: string }> {
+  // 1. Subscription invoices are always GHL's. The presence of the
+  // `subscription` field on the Invoice object is the definitive signal.
+  if (invoice.subscription) return { ours: false, reason: 'subscription_invoice' };
+
+  // 2. Explicit source metadata wins. Our create-custom-invoice and
+  // create-quote functions stamp this when they finalise an invoice.
+  const metaSource = invoice.metadata?.source || '';
+  if (metaSource === 'studiolab-growth-setup') return { ours: true, source: 'studiolab-growth-setup' };
+  if (metaSource === 'studiolab-growth-custom') return { ours: true, source: 'studiolab-growth-custom' };
+  if (metaSource === 'studiolab-growth-quote') return { ours: true, source: 'studiolab-growth-quote' };
+  if (metaSource) return { ours: false, reason: `foreign_source:${metaSource}` };
+
+  // 3. Stripe Checkout doesn't copy session metadata onto the Invoice it
+  // creates, so setup-fee invoices arrive here with empty metadata. Fall
+  // back to the payment_intent linkage — if a submission already owns the
+  // PI, the invoice is its setup invoice.
+  if (invoice.payment_intent) {
+    const sub = await submissionByPaymentIntentId(sb, invoice.payment_intent);
+    if (sub) return { ours: true, source: 'studiolab-growth-setup' };
+  }
+
+  // 4. If the invoice was already linked to a submission in a prior event,
+  // reuse that classification.
+  const prior = await submissionByInvoiceId(sb, invoice.id);
+  if (prior) return { ours: true, source: 'studiolab-growth-setup' };
+
+  // 5. Last resort: if the customer is one of ours but nothing links the
+  // invoice to us, assume it's a GHL invoice on the shared customer and
+  // skip. Better to under-process than to claim a foreign invoice.
+  return { ours: false, reason: 'no_link_to_studiolab_growth' };
+}
+
+// Map Stripe invoice.status (which includes 'void') to our normalised set.
+function normaliseInvoiceStatus(stripeStatus: string | null, refunded?: { partial?: boolean; full?: boolean }): string {
+  if (refunded?.full) return 'refunded';
+  if (refunded?.partial) return 'partially_refunded';
+  switch (stripeStatus) {
+    case 'draft': return 'draft';
+    case 'open': return 'open';
+    case 'paid': return 'paid';
+    case 'void': return 'voided';
+    case 'uncollectible': return 'uncollectible';
+    default: return 'open';
+  }
+}
+
+function tsFromUnix(seconds: number | null | undefined): string | null {
+  if (!seconds) return null;
+  return new Date(seconds * 1000).toISOString();
+}
+
+async function upsertInvoiceLedger(
+  sb: Sb,
+  invoice: InvoiceObj,
+  source: 'studiolab-growth-setup' | 'studiolab-growth-custom' | 'studiolab-growth-quote',
+  submissionId: string | null,
+  eventType: string,
+  eventId: string,
+  eventPayload: unknown,
+): Promise<void> {
+  const status = normaliseInvoiceStatus(invoice.status);
+  const totalDiscount = (invoice.total_discount_amounts || []).reduce((sum, d) => sum + (d.amount || 0), 0);
+  const kind = source === 'studiolab-growth-quote'
+    ? 'quote_invoice'
+    : source === 'studiolab-growth-custom'
+      ? 'custom_charge'
+      : 'setup_invoice';
+
+  const row = {
+    submission_id: submissionId,
+    stripe_invoice_id: invoice.id,
+    stripe_payment_intent_id: invoice.payment_intent,
+    stripe_customer_id: invoice.customer,
+    number: invoice.number,
+    kind,
+    source,
+    status,
+    currency: (invoice.currency || 'aud').toUpperCase(),
+    subtotal_cents: invoice.subtotal ?? 0,
+    discount_cents: totalDiscount,
+    tax_cents: invoice.tax ?? 0,
+    total_cents: invoice.total ?? 0,
+    amount_paid_cents: invoice.amount_paid ?? 0,
+    amount_remaining_cents: invoice.amount_remaining ?? 0,
+    issued_at: tsFromUnix(invoice.status_transitions?.finalized_at),
+    due_at: tsFromUnix(invoice.due_date),
+    paid_at: tsFromUnix(invoice.status_transitions?.paid_at),
+    voided_at: tsFromUnix(invoice.status_transitions?.voided_at),
+    hosted_url: invoice.hosted_invoice_url,
+    pdf_url: invoice.invoice_pdf,
+    collection_method: invoice.collection_method,
+  };
+
+  // Upsert by stripe_invoice_id so multiple events on the same invoice
+  // converge to one row. The source-immutability trigger will block any
+  // attempt to change source on an existing row — that's intentional.
+  const { data: upserted, error } = await sb.from('invoices')
+    .upsert(row, { onConflict: 'stripe_invoice_id' })
+    .select('id')
+    .single();
+  if (error) {
+    console.error('invoices upsert failed:', error, { invoice_id: invoice.id, event: eventType });
+    return;
+  }
+
+  // Audit row in invoice_events. Idempotent on (invoice_id, stripe_event_id).
+  if (upserted?.id) {
+    await sb.from('invoice_events').insert({
+      invoice_id: upserted.id,
+      stripe_event_id: eventId,
+      type: eventType,
+      payload: eventPayload,
+    });
+  }
+}
+
+async function logActivityForInvoice(
+  sb: Sb,
+  submissionId: string | null,
+  action: string,
+  details: Record<string, unknown>,
+): Promise<void> {
+  if (!submissionId) return;
+  try {
+    await sb.from('activity_log').insert({
+      submission_id: submissionId,
+      action,
+      actor: 'stripe',
+      details,
+    });
+  } catch (e) { console.error('activity_log insert failed:', e); }
+}
+
+async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: string, eventId: string, eventPayload: unknown): Promise<void> {
+  const classification = await classifyInvoice(sb, invoice);
+  if (!classification.ours) {
+    console.log(`stripe-webhook: ignoring invoice ${invoice.id} (${eventType}) — ${classification.reason}`);
+    return;
+  }
+
+  // Match invoice → submission for any back-compatible mutations to the
+  // submissions table. The ledger does not need a submission to be useful,
+  // but the submission still carries the "active" invoice URL pair.
   let submission: Record<string, unknown> | null = null;
   if (invoice.payment_intent) {
     submission = await submissionByPaymentIntentId(sb, invoice.payment_intent);
@@ -627,35 +801,108 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj): Promise<void> {
   if (!submission) {
     submission = await submissionByInvoiceId(sb, invoice.id);
   }
-  if (!submission) return;
 
-  await sb.from('submissions').update({
-    stripe_invoice_id: invoice.id,
-    invoice_hosted_url: invoice.hosted_invoice_url,
-    invoice_pdf_url: invoice.invoice_pdf,
-  }).eq('id', submission.id);
+  await upsertInvoiceLedger(
+    sb,
+    invoice,
+    classification.source,
+    submission ? (submission.id as string) : null,
+    eventType,
+    eventId,
+    eventPayload,
+  );
+
+  if (submission) {
+    await sb.from('submissions').update({
+      stripe_invoice_id: invoice.id,
+      invoice_hosted_url: invoice.hosted_invoice_url,
+      invoice_pdf_url: invoice.invoice_pdf,
+    }).eq('id', submission.id);
+  }
+
+  // Activity log entries scoped to the lifecycle event.
+  const submissionId = submission ? (submission.id as string) : null;
+  if (eventType === 'invoice.finalized') {
+    await logActivityForInvoice(sb, submissionId, 'invoice_issued', {
+      invoice_id: invoice.id,
+      number: invoice.number,
+      total_cents: invoice.total,
+      currency: invoice.currency,
+      source: classification.source,
+    });
+  } else if (eventType === 'invoice.payment_succeeded') {
+    await logActivityForInvoice(sb, submissionId, 'invoice_paid', {
+      invoice_id: invoice.id,
+      number: invoice.number,
+      amount_paid_cents: invoice.amount_paid,
+      currency: invoice.currency,
+      source: classification.source,
+    });
+  } else if (eventType === 'invoice.voided') {
+    await logActivityForInvoice(sb, submissionId, 'invoice_voided', {
+      invoice_id: invoice.id,
+      number: invoice.number,
+      source: classification.source,
+    });
+  }
 }
 
-async function handleChargeRefunded(sb: Sb, charge: ChargeObj): Promise<void> {
+async function handleChargeRefunded(sb: Sb, charge: ChargeObj, eventId: string, eventPayload: unknown): Promise<void> {
   if (!charge.payment_intent) return;
   const submission = await submissionByPaymentIntentId(sb, charge.payment_intent);
-  if (!submission) return;
-  await sb.from('submissions').update({
-    payment_status: 'refunded',
-  }).eq('id', submission.id);
+  // Even without a submission, we may still own the invoice via the ledger;
+  // try to locate the ledger row by payment_intent and update it.
+  const { data: ledgerRow } = await sb.from('invoices')
+    .select('id, total_cents, source')
+    .eq('stripe_payment_intent_id', charge.payment_intent)
+    .maybeSingle();
 
-  try {
-    await sb.from('activity_log').insert({
-      submission_id: submission.id,
-      action: 'payment_refunded',
-      actor: 'stripe',
-      details: {
-        charge_id: charge.id,
-        amount_refunded: charge.amount_refunded,
-        refunded: charge.refunded,
-      },
+  if (!submission && !ledgerRow) {
+    console.log(`stripe-webhook: ignoring charge.refunded ${charge.id} — no link to studiolab-growth`);
+    return;
+  }
+
+  // Update submissions.payment_status for back-compat (only when fully refunded).
+  if (submission) {
+    await sb.from('submissions').update({
+      payment_status: 'refunded',
+    }).eq('id', submission.id);
+  }
+
+  // Update the ledger row's refund state. Partial vs full is determined by
+  // comparing amount_refunded to total_cents on the ledger row.
+  if (ledgerRow) {
+    const total = ledgerRow.total_cents || 0;
+    const refunded = charge.amount_refunded || 0;
+    const status = charge.refunded || refunded >= total ? 'refunded' : 'partially_refunded';
+    await sb.from('invoices').update({
+      status,
+      amount_refunded_cents: refunded,
+      refunded_at: new Date().toISOString(),
+    }).eq('id', ledgerRow.id);
+
+    await sb.from('invoice_events').insert({
+      invoice_id: ledgerRow.id,
+      stripe_event_id: eventId,
+      type: 'charge.refunded',
+      payload: eventPayload,
     });
-  } catch (e) { console.error('activity_log insert failed:', e); }
+  }
+
+  if (submission) {
+    try {
+      await sb.from('activity_log').insert({
+        submission_id: submission.id,
+        action: 'invoice_refunded',
+        actor: 'stripe',
+        details: {
+          charge_id: charge.id,
+          amount_refunded: charge.amount_refunded,
+          refunded: charge.refunded,
+        },
+      });
+    } catch (e) { console.error('activity_log insert failed:', e); }
+  }
 }
 
 async function handlePaymentMethodDetached(sb: Sb, pm: PaymentMethodObj): Promise<void> {

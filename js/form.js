@@ -194,8 +194,22 @@
   // The URL determines the studio's region. Pre-select country accordingly and
   // filter the timezone select so only that country's options appear. Studios
   // can change country to switch the timezone list.
-  const COUNTRY_TO_REGION = { AU: 'AU', US: 'US', CA: 'US', UK: 'US' };
+  const COUNTRY_TO_REGION = { AU: 'AU', US: 'US', CA: 'US', UK: 'US', NZ: 'US', OTHER: 'US' };
   const REGION_DEFAULT_COUNTRY = { AU: 'AU', US: 'US' };
+  const KNOWN_COUNTRY_CODES = new Set(['AU', 'US', 'CA', 'UK', 'NZ']);
+
+  // The studio's effective country for pricing, summary, and submit. When the
+  // dropdown is set to OTHER we fall back to the manual text input so studios
+  // outside our supported list can still finish setup.
+  function getCountryValue() {
+    const cSel = document.getElementById('country');
+    if (!cSel) return '';
+    if (cSel.value === 'OTHER') {
+      const other = document.getElementById('countryOther');
+      return other ? (other.value || '').trim() : '';
+    }
+    return (cSel.value || '').trim();
+  }
 
   function applyCountryToTimezone() {
     const cSel = document.getElementById('country');
@@ -207,11 +221,15 @@
       US: 'United States',
       CA: 'Canada',
       UK: 'United Kingdom',
+      NZ: 'New Zealand',
     };
+    // OTHER: studio is outside our supported list — show every optgroup so they
+    // can pick the closest match instead of being locked out.
+    const showAll = country === 'OTHER';
     const wantedLabel = groupLabelByCountry[country];
     let firstVisibleValue = '';
     Array.from(tSel.querySelectorAll('optgroup')).forEach((og) => {
-      const show = og.label === wantedLabel;
+      const show = showAll || og.label === wantedLabel;
       og.style.display = show ? '' : 'none';
       og.disabled = !show;
       if (show && !firstVisibleValue) {
@@ -226,6 +244,17 @@
     }
   }
 
+  // Toggle visibility and required state of the manual "Other country" input.
+  function applyCountryOtherVisibility() {
+    const cSel = document.getElementById('country');
+    const other = document.getElementById('countryOther');
+    if (!cSel || !other) return;
+    const isOther = cSel.value === 'OTHER';
+    other.hidden = !isOther;
+    if (isOther) other.setAttribute('data-required', '');
+    else { other.removeAttribute('data-required'); other.value = ''; }
+  }
+
   function applyRegionDefaults() {
     // Pre-select the country dropdown to the URL's region default.
     const cSel = document.getElementById('country');
@@ -234,6 +263,7 @@
       cSel.value = def;
     }
     applyCountryToTimezone();
+    applyCountryOtherVisibility();
     applyRegionalCopy();
   }
 
@@ -570,6 +600,16 @@
         else if (el.type === 'url') bad = !isUrl(v);
         else if (el.id === 'website') bad = !looksLikeDomain(v);
         else if (el.id === 'col1t') bad = !isHex(v);
+        // The USD onboarding flow's free-text "Other country" must not be used
+        // to slip an AU studio onto USD pricing — or, more importantly, an AU
+        // studio onto the AUD package via a side door. AU studios must use the
+        // dedicated AU form. We reject any spelling of Australia here and ask
+        // them to switch flows.
+        else if (el.id === 'countryOther' && /^(au|aus|australia)$/i.test(v)) {
+          bad = true;
+          setFieldErr(el, true);
+          el.setCustomValidity && el.setCustomValidity('Australian studios must use our AU onboarding form.');
+        }
       }
       setFieldErr(el, bad);
       if (bad) {
@@ -948,7 +988,7 @@
     const svSetup = document.getElementById('sv-setup');
     if (svSetup) svSetup.innerHTML = setupFeeSummaryHtml();
     setSum('sv-studio', val('studioName'));
-    setSum('sv-country', val('country'));
+    setSum('sv-country', getCountryValue());
     const fn = val('firstName'), ln = val('lastName');
     setSum('sv-contact', (fn + ' ' + ln).trim() || 'Not provided');
     setSum('sv-email', val('contactEmail'));
@@ -991,7 +1031,7 @@
       setup_type: state.setup,
       studio_name: val('studioName'),
       legal_name: valOrNull('legalName'),
-      country: valOrNull('country'),
+      country: getCountryValue() || null,
       timezone: valOrNull('timezone'),
       studio_type: valOrNull('studioType'),
       address: valOrNull('address'),
@@ -1289,7 +1329,7 @@
       const r = await callFn('resolve-pricing', {
         plan: state.plan,
         setup_type: state.setup,
-        country: val('country') || (REGION === 'AU' ? 'AU' : ''),
+        country: getCountryValue() || (REGION === 'AU' ? 'AU' : ''),
         discount_code: pricingState.discountCode || null,
       });
       pricingState.fetching = false;
@@ -1943,6 +1983,19 @@
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
     ].forEach((id) => setVal(id, sub[idToColumn(id)]));
+    // Country may be a free-text value (when the studio picked "Other" and typed
+    // a country we don't list). Route those back to OTHER + manual input.
+    if (sub.country) {
+      const cSel = document.getElementById('country');
+      const cOther = document.getElementById('countryOther');
+      if (cSel) {
+        const known = Array.from(cSel.options).some((o) => o.value === sub.country);
+        if (!known && cOther) {
+          cSel.value = 'OTHER';
+          cOther.value = sub.country;
+        }
+      }
+    }
     // Two-line signature: split the legacy single-string column on newline so
     // older drafts hydrate cleanly into the new UI.
     if (sub.sign_off) {
@@ -1999,6 +2052,7 @@
       if (removeBtn) removeBtn.hidden = false;
     }
     applyCountryToTimezone();
+    applyCountryOtherVisibility();
   }
 
   // Mapping JS field IDs (camelCase) to DB column names (snake_case)
@@ -2114,7 +2168,7 @@
         const row = document.getElementById('twilioRow');
         if (row) row.style.display = t.checked ? '' : 'none';
       }
-      else if (t.id === 'country') applyCountryToTimezone();
+      else if (t.id === 'country') { applyCountryToTimezone(); applyCountryOtherVisibility(); }
     });
 
     document.addEventListener('input', (e) => {

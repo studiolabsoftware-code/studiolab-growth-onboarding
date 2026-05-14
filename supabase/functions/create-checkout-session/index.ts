@@ -9,7 +9,7 @@
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
-import { resolvePricing } from '../_shared/pricing.ts';
+import { resolvePricing, isAustralianFreeText } from '../_shared/pricing.ts';
 import { getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 
 type Submission = {
@@ -30,39 +30,118 @@ type PaymentSettings = {
   default_payment_mode: 'immediate' | 'hold' | 'save_card';
 };
 
+// Map our country codes to Stripe / ISO 3166-1 alpha-2. We store 'UK' for the
+// United Kingdom; Stripe expects 'GB'. 'OTHER' (free-text country) returns
+// null so we let Stripe Checkout's own billing-address form collect a real
+// ISO country from the studio — that's the only safe path for studios outside
+// our supported list, because guessing the ISO from a typed string is wrong.
+function isoCountryForStripe(stored: string | null | undefined): string | null {
+  if (!stored) return null;
+  const c = stored.trim().toUpperCase();
+  if (c === 'UK') return 'GB';
+  if (/^[A-Z]{2}$/.test(c)) return c;
+  return null;
+}
+
+// Patch our metadata + country onto an existing Stripe Customer. Used when we
+// link to a Customer that was created elsewhere (GHL SaaS Configurator) — we
+// augment rather than overwrite so GHL's own metadata keys survive untouched.
+async function augmentExistingCustomer(
+  customerId: string,
+  submission: Submission,
+  isoCountry: string | null,
+  secretKey: string,
+): Promise<void> {
+  const body: Record<string, unknown> = {
+    'metadata[submission_id]': submission.id,
+    'metadata[source]': 'studiolab-growth-setup',
+    'metadata[studio_name]': submission.studio_name || '',
+    'metadata[country_code]': isoCountry || submission.country || '',
+  };
+  if (isoCountry) body['address[country]'] = isoCountry;
+  await stripeRequest(
+    'POST',
+    `customers/${encodeURIComponent(customerId)}`,
+    body,
+    secretKey,
+  );
+}
+
 async function findOrCreateCustomer(
   submission: Submission,
   secretKey: string,
 ): Promise<{ id: string } | { error: string }> {
+  const isoCountry = isoCountryForStripe(submission.country);
+
   if (submission.stripe_customer_id) {
     // Trust the stored id; Stripe will fail loudly on the session create if
-    // it's stale and we'll surface that error.
+    // it's stale.
+    await augmentExistingCustomer(submission.stripe_customer_id, submission, isoCountry, secretKey);
     return { id: submission.stripe_customer_id };
   }
-  // Search by email metadata to dedupe across draft retries.
-  const search = await stripeRequest<{ data: Array<{ id: string }> }>(
+  // 1. Search by our submission_id metadata — handles draft retries on our side.
+  const bySubmission = await stripeRequest<{ data: Array<{ id: string }> }>(
     'GET',
     `customers/search?query=${encodeURIComponent(`metadata['submission_id']:'${submission.id}'`)}`,
     null,
     secretKey,
   );
-  if (search.ok && search.body.data && search.body.data.length) {
-    return { id: search.body.data[0].id };
+  if (bySubmission.ok && bySubmission.body.data && bySubmission.body.data.length) {
+    const existingId = bySubmission.body.data[0].id;
+    await augmentExistingCustomer(existingId, submission, isoCountry, secretKey);
+    return { id: existingId };
   }
+
+  // 2. Email lookup. The GHL SaaS Configurator creates the Stripe Customer
+  // first during signup; by the time the studio reaches our onboarding the
+  // Customer already exists. Email is the only consolidation lever we have
+  // because GHL's side is fixed-from-our-perspective. Case-insensitive exact
+  // match — Stripe's customers/search supports `email:` directly. If multiple
+  // Customers share the email (a GHL bug or a manual duplicate), we take the
+  // most recently updated one and rely on later admin tooling to merge.
+  const emailQ = `email:'${submission.contact_email.toLowerCase().replace(/'/g, "\\'")}'`;
+  const byEmail = await stripeRequest<{ data: Array<{ id: string; updated?: number; created?: number }> }>(
+    'GET',
+    `customers/search?query=${encodeURIComponent(emailQ)}`,
+    null,
+    secretKey,
+  );
+  if (byEmail.ok && byEmail.body.data && byEmail.body.data.length) {
+    const sorted = byEmail.body.data.slice().sort((a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0));
+    const chosen = sorted[0];
+    if (sorted.length > 1) {
+      console.warn('Multiple Stripe Customers found for email; linking to most recent', {
+        submission_id: submission.id,
+        email: submission.contact_email,
+        candidates: sorted.map((c) => c.id),
+        chosen: chosen.id,
+      });
+    }
+    await augmentExistingCustomer(chosen.id, submission, isoCountry, secretKey);
+    return { id: chosen.id };
+  }
+
+  // 3. No existing Customer — create one. Country is set so Stripe Tax can
+  // compute jurisdiction immediately; without it, automatic_tax returns 0
+  // for AU and we'd ship GST-less invoices.
   const fullName = [submission.first_name, submission.last_name].filter(Boolean).join(' ').trim()
     || submission.studio_name
     || submission.contact_email;
+  const createBody: Record<string, unknown> = {
+    email: submission.contact_email,
+    name: fullName,
+    metadata: {
+      submission_id: submission.id,
+      source: 'studiolab-growth-setup',
+      studio_name: submission.studio_name || '',
+      country_code: isoCountry || submission.country || '',
+    },
+  };
+  if (isoCountry) createBody['address[country]'] = isoCountry;
   const create = await stripeRequest<{ id: string }>(
     'POST',
     'customers',
-    {
-      email: submission.contact_email,
-      name: fullName,
-      metadata: {
-        submission_id: submission.id,
-        studio_name: submission.studio_name || '',
-      },
-    },
+    createBody,
     secretKey,
     `studiolab-customer-${submission.id}`,
   );
@@ -100,6 +179,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: 'This submission has already been paid.' }, 409);
     }
 
+    // Block AU studios that came through the USD flow by typing "Australia"
+    // into the Other-country box. Country='AU' is reserved for the AU form,
+    // which is region-locked at /au/[plan]/.
+    if (isAustralianFreeText(submission.country)) {
+      return jsonResponse({
+        ok: false,
+        error: 'Australian studios must use our AU onboarding form. Please email growth@studiolabgrowth.com if you reached this page in error.',
+        code: 'au_must_use_au_flow',
+      }, 400);
+    }
+
     // Resolve price using current catalog state.
     const pricing = await resolvePricing({
       plan: submission.plan,
@@ -133,23 +223,34 @@ Deno.serve(async (req) => {
     const fallbackOrigin = Deno.env.get('PUBLIC_APP_URL') || 'https://app.studiolabgrowth.com';
     const origin = /^https?:\/\//.test(returnOrigin) ? returnOrigin.replace(/\/$/, '') : fallbackOrigin;
 
-    // Build the Checkout Session. Inline price_data — Stripe Products carry
-    // names/descriptions for reporting only; the amount + currency live
-    // here, snapshotted from our catalog at this moment.
+    // Every catalog row must be synced to Stripe before checkout — that's
+    // what binds the AUD and USD product reports together. Refuse to fall
+    // back to inline product_data; an unsynced row is an admin bug, not a
+    // studio-facing failure mode to paper over.
+    if (!pricing.stripe_product_id) {
+      console.error('Product not synced to Stripe', {
+        product_id: pricing.product_id,
+        currency: pricing.currency,
+        country: submission.country,
+      });
+      return jsonResponse({
+        ok: false,
+        error: 'This plan is not available for checkout yet. Our team has been notified — please email growth@studiolabgrowth.com.',
+        code: 'product_not_synced',
+      }, 503);
+    }
+
+    // Build the Checkout Session. Inline price_data — the Stripe Product
+    // carries the name/description/tax_code for reporting; amount + currency
+    // are snapshotted from our catalog at this moment. The Product itself is
+    // currency-specific (one row per plan × setup × currency) so AU studios
+    // hit the AUD Product and US/Intl studios hit the USD Product.
     const lineItem: Record<string, unknown> = {
       quantity: 1,
       price_data: {
         currency: pricing.currency.toLowerCase(),
         unit_amount: pricing.final_amount_cents,
-        product_data: pricing.stripe_product_id ? undefined : {
-          name: pricing.product_name,
-          description: pricing.product_description || undefined,
-          tax_code: pricing.tax_code,
-          metadata: {
-            studiolab_product_id: pricing.product_id,
-          },
-        },
-        product: pricing.stripe_product_id || undefined,
+        product: pricing.stripe_product_id,
         tax_behavior: 'exclusive',
       },
     };
@@ -166,8 +267,16 @@ Deno.serve(async (req) => {
         payment_mode: paymentMode,
         product_id: pricing.product_id,
         currency: pricing.currency,
+        country: submission.country || '',
       },
       automatic_tax: { enabled: true },
+      // Force Stripe to confirm a billing address (and update the Customer
+      // record with whatever the studio enters) so Stripe Tax always has a
+      // jurisdiction. Without this, automatic_tax silently returns 0 if the
+      // address fields don't round-trip back to the Customer.
+      billing_address_collection: 'required',
+      customer_update: { address: 'auto', name: 'auto' },
+      tax_id_collection: { enabled: true },
     };
     if (!isSetup) {
       sessionPayload.line_items = [lineItem];

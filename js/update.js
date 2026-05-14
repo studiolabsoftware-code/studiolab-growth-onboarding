@@ -15,8 +15,10 @@
     // Studio details
     studio_name:        { label: 'Studio name', type: 'text', required: true },
     legal_name:         { label: 'Legal business name', type: 'text' },
-    country:            { label: 'Country', type: 'select', required: true,
-                          options: [['AU','Australia'],['US','United States'],['CA','Canada'],['UK','United Kingdom']] },
+    // Options are populated at render time from the studio's existing currency
+    // package: AUD studios can only select Australia, USD studios choose from
+    // US/Canada/UK/NZ or type a custom country via "Other".
+    country:            { label: 'Country', type: 'select', required: true, options: [] },
     timezone:           { label: 'Time zone', type: 'text' },
     studio_type:        { label: 'Studio type', type: 'text' },
     address:            { label: 'Studio address', type: 'text', required: true },
@@ -146,12 +148,37 @@
       const blank = document.createElement('option');
       blank.value = ''; blank.textContent = 'Select';
       input.appendChild(blank);
-      (def.options || []).forEach(([v, lbl]) => {
+      // Country options are package-scoped: AUD = Australia only; USD = the
+      // four supported English-speaking markets plus a manual "Other" entry.
+      let options = def.options || [];
+      if (key === 'country') {
+        const existing = (context.submission && context.submission.country) || '';
+        if (existing === 'AU') {
+          options = [['AU','Australia']];
+        } else {
+          options = [
+            ['US','United States'],
+            ['CA','Canada'],
+            ['UK','United Kingdom'],
+            ['NZ','New Zealand'],
+            ['OTHER','Other (enter below)'],
+          ];
+        }
+      }
+      let matched = false;
+      options.forEach(([v, lbl]) => {
         const opt = document.createElement('option');
         opt.value = v; opt.textContent = lbl;
-        if (current === v) opt.selected = true;
+        if (current === v) { opt.selected = true; matched = true; }
         input.appendChild(opt);
       });
+      // Country: if the stored value isn't a known code (and this is a USD
+      // studio), route to OTHER and pre-fill the manual input below.
+      const isUsdCountry = key === 'country' && (!context.submission || context.submission.country !== 'AU');
+      if (key === 'country' && !matched && current && isUsdCountry) {
+        const otherOpt = input.querySelector('option[value="OTHER"]');
+        if (otherOpt) otherOpt.selected = true;
+      }
     } else if (def.type === 'colour') {
       const cf = document.createElement('div');
       cf.className = 'cf';
@@ -194,6 +221,29 @@
     if (def.required) input.dataset.required = '';
     wrap.appendChild(input);
 
+    // Country (USD studios only): add a manual text input that shows whenever
+    // the select is on OTHER, so studios outside our supported list can still
+    // submit a real country name. collectValues() reads it via the same key.
+    if (key === 'country' && input.tagName === 'SELECT') {
+      const hasOther = !!input.querySelector('option[value="OTHER"]');
+      if (hasOther) {
+        const other = document.createElement('input');
+        other.type = 'text';
+        other.id = 'up-country-other';
+        other.placeholder = 'Country name';
+        other.setAttribute('autocomplete', 'country-name');
+        other.style.marginTop = '8px';
+        if (input.value !== 'OTHER') other.hidden = true;
+        else other.value = (current && current !== 'OTHER') ? current : '';
+        input.addEventListener('change', () => {
+          const isOther = input.value === 'OTHER';
+          other.hidden = !isOther;
+          if (!isOther) other.value = '';
+        });
+        wrap.appendChild(other);
+      }
+    }
+
     const err = document.createElement('span');
     err.className = 'field-err';
     err.id = errId;
@@ -221,6 +271,12 @@
         v = (wrap.querySelector('input[type="text"]').value || '').trim();
       } else {
         v = (wrap.querySelector('#up-' + CSS.escape(key))?.value || '').trim();
+      }
+
+      // Country: when the select is on OTHER, substitute the manually typed
+      // country name so we store a real value instead of the literal "OTHER".
+      if (key === 'country' && v === 'OTHER') {
+        v = (wrap.querySelector('#up-country-other')?.value || '').trim();
       }
 
       let bad = def.required && !v;

@@ -17,6 +17,16 @@ export function currencyForCountry(country: string | null | undefined): Currency
   return 'USD';
 }
 
+// True when a free-text country value implies Australia. Used as a server-side
+// guard so a US-flow studio can't slip into the AUD package by typing
+// "Australia" into the "Other country" input — AU studios must use the
+// dedicated AU onboarding flow which is region-locked to country='AU'.
+export function isAustralianFreeText(country: string | null | undefined): boolean {
+  if (!country) return false;
+  const c = country.trim().toUpperCase();
+  return c === 'AUS' || c === 'AUSTRALIA';
+}
+
 export type PricingResult = {
   ok: true;
   product_id: string;

@@ -170,24 +170,19 @@
             <label for="country">Country <span class="req">*</span></label>
             <select id="country" data-required>
               <option value="">Select</option>
-              <option value="AU">Australia</option>
               <option value="US">United States</option>
               <option value="CA">Canada</option>
-              <option value="NZ">New Zealand</option>
               <option value="UK">United Kingdom</option>
+              <option value="NZ">New Zealand</option>
+              <option value="OTHER">Other (enter below)</option>
             </select>
+            <input id="countryOther" type="text" placeholder="Country name" autocomplete="country-name" hidden style="margin-top:8px;">
             <span class="field-err">Please select your country.</span>
           </div>
           <div class="f">
             <label for="timezone">Time zone <span class="req">*</span></label>
             <select id="timezone" data-required>
               <option value="">Select</option>
-              <optgroup label="Australia">
-                <option value="Australia/Sydney">Sydney / Melbourne (AEST)</option>
-                <option value="Australia/Brisbane">Brisbane (AEST no DST)</option>
-                <option value="Australia/Perth">Perth (AWST)</option>
-                <option value="Australia/Adelaide">Adelaide (ACST)</option>
-              </optgroup>
               <optgroup label="United States">
                 <option value="America/New_York">Eastern Time (ET)</option>
                 <option value="America/Chicago">Central Time (CT)</option>
