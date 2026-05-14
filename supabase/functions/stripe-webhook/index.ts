@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
         await handleAmountCapturableUpdated(sb, event.data.object as PaymentIntent);
         break;
       case 'payment_intent.succeeded':
-        await handlePaymentIntentSucceeded(sb, event.data.object as PaymentIntent);
+        await handlePaymentIntentSucceeded(sb, event.data.object as PaymentIntent, stripeMode);
         break;
       case 'payment_intent.payment_failed':
         await handlePaymentIntentFailed(sb, event.data.object as PaymentIntent);
@@ -408,109 +408,137 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
     });
   } catch (e) { console.error('activity_log insert failed:', e); }
 
-  // Studio confirmation + admin notification emails. Gate on stripe_mode:
-  // in test/sandbox mode we DO NOT send to the real recipient addresses
-  // (would spam real studios and admins during testing). Instead, if
-  // STRIPE_TEST_EMAIL_RECIPIENT is set we redirect all payment emails to
-  // that address with a [TEST] prefix on the subject so the rendering can
-  // be reviewed without affecting real inboxes. If unset, we skip entirely
-  // and just log what would have been sent.
-  const studioName = (submission.studio_name as string) || 'there';
-  const ref = refFor(submission.id as string);
-  const includesGst = (currency || '').toUpperCase() === 'AUD';
-  const isLive = stripeMode === 'live';
+  // Receipts + admin notification + inbox post are handled by a shared
+  // helper that runs at most once per submission. See sendPaymentReceiptsOnce.
+  await sendPaymentReceiptsOnce(sb, {
+    submissionId: submission.id as string,
+    paymentMode,
+    amountCents,
+    currency,
+    stripeMode,
+    contactEmail: submission.contact_email as string | null,
+    studioName: (submission.studio_name as string) || null,
+    plan: submission.plan as string | null,
+    setupType: submission.setup_type as string | null,
+    invoiceHostedUrl: (submission.invoice_hosted_url as string | null) || null,
+  });
+}
+
+// ----------------------------------------------------------------------------
+// Shared post-payment notifications — runs at most once per submission
+// ----------------------------------------------------------------------------
+// Receipts can be triggered by either checkout.session.completed OR
+// payment_intent.succeeded depending on which event Stripe delivers first
+// (retries can scramble order). To guarantee exactly-once delivery, the
+// helper atomically claims submissions.receipts_sent_at with a conditional
+// UPDATE; only the first concurrent caller wins and proceeds to send.
+async function sendPaymentReceiptsOnce(
+  sb: Sb,
+  args: {
+    submissionId: string;
+    paymentMode: PaymentMode;
+    amountCents: number;
+    currency: string;
+    stripeMode: StripeMode;
+    contactEmail: string | null;
+    studioName: string | null;
+    plan: string | null;
+    setupType: string | null;
+    invoiceHostedUrl: string | null;
+  },
+): Promise<void> {
+  // Atomic claim — only the first caller succeeds in setting the timestamp.
+  // Subsequent callers see receipts_sent_at populated and select returns
+  // no row, so we bail without re-sending. Burns one read+write per attempt
+  // but guarantees correctness across retry storms and out-of-order events.
+  const { data: claimed, error: claimErr } = await sb.from('submissions')
+    .update({ receipts_sent_at: new Date().toISOString() })
+    .eq('id', args.submissionId)
+    .is('receipts_sent_at', null)
+    .select('id')
+    .maybeSingle();
+  if (claimErr) {
+    console.error('receipts claim update failed:', claimErr);
+    return;
+  }
+  if (!claimed) {
+    // Receipts already sent for this submission. Nothing to do.
+    return;
+  }
+
+  const ref = refFor(args.submissionId);
+  const studioName = args.studioName || 'there';
+  const includesGst = (args.currency || '').toUpperCase() === 'AUD';
+  const currency = args.currency || 'AUD';
+  const isLive = args.stripeMode === 'live';
   const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
 
-  async function sendGated(args: { to: string | string[]; subject: string; html: string; replyTo?: string; intent: string }) {
+  async function sendGated(g: { to: string | string[]; subject: string; html: string; replyTo?: string; intent: string }) {
     if (isLive) {
-      await sendEmail({ to: args.to, subject: args.subject, html: args.html, replyTo: args.replyTo });
+      await sendEmail({ to: g.to, subject: g.subject, html: g.html, replyTo: g.replyTo });
       return;
     }
-    // Test mode: optionally redirect to a single test recipient
     if (testRecipient) {
       await sendEmail({
         to: testRecipient,
-        subject: `[TEST · ${args.intent}] ${args.subject}`,
-        html: args.html,
-        replyTo: args.replyTo,
+        subject: `[TEST · ${g.intent}] ${g.subject}`,
+        html: g.html,
+        replyTo: g.replyTo,
       });
     } else {
-      console.log(`stripe-webhook: skipping ${args.intent} email in test mode (would send to ${Array.isArray(args.to) ? args.to.join(', ') : args.to})`);
+      console.log(`stripe-webhook: skipping ${g.intent} email in test mode (would send to ${Array.isArray(g.to) ? g.to.join(', ') : g.to})`);
     }
   }
 
+  // Studio receipt — mode-specific template
   try {
-    if (paymentMode === 'immediate') {
-      const t = paymentReceiptImmediate({
-        studioName,
-        ref,
-        amountCents,
-        currency: currency || 'AUD',
-        includesGst,
-        invoiceUrl: (submission.invoice_hosted_url as string | null) || null,
-      });
-      await sendGated({
-        to: submission.contact_email as string,
-        subject: t.subject,
-        html: t.html,
-        replyTo: 'growth@studiolabgrowth.com',
-        intent: 'studio receipt (immediate)',
-      });
-    } else if (paymentMode === 'hold') {
-      const t = paymentReceiptHold({ studioName, ref, amountCents, currency: currency || 'AUD', includesGst });
-      await sendGated({
-        to: submission.contact_email as string,
-        subject: t.subject,
-        html: t.html,
-        replyTo: 'growth@studiolabgrowth.com',
-        intent: 'studio receipt (hold)',
-      });
-    } else {
-      const t = paymentReceiptSaveCard({ studioName, ref, amountCents, currency: currency || 'AUD', includesGst });
-      await sendGated({
-        to: submission.contact_email as string,
-        subject: t.subject,
-        html: t.html,
-        replyTo: 'growth@studiolabgrowth.com',
-        intent: 'studio receipt (save card)',
-      });
+    if (args.contactEmail) {
+      if (args.paymentMode === 'immediate') {
+        const t = paymentReceiptImmediate({
+          studioName, ref,
+          amountCents: args.amountCents, currency, includesGst,
+          invoiceUrl: args.invoiceHostedUrl,
+        });
+        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'growth@studiolabgrowth.com', intent: 'studio receipt (immediate)' });
+      } else if (args.paymentMode === 'hold') {
+        const t = paymentReceiptHold({ studioName, ref, amountCents: args.amountCents, currency, includesGst });
+        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'growth@studiolabgrowth.com', intent: 'studio receipt (hold)' });
+      } else {
+        const t = paymentReceiptSaveCard({ studioName, ref, amountCents: args.amountCents, currency, includesGst });
+        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'growth@studiolabgrowth.com', intent: 'studio receipt (save card)' });
+      }
     }
   } catch (e) { console.error('studio receipt email failed:', e); }
 
-  // Admin notification.
+  // Admin notification
   try {
     const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
     if (admins && admins.length) {
       const t = adminPaymentLanded({
-        studioName: (submission.studio_name as string) || '(no name)',
-        plan: PLAN_LABEL[submission.plan as string] || (submission.plan as string),
-        setup: SETUP_LABEL[submission.setup_type as string] || (submission.setup_type as string),
-        mode: paymentMode,
-        amountCents,
-        currency: currency || 'AUD',
+        studioName: args.studioName || '(no name)',
+        plan: PLAN_LABEL[args.plan || ''] || (args.plan || ''),
+        setup: SETUP_LABEL[args.setupType || ''] || (args.setupType || ''),
+        mode: args.paymentMode,
+        amountCents: args.amountCents,
+        currency,
         includesGst,
-        adminUrl: adminUrlFor(submission.id as string),
+        adminUrl: adminUrlFor(args.submissionId),
       });
-      await sendGated({
-        to: admins.map((a) => a.email),
-        subject: t.subject,
-        html: t.html,
-        intent: 'admin notification',
-      });
+      await sendGated({ to: admins.map((a) => a.email), subject: t.subject, html: t.html, intent: 'admin notification' });
     }
   } catch (e) { console.error('admin notification failed:', e); }
 
-  // Append a system event to the studio's conversation timeline.
+  // Inbox system message
   try {
     const { postSystemMessage } = await import('../_shared/inbox.ts');
-    const amountDisplay = `${currency || 'AUD'} $${(amountCents / 100).toFixed(2)}`;
-    const verb = paymentMode === 'immediate' ? 'Payment received'
-              : paymentMode === 'hold' ? 'Card authorised'
+    const amountDisplay = `${currency} $${(args.amountCents / 100).toFixed(2)}`;
+    const verb = args.paymentMode === 'immediate' ? 'Payment received'
+              : args.paymentMode === 'hold' ? 'Card authorised'
               : 'Card saved';
     await postSystemMessage(
       sb,
-      submission.id as string,
-      (submission.studio_name as string) || null,
+      args.submissionId,
+      args.studioName,
       `💳 ${verb} — ${amountDisplay}`,
     );
   } catch (e) { console.error('system message (payment) failed:', e); }
@@ -558,42 +586,61 @@ async function handleAmountCapturableUpdated(sb: Sb, pi: PaymentIntent): Promise
   await sb.from('submissions').update(update).eq('id', submission.id);
 }
 
-async function handlePaymentIntentSucceeded(sb: Sb, pi: PaymentIntent): Promise<void> {
+async function handlePaymentIntentSucceeded(sb: Sb, pi: PaymentIntent, stripeMode: StripeMode): Promise<void> {
   const submission = await resolveSubmissionFromMetadata(sb, pi.metadata)
     || await submissionByPaymentIntentId(sb, pi.id);
   if (!submission) return;
 
-  // In immediate mode this event arrives alongside checkout.session.completed,
-  // which already set payment_status='paid' and logged 'payment_captured'.
-  // Treat that case as a no-op so we do not duplicate the log row.
-  if (submission.payment_status === 'paid') return;
+  const wasAlreadyPaid = submission.payment_status === 'paid';
 
-  const nowIso = new Date().toISOString();
-  const update: Record<string, unknown> = {
-    stripe_payment_intent_id: pi.id,
-    payment_status: 'paid',
-    captured_at: nowIso,
-    paid_at: submission.paid_at || nowIso,
-    last_charge_attempt_at: nowIso,
-    charge_failure_reason: null,
-  };
-  if (pi.amount_received) update.amount_paid_cents = pi.amount_received;
-  if (pi.currency) update.currency = pi.currency.toUpperCase();
+  // Update the submission's status fields. Idempotent: if already paid we
+  // skip the status flip but still call the receipt helper at the end —
+  // the helper is itself one-shot via receipts_sent_at, so a no-op there is
+  // safe.
+  if (!wasAlreadyPaid) {
+    const nowIso = new Date().toISOString();
+    const update: Record<string, unknown> = {
+      stripe_payment_intent_id: pi.id,
+      payment_status: 'paid',
+      captured_at: nowIso,
+      paid_at: submission.paid_at || nowIso,
+      last_charge_attempt_at: nowIso,
+      charge_failure_reason: null,
+    };
+    if (pi.amount_received) update.amount_paid_cents = pi.amount_received;
+    if (pi.currency) update.currency = pi.currency.toUpperCase();
 
-  await sb.from('submissions').update(update).eq('id', submission.id);
+    await sb.from('submissions').update(update).eq('id', submission.id);
 
-  try {
-    await sb.from('activity_log').insert({
-      submission_id: submission.id,
-      action: 'payment_captured',
-      actor: 'stripe',
-      details: {
-        payment_intent_id: pi.id,
-        amount_received: pi.amount_received,
-        currency: pi.currency,
-      },
-    });
-  } catch (e) { console.error('activity_log insert failed:', e); }
+    try {
+      await sb.from('activity_log').insert({
+        submission_id: submission.id,
+        action: 'payment_captured',
+        actor: 'stripe',
+        details: {
+          payment_intent_id: pi.id,
+          amount_received: pi.amount_received,
+          currency: pi.currency,
+        },
+      });
+    } catch (e) { console.error('activity_log insert failed:', e); }
+  }
+
+  // Fire receipts. Safe to call regardless of which event handler wins the
+  // race — the helper atomically claims submissions.receipts_sent_at and
+  // bails if another caller already sent receipts for this submission.
+  await sendPaymentReceiptsOnce(sb, {
+    submissionId: submission.id as string,
+    paymentMode: (submission.payment_mode as PaymentMode | null) || 'immediate',
+    amountCents: pi.amount_received || (submission.amount_paid_cents as number | null) || 0,
+    currency: (pi.currency || '').toUpperCase() || (submission.currency as string | null) || 'AUD',
+    stripeMode,
+    contactEmail: submission.contact_email as string | null,
+    studioName: (submission.studio_name as string) || null,
+    plan: submission.plan as string | null,
+    setupType: submission.setup_type as string | null,
+    invoiceHostedUrl: (submission.invoice_hosted_url as string | null) || null,
+  });
 }
 
 async function handlePaymentIntentFailed(sb: Sb, pi: PaymentIntent): Promise<void> {
