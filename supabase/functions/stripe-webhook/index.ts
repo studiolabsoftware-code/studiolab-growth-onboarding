@@ -311,13 +311,17 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
     return;
   }
 
-  // Idempotency at the application level — if the submission is already
-  // past 'pending', another delivery has already moved it. Bail early.
-  if (submission.payment_status === 'paid'
-      || submission.payment_status === 'authorised'
-      || submission.payment_status === 'card_saved') {
-    return;
-  }
+  // No early-return on already-paid status. Event delivery is unordered,
+  // so checkout.session.completed can arrive AFTER payment_intent.succeeded
+  // has already flipped payment_status to 'paid'. If we bail here, we miss
+  // writing stripe_payment_intent_id (which the invoice classifier needs to
+  // attribute the invoice to our submission) and miss stamping submitted_at.
+  // Instead, every UPDATE below uses '|| existing' so re-running is safe;
+  // receipts are deduplicated via receipts_sent_at; the activity_log insert
+  // is wrapped in try/catch and an alreadyLoggedThisAction guard.
+  const alreadyPaid = submission.payment_status === 'paid'
+    || submission.payment_status === 'authorised'
+    || submission.payment_status === 'card_saved';
 
   const modeFromMeta = (session.metadata?.payment_mode as PaymentMode | undefined);
   const paymentMode: PaymentMode = modeFromMeta
@@ -325,20 +329,23 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
     || (session.mode === 'setup' ? 'save_card' : 'immediate');
 
   const nowIso = new Date().toISOString();
+
+  // Identity + bookkeeping fields. These are always safe to (re-)write:
+  // * status is 'submitted' or beyond — never regress
+  // * submitted_at is COALESCE-style so we don't overwrite an earlier stamp
+  // * payment_mode is sticky once set
+  // * stripe_payment_intent_id is the critical one — without this set, the
+  //   invoice.finalized handler can't classify the invoice as ours
+  // * stripe_invoice_id is similar
+  // * session token is always burned post-checkout
   const update: Record<string, unknown> = {
     status: 'submitted',
     submitted_at: submission.submitted_at || nowIso,
-    payment_mode: paymentMode,
-    // Burn the studio's session token now that payment has landed — they
-    // can no longer edit the draft.
+    payment_mode: submission.payment_mode || paymentMode,
     session_token_hash: null,
     session_expires_at: null,
   };
 
-  // We need the studio-facing amount in their currency for the receipt. For
-  // payment-mode sessions Stripe gives us amount_total + total_details on the
-  // session; for setup-mode there is no amount on the session, so we fall
-  // back to the snapshot in submission_pricing.
   let amountCents = 0;
   let currency = (session.currency || '').toUpperCase() || (submission.currency as string | null) || '';
   let taxCents: number | null = null;
@@ -346,32 +353,37 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
   if (session.mode === 'payment') {
     amountCents = session.amount_total ?? 0;
     taxCents = session.total_details?.amount_tax ?? null;
+    // Always write the linkage fields — without these set, invoice events
+    // can't classify their invoice as ours and silently drop.
     if (session.payment_intent) update.stripe_payment_intent_id = session.payment_intent;
     if (session.invoice) update.stripe_invoice_id = session.invoice;
-    update.amount_paid_cents = amountCents;
-    if (currency) update.currency = currency;
-    if (taxCents !== null) update.tax_amount_cents = taxCents;
+    if (!submission.amount_paid_cents && amountCents) update.amount_paid_cents = amountCents;
+    if (currency && !submission.currency) update.currency = currency;
+    if (taxCents !== null && submission.tax_amount_cents == null) update.tax_amount_cents = taxCents;
 
-    if (paymentMode === 'immediate') {
-      update.payment_status = 'paid';
-      update.paid_at = nowIso;
-      update.captured_at = nowIso;
-    } else if (paymentMode === 'hold') {
-      update.payment_status = 'authorised';
-      // Stripe's default uncaptured PaymentIntent expires after 7 days.
-      // Capture before then or the auth releases automatically.
-      update.authorization_expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Status flip + timestamps — only on the FIRST event that promotes us
+    // past 'pending'. If a sibling event already moved us, leave the
+    // existing stamp alone.
+    if (!alreadyPaid) {
+      if (paymentMode === 'immediate') {
+        update.payment_status = 'paid';
+        update.paid_at = nowIso;
+        update.captured_at = nowIso;
+      } else if (paymentMode === 'hold') {
+        update.payment_status = 'authorised';
+        update.authorization_expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      }
     }
   } else if (session.mode === 'setup') {
-    update.payment_status = 'card_saved';
-    update.card_saved_at = nowIso;
-    // Fetch the SetupIntent to record the saved payment method id — Stripe
-    // does not include payment_method on the session object directly.
+    if (!alreadyPaid) {
+      update.payment_status = 'card_saved';
+      update.card_saved_at = nowIso;
+    }
     if (session.setup_intent) {
       try {
         const secretKey = getStripeKey(stripeMode);
         const si = await stripeRequest<SetupIntent>('GET', `setup_intents/${session.setup_intent}`, null, secretKey);
-        if (si.ok && si.body.payment_method) {
+        if (si.ok && si.body.payment_method && !submission.payment_method_id) {
           update.payment_method_id = si.body.payment_method;
         }
       } catch (e) {
@@ -382,19 +394,21 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
     if (snap) {
       amountCents = snap.final_amount_cents;
       currency = snap.currency;
-      update.currency = currency;
+      if (!submission.currency) update.currency = currency;
     }
   }
 
   const { error: updErr } = await sb.from('submissions').update(update).eq('id', submission.id);
   if (updErr) throw updErr;
 
-  // Activity log row — action type depends on mode.
+  // Activity log row — action type depends on mode. Skip if already paid
+  // because a sibling event (payment_intent.succeeded) has already logged
+  // the state transition and we'd just be duplicating.
   const action = paymentMode === 'immediate' ? 'payment_captured'
     : paymentMode === 'hold' ? 'payment_authorised'
     : 'payment_card_saved';
   try {
-    await sb.from('activity_log').insert({
+    if (!alreadyPaid) await sb.from('activity_log').insert({
       submission_id: submission.id,
       action,
       actor: submission.contact_email || 'stripe',
@@ -765,9 +779,22 @@ async function classifyInvoice(
   const prior = await submissionByInvoiceId(sb, invoice.id);
   if (prior) return { ours: true, source: 'studiolab-growth-setup' };
 
-  // 5. Last resort: if the customer is one of ours but nothing links the
-  // invoice to us, assume it's a GHL invoice on the shared customer and
-  // skip. Better to under-process than to claim a foreign invoice.
+  // 5. Customer-based match. invoice.customer maps to a submission's
+  // stripe_customer_id and the invoice has no subscription (branch 1
+  // already filtered subscriptions), so this is one of our one-shot
+  // invoices arriving before its PI got stored on the submission row.
+  // Safe because GHL subscription invoices always carry invoice.subscription
+  // and would have bailed at branch 1.
+  if (invoice.customer) {
+    const { data: byCustomer } = await sb.from('submissions')
+      .select('id')
+      .eq('stripe_customer_id', invoice.customer)
+      .limit(1)
+      .maybeSingle();
+    if (byCustomer) return { ours: true, source: 'studiolab-growth-setup' };
+  }
+
+  // 6. Last resort: nothing links the invoice to us. Skip.
   return { ours: false, reason: 'no_link_to_studiolab_growth' };
 }
 
