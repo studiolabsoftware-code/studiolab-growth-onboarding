@@ -92,9 +92,11 @@
   if (signOutBtn) {
     signOutBtn.addEventListener('click', function () {
       try { localStorage.removeItem(SESSION_KEY); } catch (_) { /* ignore */ }
-      // Use href (not replace) so the studio can use the browser back
-      // button to return if they signed out by mistake.
-      window.location.href = '/';
+      // Land on the OTP sign-in page rather than the public gate page.
+      // From /setup/ the studio can immediately enter an email to re-auth
+      // (their own or a different studio) without re-finding the welcome
+      // email. href (not replace) so back-button still works.
+      window.location.href = '/setup/';
     });
   }
   const PLAN_LABEL = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
