@@ -710,7 +710,7 @@ async function upsertInvoiceLedger(
   eventType: string,
   eventId: string,
   eventPayload: unknown,
-): Promise<void> {
+): Promise<{ id: string; external_contact_id: string | null } | null> {
   const status = normaliseInvoiceStatus(invoice.status);
   const totalDiscount = (invoice.total_discount_amounts || []).reduce((sum, d) => sum + (d.amount || 0), 0);
   const kind = source === 'studiolab-growth-quote'
@@ -719,8 +719,19 @@ async function upsertInvoiceLedger(
       ? 'custom_charge'
       : 'setup_invoice';
 
-  const row = {
-    submission_id: submissionId,
+  // Look up the existing row (if any) so we can preserve identity columns
+  // that create-custom-invoice or create-quote set at issue time but the
+  // webhook does not know about (submission_id when not findable from PI,
+  // and external_contact_id which never appears in Stripe metadata fields
+  // we read here).
+  const { data: existing } = await sb.from('invoices')
+    .select('id, submission_id, external_contact_id')
+    .eq('stripe_invoice_id', invoice.id)
+    .maybeSingle();
+
+  const row: Record<string, unknown> = {
+    submission_id: submissionId ?? existing?.submission_id ?? null,
+    external_contact_id: existing?.external_contact_id ?? null,
     stripe_invoice_id: invoice.id,
     stripe_payment_intent_id: invoice.payment_intent,
     stripe_customer_id: invoice.customer,
@@ -749,11 +760,11 @@ async function upsertInvoiceLedger(
   // attempt to change source on an existing row — that's intentional.
   const { data: upserted, error } = await sb.from('invoices')
     .upsert(row, { onConflict: 'stripe_invoice_id' })
-    .select('id')
+    .select('id, external_contact_id')
     .single();
   if (error) {
     console.error('invoices upsert failed:', error, { invoice_id: invoice.id, event: eventType });
-    return;
+    return null;
   }
 
   // Audit row in invoice_events. Idempotent on (invoice_id, stripe_event_id).
@@ -765,6 +776,27 @@ async function upsertInvoiceLedger(
       payload: eventPayload,
     });
   }
+  return upserted as { id: string; external_contact_id: string | null };
+}
+
+// Bump external_contacts totals when an external invoice is paid or refunded.
+// Best-effort; failures are logged and swallowed so a totals mismatch never
+// blocks the primary ledger update.
+async function bumpExternalContactOnPayment(
+  sb: Sb,
+  externalContactId: string,
+  paidCents: number,
+): Promise<void> {
+  try {
+    const { data: c } = await sb.from('external_contacts')
+      .select('total_paid_cents')
+      .eq('id', externalContactId)
+      .maybeSingle();
+    await sb.from('external_contacts').update({
+      total_paid_cents: (c?.total_paid_cents || 0) + paidCents,
+      last_paid_at: new Date().toISOString(),
+    }).eq('id', externalContactId);
+  } catch (e) { console.error('external_contacts paid update failed:', e); }
 }
 
 async function logActivityForInvoice(
@@ -802,7 +834,7 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
     submission = await submissionByInvoiceId(sb, invoice.id);
   }
 
-  await upsertInvoiceLedger(
+  const ledger = await upsertInvoiceLedger(
     sb,
     invoice,
     classification.source,
@@ -811,6 +843,25 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
     eventId,
     eventPayload,
   );
+
+  // External-contact totals bump on payment_succeeded.
+  if (eventType === 'invoice.payment_succeeded' && ledger?.external_contact_id) {
+    await bumpExternalContactOnPayment(sb, ledger.external_contact_id, invoice.amount_paid ?? 0);
+    try {
+      await sb.from('activity_log').insert({
+        submission_id: null,
+        action: 'external_contact_paid',
+        actor: 'stripe',
+        details: {
+          external_contact_id: ledger.external_contact_id,
+          invoice_id: invoice.id,
+          number: invoice.number,
+          amount_paid_cents: invoice.amount_paid,
+          currency: invoice.currency,
+        },
+      });
+    } catch (e) { console.error('activity_log insert failed:', e); }
+  }
 
   if (submission) {
     await sb.from('submissions').update({
