@@ -46,6 +46,9 @@ Deno.serve(async (req) => {
         await sendEmail({ to: args.to, subject: args.subject, html: args.html, replyTo: args.replyTo });
         return;
       }
+      // Test mode default: send to real recipients (paired with Gmail
+      // aliases for studio test addresses). STRIPE_TEST_EMAIL_RECIPIENT
+      // remains as an opt-in funnel if you want all test mail in one inbox.
       if (testRecipient) {
         await sendEmail({
           to: testRecipient,
@@ -54,7 +57,7 @@ Deno.serve(async (req) => {
           replyTo: args.replyTo,
         });
       } else {
-        console.log(`on-submission: skipping ${args.intent} email in test mode (would send to ${Array.isArray(args.to) ? args.to.join(', ') : args.to})`);
+        await sendEmail({ to: args.to, subject: args.subject, html: args.html, replyTo: args.replyTo });
       }
     }
 

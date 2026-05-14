@@ -480,6 +480,11 @@ async function sendPaymentReceiptsOnce(
       await sendEmail({ to: g.to, subject: g.subject, html: g.html, replyTo: g.replyTo });
       return;
     }
+    // Test mode. Opt-in redirect is for situations where you want to
+    // funnel all test emails to a single inbox (e.g. shared QA mailbox).
+    // Default behaviour is now "send to the real recipient" — paired with
+    // Gmail aliases (foo+bar@gmail.com) for studio test addresses, the
+    // realistic flow exercises Mailgun + email routing properly.
     if (testRecipient) {
       await sendEmail({
         to: testRecipient,
@@ -488,7 +493,7 @@ async function sendPaymentReceiptsOnce(
         replyTo: g.replyTo,
       });
     } else {
-      console.log(`stripe-webhook: skipping ${g.intent} email in test mode (would send to ${Array.isArray(g.to) ? g.to.join(', ') : g.to})`);
+      await sendEmail({ to: g.to, subject: g.subject, html: g.html, replyTo: g.replyTo });
     }
   }
 
