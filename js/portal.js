@@ -7,6 +7,29 @@
 
   const FN_BASE = 'https://hiaruvsdamggenhqdvtp.supabase.co/functions/v1/';
 
+  // Mirror upload-submission-attachment's allowlist + caps. The form
+  // attachments widget enforces the same constraints (js/form-attachments.js)
+  // so studios get a consistent UX whichever surface they're on.
+  const MAX_FILES_PER_MESSAGE = 5;
+  const MAX_BYTES = 25 * 1024 * 1024;
+  const ACCEPT_MIME = [
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'image/svg+xml',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+  ];
+  const ACCEPT_ATTR =
+    '.pdf,.png,.jpg,.jpeg,.svg,.docx,.doc,.xlsx,.xls,' +
+    'application/pdf,image/png,image/jpeg,image/svg+xml,' +
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document,' +
+    'application/msword,' +
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,' +
+    'application/vnd.ms-excel';
+
   const state = {
     conv: null,
     submission: null,
@@ -51,10 +74,10 @@
       e.preventDefault();
       load();
     });
+    $('portalFileInput').setAttribute('accept', ACCEPT_ATTR);
     $('portalFileInput').addEventListener('change', () => {
-      for (const f of $('portalFileInput').files) state.pendingFiles.push(f);
+      addPendingFiles($('portalFileInput').files);
       $('portalFileInput').value = '';
-      renderFileList();
     });
     $('portalFiles').addEventListener('click', (e) => {
       const rm = e.target.closest('[data-rm]'); if (!rm) return;
@@ -132,8 +155,15 @@
     errEl.textContent = '';
     const body = $('portalBody').value;
     if (!body.trim() && !state.pendingFiles.length) { errEl.textContent = 'Type a message or attach a file first.'; return; }
-    const oversize = state.pendingFiles.find((f) => f.size > 10 * 1024 * 1024);
-    if (oversize) { errEl.textContent = `"${oversize.name}" exceeds the 10 MB limit. Compress or send a download link.`; return; }
+    const oversize = state.pendingFiles.find((f) => f.size > MAX_BYTES);
+    if (oversize) {
+      errEl.textContent = `"${oversize.name}" is over the ${MAX_BYTES / 1024 / 1024} MB limit. Compress it or send a download link instead.`;
+      return;
+    }
+    if (state.pendingFiles.length > MAX_FILES_PER_MESSAGE) {
+      errEl.textContent = `You can attach up to ${MAX_FILES_PER_MESSAGE} files per message. Remove a few and try again.`;
+      return;
+    }
     btn.disabled = true;
     const senderName = state.submission?.studio_name || null;
     const senderEmail = state.submission?.contact_email || null;
@@ -157,6 +187,10 @@
     scrollMsgsToBottom();
   }
 
+  // Phase 2B: uploads now go to upload-submission-attachment with the
+  // conversation token auth path. The legacy portal-attach function is
+  // no longer called from the live UI but is preserved for historical
+  // data display via the 'legacy' source tag on existing chips.
   async function uploadFiles(messageId, files) {
     const failures = [];
     for (const file of files) {
@@ -166,12 +200,46 @@
       fd.append('message_id', messageId);
       fd.append('file', file);
       try {
-        const resp = await fetch(FN_BASE + 'portal-attach', { method: 'POST', body: fd });
+        const resp = await fetch(FN_BASE + 'upload-submission-attachment', { method: 'POST', body: fd });
         const data = await resp.json().catch(() => ({}));
-        if (!resp.ok || data?.ok === false) failures.push(file.name);
+        if (!resp.ok || data?.ok === false) {
+          failures.push(`${file.name}${data?.error ? ` (${data.error})` : ''}`);
+        }
       } catch (_) { failures.push(file.name); }
     }
     return failures.length ? failures.join(', ') : null;
+  }
+
+  // Client-side pre-checks so the studio sees instant feedback instead of
+  // a server error after picking the wrong file. Server still gates these.
+  function addPendingFiles(fileList) {
+    const errEl = $('portalErr');
+    const cap = MAX_FILES_PER_MESSAGE - state.pendingFiles.length;
+    if (cap <= 0) {
+      errEl.textContent = `You've hit the ${MAX_FILES_PER_MESSAGE}-file limit. Remove one to add another.`;
+      return;
+    }
+    let firstError = '';
+    let added = 0;
+    for (const f of Array.from(fileList)) {
+      if (added >= cap) {
+        firstError = firstError || `Only ${cap} more file${cap === 1 ? '' : 's'} fit before the ${MAX_FILES_PER_MESSAGE}-file limit.`;
+        break;
+      }
+      if (f.size <= 0) { firstError = firstError || `${f.name} is empty.`; continue; }
+      if (f.size > MAX_BYTES) {
+        firstError = firstError || `${f.name} is over the ${MAX_BYTES / 1024 / 1024} MB limit.`;
+        continue;
+      }
+      if (f.type && ACCEPT_MIME.indexOf(f.type) === -1) {
+        firstError = firstError || `${f.name} isn't a supported file type. We accept PDF, PNG, JPG, SVG, DOCX, DOC, XLSX, XLS.`;
+        continue;
+      }
+      state.pendingFiles.push(f);
+      added++;
+    }
+    errEl.textContent = firstError;
+    renderFileList();
   }
 
   // ------------------------------------------------------------------
@@ -195,14 +263,21 @@
       return;
     }
     host.innerHTML = state.messages.map(renderMsg).join('');
-    // Wire attachment downloads.
-    host.querySelectorAll('[data-storage-path]').forEach((el) => {
+    // Wire attachment downloads. Two sources: legacy message_attachments
+    // signs by storage_path; new submission_attachments signs by attachment_id.
+    host.querySelectorAll('[data-att-source]').forEach((el) => {
       el.addEventListener('click', async (e) => {
         e.preventDefault();
-        const path = el.getAttribute('data-storage-path');
-        const res = await api('sign-url', { storage_path: path });
-        if (!res.ok || !res.data?.signed_url) { alert('Could not generate download link.'); return; }
-        window.open(res.data.signed_url, '_blank', 'noopener');
+        const source = el.getAttribute('data-att-source');
+        let res;
+        if (source === 'submission') {
+          res = await api('attachment-url', { attachment_id: el.getAttribute('data-att-id') });
+        } else {
+          res = await api('sign-url', { storage_path: el.getAttribute('data-storage-path') });
+        }
+        const url = res.data?.url || res.data?.signed_url;
+        if (!res.ok || !url) { alert('Could not generate download link.'); return; }
+        window.open(url, '_blank', 'noopener');
       });
     });
     scrollMsgsToBottom();
@@ -215,7 +290,13 @@
     const who = isStudio ? (m.sender_name || 'You') : (isSystem ? '' : (m.sender_name || 'StudioLAB Growth'));
     const ts = new Date(m.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Australia/Sydney' });
     const body = m.body_html || textToHtml(m.body_text || '');
-    const atts = (m.attachments || []).map((a) => `<a class="portal-att" href="#" data-storage-path="${escapeHtml(a.storage_path)}">📎 ${escapeHtml(a.filename)} <span class="portal-att-size">${formatBytes(a.size_bytes)}</span></a>`).join('');
+    const atts = (m.attachments || []).map((a) => {
+      const isNew = a.source === 'submission';
+      const ref = isNew
+        ? `data-att-source="submission" data-att-id="${escapeHtml(a.id)}"`
+        : `data-att-source="legacy" data-storage-path="${escapeHtml(a.storage_path)}"`;
+      return `<a class="portal-att" href="#" ${ref}>📎 ${escapeHtml(a.filename)} <span class="portal-att-size">${formatBytes(a.size_bytes)}</span></a>`;
+    }).join('');
     if (isSystem) {
       return `<div class="portal-msg-system-row"><span class="portal-msg-system-dot">●</span> <span>${body}</span> <span class="portal-msg-system-when">${escapeHtml(ts)}</span></div>`;
     }
@@ -236,7 +317,7 @@
     const host = $('portalFiles');
     if (!state.pendingFiles.length) { host.innerHTML = ''; return; }
     host.innerHTML = state.pendingFiles.map((f, i) => {
-      const over = f.size > 10 * 1024 * 1024;
+      const over = f.size > MAX_BYTES;
       return `<span class="portal-file${over ? ' oversize' : ''}">📎 ${escapeHtml(f.name)} <span class="portal-file-size">${formatBytes(f.size)}</span>${over ? ' <span class="portal-file-warn">too large</span>' : ''} <button type="button" data-rm="${i}" aria-label="Remove">×</button></span>`;
     }).join('');
   }

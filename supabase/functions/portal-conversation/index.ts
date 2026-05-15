@@ -10,10 +10,16 @@
 //   'send'       — body: { body_text }. Inserts a studio-role message.
 //   'mark-read'  — zeroes studio_unread_count.
 //   'sign-url'   — body: { storage_path }. Returns a signed URL valid for
-//                  10 min so the studio can download an attachment.
+//                  10 min so the studio can download a legacy
+//                  message_attachments file.
+//   'attachment-url' — body: { attachment_id }. Returns a signed URL
+//                  (5 min) for a submission_attachments row attached to
+//                  a studio-visible message in this conversation.
 //
-// Attachment UPLOADS use a separate function (portal-attach) because they
-// are multipart/form-data; everything here is JSON.
+// Attachment UPLOADS for new messages go to upload-submission-attachment
+// (multipart) using the conversation token auth path. The legacy
+// portal-attach function still exists for historical compatibility but
+// is no longer wired into the live UI.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
@@ -35,11 +41,12 @@ Deno.serve(async (req) => {
     if (!auth.ok) return jsonResponse({ ok: false, error: 'Invalid or revoked link.' }, 401);
 
     switch (action) {
-      case 'load':     return await actLoad(sb, conversation_id, auth.submissionId!);
-      case 'send':     return await actSend(sb, conversation_id, payload, req);
-      case 'mark-read':return await actMarkRead(sb, conversation_id);
-      case 'sign-url': return await actSignUrl(sb, conversation_id, payload);
-      default:         return jsonResponse({ ok: false, error: 'Unknown action.' }, 400);
+      case 'load':           return await actLoad(sb, conversation_id, auth.submissionId!);
+      case 'send':           return await actSend(sb, conversation_id, payload, req);
+      case 'mark-read':      return await actMarkRead(sb, conversation_id);
+      case 'sign-url':       return await actSignUrl(sb, conversation_id, payload);
+      case 'attachment-url': return await actAttachmentUrl(sb, conversation_id, payload);
+      default:               return jsonResponse({ ok: false, error: 'Unknown action.' }, 400);
     }
   } catch (err) {
     console.error('portal-conversation error:', err);
@@ -63,15 +70,40 @@ async function actLoad(sb: any, conversationId: string, submissionId: string) {
       .order('created_at', { ascending: true }),
   ]);
 
-  // Pull attachments in a second round.
+  // Pull attachments from both tables and merge per message:
+  //   - message_attachments (legacy)        → source: 'legacy', download by storage_path
+  //   - submission_attachments (Phase 2B+)  → source: 'submission', download by attachment_id
+  // Both render as chips client-side; the source tag picks the download path.
   const msgIds = (msgs || []).map((m: any) => m.id);
-  let attsByMsg: Record<string, any[]> = {};
+  const attsByMsg: Record<string, any[]> = {};
   if (msgIds.length) {
-    const { data: atts } = await sb.from('message_attachments')
-      .select('id, message_id, storage_path, filename, content_type, size_bytes')
-      .in('message_id', msgIds);
-    (atts || []).forEach((a: any) => {
-      (attsByMsg[a.message_id] = attsByMsg[a.message_id] || []).push(a);
+    const [legacyRes, newRes] = await Promise.all([
+      sb.from('message_attachments')
+        .select('id, message_id, storage_path, filename, content_type, size_bytes')
+        .in('message_id', msgIds),
+      sb.from('submission_attachments')
+        .select('id, message_id, file_name, mime_type, size_bytes, uploaded_at')
+        .in('message_id', msgIds),
+    ]);
+    (legacyRes.data || []).forEach((a: any) => {
+      (attsByMsg[a.message_id] = attsByMsg[a.message_id] || []).push({
+        source: 'legacy',
+        id: a.id,
+        storage_path: a.storage_path,
+        filename: a.filename,
+        content_type: a.content_type,
+        size_bytes: a.size_bytes,
+      });
+    });
+    (newRes.data || []).forEach((a: any) => {
+      (attsByMsg[a.message_id] = attsByMsg[a.message_id] || []).push({
+        source: 'submission',
+        id: a.id,
+        filename: a.file_name,
+        content_type: a.mime_type,
+        size_bytes: a.size_bytes,
+        uploaded_at: a.uploaded_at,
+      });
     });
   }
   const withAtts = (msgs || []).map((m: any) => ({ ...m, attachments: attsByMsg[m.id] || [] }));
@@ -132,6 +164,40 @@ async function actSignUrl(sb: any, conversationId: string, payload: any) {
     return jsonResponse({ ok: false, error: 'Could not sign URL.' }, 500);
   }
   return jsonResponse({ ok: true, signed_url: data.signedUrl });
+}
+
+async function actAttachmentUrl(sb: any, conversationId: string, payload: any) {
+  const attachmentId = String(payload.attachment_id || '').trim();
+  if (!attachmentId) {
+    return jsonResponse({ ok: false, error: 'attachment_id is required.' }, 400);
+  }
+  // The attachment must belong to a studio-visible message in this
+  // conversation. Studio side never sees internal notes.
+  const { data: att } = await sb.from('submission_attachments')
+    .select('id, storage_path, file_name, mime_type, message:messages!inner(id, visibility, conversation_id)')
+    .eq('id', attachmentId)
+    .maybeSingle();
+  if (!att) {
+    return jsonResponse({ ok: false, error: 'Attachment not found.' }, 404);
+  }
+  const visibility = (att as any).message?.visibility;
+  const convOk = (att as any).message?.conversation_id === conversationId;
+  if (!convOk || visibility !== 'studio') {
+    return jsonResponse({ ok: false, error: 'Forbidden.' }, 403);
+  }
+  const { data: signed, error } = await sb.storage
+    .from('submission-attachments')
+    .createSignedUrl((att as any).storage_path, 300, { download: (att as any).file_name });
+  if (error || !signed?.signedUrl) {
+    return jsonResponse({ ok: false, error: 'Could not sign URL.' }, 500);
+  }
+  return jsonResponse({
+    ok: true,
+    url: signed.signedUrl,
+    file_name: (att as any).file_name,
+    mime_type: (att as any).mime_type,
+    expires_in_seconds: 300,
+  });
 }
 
 function textToHtml(s: string): string {

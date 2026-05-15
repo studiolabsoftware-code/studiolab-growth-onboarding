@@ -13,6 +13,19 @@
   const sb = () => window.AdminAuth?.sb;
   const me = () => window.AdminAuth?.profile;
 
+  // Mirror upload-submission-attachment's allowlist + caps. Phase 2B: admin
+  // attaches via the same edge function as the studio side so cleanup,
+  // retention, and ACLs are handled in one place.
+  const ATT_MAX_FILES_PER_MESSAGE = 5;
+  const ATT_MAX_BYTES = 25 * 1024 * 1024;
+  const ATT_ACCEPT_ATTR =
+    '.pdf,.png,.jpg,.jpeg,.svg,.docx,.doc,.xlsx,.xls,' +
+    'application/pdf,image/png,image/jpeg,image/svg+xml,' +
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document,' +
+    'application/msword,' +
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,' +
+    'application/vnd.ms-excel';
+
   const state = {
     rows: [],            // active conversations + their submissions (for list)
     filter: 'unread',    // 'unread' | 'all' | 'mine'
@@ -111,7 +124,7 @@
     const client = sb();
     const { data: existing } = await client
       .from('conversations')
-      .select('id, subject, status, last_message_at, admin_unread_count, studio_unread_count')
+      .select('id, submission_id, subject, status, last_message_at, admin_unread_count, studio_unread_count')
       .eq('submission_id', submissionId)
       .maybeSingle();
     if (existing) return existing;
@@ -122,7 +135,7 @@
         submission_id: submissionId,
         subject: studioName ? `Conversation with ${studioName}` : null,
       })
-      .select('id, subject, status, last_message_at, admin_unread_count, studio_unread_count')
+      .select('id, submission_id, subject, status, last_message_at, admin_unread_count, studio_unread_count')
       .single();
     if (error) { console.error('ensureConversation:', error); return null; }
     return created;
@@ -141,17 +154,44 @@
       .order('created_at', { ascending: true });
     state.threadMessages = msgs || [];
 
-    // Pull attachments in a second round trip so the messages query stays small.
+    // Pull attachments from BOTH tables and merge per message. Legacy
+    // message_attachments rows render as `source: 'legacy'` chips and
+    // download through Supabase Storage directly; Phase 2B+
+    // submission_attachments rows render as `source: 'submission'` and
+    // download via the get-attachment-download-url edge function so the
+    // bucket can stay private.
     const ids = state.threadMessages.map((m) => m.id);
     if (ids.length) {
-      const { data: atts } = await client
-        .from('message_attachments')
-        .select('id, message_id, storage_path, filename, content_type, size_bytes')
-        .in('message_id', ids);
+      const [legacyRes, newRes] = await Promise.all([
+        client.from('message_attachments')
+          .select('id, message_id, storage_path, filename, content_type, size_bytes')
+          .in('message_id', ids),
+        client.from('submission_attachments')
+          .select('id, message_id, file_name, mime_type, size_bytes, uploaded_at')
+          .in('message_id', ids),
+      ]);
       const byMsg = new Map();
-      (atts || []).forEach((a) => {
+      (legacyRes.data || []).forEach((a) => {
         if (!byMsg.has(a.message_id)) byMsg.set(a.message_id, []);
-        byMsg.get(a.message_id).push(a);
+        byMsg.get(a.message_id).push({
+          source: 'legacy',
+          id: a.id,
+          storage_path: a.storage_path,
+          filename: a.filename,
+          content_type: a.content_type,
+          size_bytes: a.size_bytes,
+        });
+      });
+      (newRes.data || []).forEach((a) => {
+        if (!byMsg.has(a.message_id)) byMsg.set(a.message_id, []);
+        byMsg.get(a.message_id).push({
+          source: 'submission',
+          id: a.id,
+          filename: a.file_name,
+          content_type: a.mime_type,
+          size_bytes: a.size_bytes,
+          uploaded_at: a.uploaded_at,
+        });
       });
       state.threadMessages.forEach((m) => { m._attachments = byMsg.get(m.id) || []; });
     }
@@ -222,7 +262,11 @@
             if (host) {
               const convRow = state.rows.find((r) => r.id === state.threadConvId);
               const studioName = convRow?.submission?.studio_name || 'this studio';
-              renderThread(host, { id: state.threadConvId, subject: convRow?.subject }, studioName);
+              renderThread(host, {
+                id: state.threadConvId,
+                submission_id: convRow?.submission_id || convRow?.submission?.id,
+                subject: convRow?.subject,
+              }, studioName);
             }
           });
         }
@@ -358,9 +402,9 @@
             <label class="compose-internal" title="Internal notes are visible to admins only. The studio never sees them or gets notified.">
               <input type="checkbox" id="composeInternal"> Internal note
             </label>
-            <label class="compose-attach" title="Attach files (10 MB max per file)">
+            <label class="compose-attach" title="Attach up to ${ATT_MAX_FILES_PER_MESSAGE} files, ${ATT_MAX_BYTES / 1024 / 1024} MB each. Accepted: PDF, PNG, JPG, SVG, DOCX, DOC, XLSX, XLS.">
               📎 Attach
-              <input type="file" id="composeFileInput" multiple style="display:none">
+              <input type="file" id="composeFileInput" multiple accept="${ATT_ACCEPT_ATTR}" style="display:none">
             </label>
             <div class="compose-spacer"></div>
             <span class="compose-err" id="composeErr" role="alert"></span>
@@ -381,12 +425,22 @@
     function renderFileList() {
       if (!pendingFiles.length) { fileList.innerHTML = ''; return; }
       fileList.innerHTML = pendingFiles.map((f, i) => {
-        const oversize = f.size > 10 * 1024 * 1024;
+        const oversize = f.size > ATT_MAX_BYTES;
         return `<span class="compose-file${oversize ? ' oversize' : ''}">📎 ${escapeHtml(f.name)} <span class="compose-file-size">${formatBytes(f.size)}</span>${oversize ? ' <span class="compose-file-warn">too large</span>' : ''} <button type="button" data-rm="${i}" aria-label="Remove">×</button></span>`;
       }).join('');
     }
     fileInput.addEventListener('change', () => {
-      for (const f of fileInput.files) pendingFiles.push(f);
+      const errEl = host.querySelector('#composeErr');
+      const cap = ATT_MAX_FILES_PER_MESSAGE - pendingFiles.length;
+      const picked = Array.from(fileInput.files || []);
+      if (cap <= 0) {
+        errEl.textContent = `You've hit the ${ATT_MAX_FILES_PER_MESSAGE}-file limit. Remove one to add another.`;
+      } else if (picked.length > cap) {
+        errEl.textContent = `Only ${cap} more file${cap === 1 ? '' : 's'} fit before the ${ATT_MAX_FILES_PER_MESSAGE}-file limit.`;
+      } else {
+        errEl.textContent = '';
+      }
+      for (const f of picked.slice(0, Math.max(cap, 0))) pendingFiles.push(f);
       fileInput.value = '';
       renderFileList();
     });
@@ -411,16 +465,28 @@
       const body = ta.value;
       const internal = host.querySelector('#composeInternal').checked;
       if (!body.trim() && !pendingFiles.length) { errEl.textContent = 'Type a message or attach a file first.'; return; }
-      const oversize = pendingFiles.find((f) => f.size > 10 * 1024 * 1024);
-      if (oversize) { errEl.textContent = `"${oversize.name}" exceeds the 10 MB limit. Compress or send a download link instead.`; return; }
+      const oversize = pendingFiles.find((f) => f.size > ATT_MAX_BYTES);
+      if (oversize) {
+        errEl.textContent = `"${oversize.name}" is over the ${ATT_MAX_BYTES / 1024 / 1024} MB limit. Compress it or send a download link instead.`;
+        return;
+      }
+      if (pendingFiles.length > ATT_MAX_FILES_PER_MESSAGE) {
+        errEl.textContent = `You can attach up to ${ATT_MAX_FILES_PER_MESSAGE} files per message. Remove a few and try again.`;
+        return;
+      }
       btn.disabled = true;
       const res = await sendMessage(conv.id, body, { internal });
       if (!res.ok) { btn.disabled = false; errEl.textContent = res.error; return; }
       // Upload attachments after the message exists so we have its id.
       if (pendingFiles.length) {
-        const upErr = await uploadAttachments(conv.id, res.id, pendingFiles);
-        if (upErr) {
-          errEl.textContent = 'Message sent, but one or more attachments failed to upload: ' + upErr;
+        const submissionId = conv.submission_id;
+        if (!submissionId) {
+          errEl.textContent = 'Message sent, but attachments could not upload — missing submission link. Please refresh and try again.';
+        } else {
+          const upErr = await uploadAttachments(submissionId, res.id, pendingFiles);
+          if (upErr) {
+            errEl.textContent = 'Message sent, but one or more attachments failed to upload: ' + upErr;
+          }
         }
       }
       btn.disabled = false;
@@ -433,40 +499,87 @@
       scrollMsgsToBottom();
     });
 
-    // Click an attachment chip → mint a signed URL and open it.
-    host.querySelectorAll('.msg-att[data-storage-path]').forEach((el) => {
+    // Click an attachment chip → mint a signed URL and open it. Two sources:
+    // legacy message_attachments downloads direct from Storage; new
+    // submission_attachments routes through get-attachment-download-url so
+    // the bucket stays private.
+    host.querySelectorAll('.msg-att[data-att-source]').forEach((el) => {
       el.addEventListener('click', async (e) => {
         e.preventDefault();
-        const path = el.getAttribute('data-storage-path');
-        const { data, error } = await sb().storage.from('message-attachments').createSignedUrl(path, 600);
-        if (error || !data?.signedUrl) { alert('Could not generate download link.'); return; }
-        window.open(data.signedUrl, '_blank', 'noopener');
+        const source = el.getAttribute('data-att-source');
+        if (source === 'submission') {
+          const id = el.getAttribute('data-att-id');
+          const url = await getSubmissionAttachmentUrl(id);
+          if (!url) { alert('Could not generate download link.'); return; }
+          window.open(url, '_blank', 'noopener');
+        } else {
+          const path = el.getAttribute('data-storage-path');
+          const { data, error } = await sb().storage.from('message-attachments').createSignedUrl(path, 600);
+          if (error || !data?.signedUrl) { alert('Could not generate download link.'); return; }
+          window.open(data.signedUrl, '_blank', 'noopener');
+        }
       });
     });
     scrollMsgsToBottom();
   }
 
-  async function uploadAttachments(conversationId, messageId, files) {
-    const client = sb();
+  // POSTs each pending file to upload-submission-attachment with the admin
+  // JWT. The edge function enforces the per-message file cap, mime allowlist,
+  // size cap, and bucket placement; the metadata row is created server-side
+  // so retention triggers and cleanup-attachments cron pick up these files
+  // automatically (matches the studio + form-side flows).
+  async function uploadAttachments(submissionId, messageId, files) {
+    const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/upload-submission-attachment';
+    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+    const anonKey = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '';
     const failures = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const safeName = file.name.replace(/[^\w.\-]+/g, '_').slice(0, 120);
-      const path = `${conversationId}/${messageId}/${i}-${safeName}`;
-      const { error: upErr } = await client.storage
-        .from('message-attachments')
-        .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
-      if (upErr) { failures.push(file.name); continue; }
-      const { error: rowErr } = await client.from('message_attachments').insert({
-        message_id: messageId,
-        storage_path: path,
-        filename: safeName,
-        content_type: file.type || null,
-        size_bytes: file.size,
-      });
-      if (rowErr) failures.push(file.name);
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('file', file, file.name);
+      fd.append('submission_id', submissionId);
+      fd.append('message_id', messageId);
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': jwt ? `Bearer ${jwt}` : '',
+            'apikey': anonKey,
+          },
+          body: fd,
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data?.ok) {
+          failures.push(`${file.name}${data?.error ? ` (${data.error})` : ''}`);
+        }
+      } catch (err) {
+        console.error('attachment upload failed:', err);
+        failures.push(file.name);
+      }
     }
     return failures.length ? failures.join(', ') : null;
+  }
+
+  async function getSubmissionAttachmentUrl(attachmentId) {
+    const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/get-attachment-download-url';
+    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+    const anonKey = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '';
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': jwt ? `Bearer ${jwt}` : '',
+          'apikey': anonKey,
+        },
+        body: JSON.stringify({ attachment_id: attachmentId }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data?.ok || !data.url) return null;
+      return data.url;
+    } catch (err) {
+      console.error('download attachment failed:', err);
+      return null;
+    }
   }
 
   function scrollMsgsToBottom() {
@@ -482,7 +595,13 @@
     const who = role === 'admin' ? (m.sender_name || 'Admin') : (role === 'system' ? 'System' : (m.sender_name || m.sender_email || 'Studio'));
     const ts = new Date(m.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Australia/Sydney' });
     const body = m.body_html || textToHtml(m.body_text || '');
-    const atts = (m._attachments || []).map((a) => `<a class="msg-att" href="#" data-storage-path="${escapeHtml(a.storage_path)}">📎 ${escapeHtml(a.filename)} <span class="msg-att-size">${formatBytes(a.size_bytes)}</span></a>`).join('');
+    const atts = (m._attachments || []).map((a) => {
+      const isNew = a.source === 'submission';
+      const ref = isNew
+        ? `data-att-source="submission" data-att-id="${escapeHtml(a.id)}"`
+        : `data-att-source="legacy" data-storage-path="${escapeHtml(a.storage_path)}"`;
+      return `<a class="msg-att" href="#" ${ref}>📎 ${escapeHtml(a.filename)} <span class="msg-att-size">${formatBytes(a.size_bytes)}</span></a>`;
+    }).join('');
     if (role === 'system') {
       return `<div class="msg-system-row"><span class="msg-system-dot">●</span> ${body} <span class="msg-system-when">${escapeHtml(ts)}</span></div>`;
     }
