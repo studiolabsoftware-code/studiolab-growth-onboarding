@@ -1176,11 +1176,25 @@
         +   '<button type="button" class="btn btn-ok paybar-pay" id="payBtn">Pay now</button>'
         +   '<button type="button" class="btn-link paybar-later" id="payLaterBtn">Save draft, pay later</button>'
         + '</div>';
-      const reviewHeading = p.querySelector('.sh-title');
-      if (reviewHeading && reviewHeading.parentNode) {
-        reviewHeading.parentNode.insertBefore(bar, reviewHeading.nextSibling);
+      // Preferred placement: inside the "Choose your setup option" card so
+      // the picker and the live-updating fee + Pay CTA read as one unit.
+      // The user has to make the setup choice before paying anyway — keeping
+      // them in the same visual frame avoids the "two unrelated controls"
+      // problem the sticky-at-top layout created.
+      const setupCardCt = p.querySelector('#lbl-setup-review');
+      const setupCard = setupCardCt ? setupCardCt.closest('.card') : null;
+      if (setupCard) {
+        bar.classList.add('paybar-in-card');
+        setupCard.appendChild(bar);
       } else {
-        p.insertBefore(bar, p.firstChild);
+        // Fallback (in case the setup-review card markup ever changes):
+        // drop the paybar just below the review heading.
+        const reviewHeading = p.querySelector('.sh-title');
+        if (reviewHeading && reviewHeading.parentNode) {
+          reviewHeading.parentNode.insertBefore(bar, reviewHeading.nextSibling);
+        } else {
+          p.insertBefore(bar, p.firstChild);
+        }
       }
     }
 

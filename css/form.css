@@ -529,6 +529,10 @@ select {
    Sticky-feeling strip at the top of the review step showing the total and
    the primary Pay CTA. The body below stays a calm review summary. */
 .paybar { background: #fff; border: 1px solid var(--g2); border-radius: 14px; padding: 18px 22px; margin: 8px 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; box-shadow: 0 2px 8px rgba(19,16,46,0.05); flex-wrap: wrap; }
+/* Embedded inside the "Choose your setup option" card so the picker and
+   the live setup-fee + Pay CTA read as one unit. Strip the standalone-
+   card styling and use a top divider to separate from the picker grid. */
+.paybar-in-card { background: transparent; border: 0; border-top: 1px solid var(--g2); border-radius: 0; box-shadow: none; padding: 18px 0 0; margin: 18px 0 0; }
 .paybar-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .paybar-label { font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.7px; }
 .paybar-amt { font-size: 28px; font-weight: 800; color: var(--in-d); letter-spacing: -0.6px; line-height: 1.1; font-variant-numeric: tabular-nums; }
