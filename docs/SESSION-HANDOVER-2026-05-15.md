@@ -1,6 +1,6 @@
 # Session Handover — 2026-05-15
 
-**Last commit on main:** `7e9bc4b` Audit fixes (Block 1 + 2): security, money, UX, a11y
+**Last commit on main:** `b44bd2c` Submission attachments: backend + admin UI (phase 1)
 **Branch:** `main` (GitHub Pages auto-deploys static surfaces)
 
 > This is a session-specific handover. The general onboarding brief is `HANDOVER-NEXT-SESSION.md`. Read both before resuming.
@@ -78,6 +78,53 @@ Still TODO. Scope:
 - Confirm business address + ABN on Stripe account
 - Write a one-shot cutover script that flips `stripe_mode` in `payment_settings` to `live`, with a rollback path
 - Smoke test against live mode with one $1 test transaction before opening the gates
+
+---
+
+## Phase 2 of submission attachments — pending
+
+The backend (migration 020, four edge functions, daily cleanup cron) and the
+admin UI for attachments are shipped and live as of `b44bd2c`. The two
+remaining surfaces to wire are studio-facing:
+
+### 1. Form upload widget on the onboarding form
+
+**Where:** `js/form.js` (~2300 lines) and the per-region/plan form pages
+(`au/launch/index.html`, `au/scale/index.html`, etc.)
+
+**Scope:**
+- Add a new form step / section for attachments. Logical placement: after
+  "Additional notes", before the final review step.
+- Drag-and-drop zone + file picker. Multi-select, max 5 files per
+  submission, 25 MB per file, mime allowlist matching the edge function:
+  `pdf, png, jpg, svg, docx, doc, xlsx, xls`.
+- Upload each file via `POST /functions/v1/upload-submission-attachment`
+  (multipart, including `session_token` + `submission_id` from form state).
+- Show progress bar per file, remove-before-submit button per file.
+- Persist uploaded attachments across save-draft cycles by re-querying
+  `submission_attachments` on form load (filtered by submission_id).
+- Studio-side delete via `POST /functions/v1/delete-submission-attachment`.
+- Display retention notice: "Files we keep auto-delete 7 days after your
+  onboarding is complete, or 90 days from upload — whichever is sooner."
+
+### 2. Inbox composer file upload (studio + admin sides)
+
+**Where:** the inbox composer used by both `portal.html` (studio) and the
+admin Messages panel (in `admin/js/inbox.js` if it exists, or wired into
+detail.js).
+
+**Scope:**
+- Attach button next to the message send button.
+- Up to 5 files per message, same constraints as form upload.
+- When the message is sent, the attachments are tied to the new message_id
+  (the upload happens BEFORE message send, then on send we either pass
+  attachment IDs to the send-message function or attach inline by
+  message_id which the upload already supports).
+- Inline display: attached files render as chips under the message body in
+  the conversation thread (filename + size + download link).
+
+Both phase-2 widgets call into the four edge functions already shipped —
+no new backend work needed.
 
 ---
 
