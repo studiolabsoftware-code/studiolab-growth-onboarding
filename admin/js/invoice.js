@@ -123,9 +123,20 @@
     $('#invDueDays').value = '14';
     $('#invDescription').value = '';
     $('#invMemo').value = '';
-    // Reset line items to one empty row
+    // Reset line items. If we're opening as a revision of a previously
+    // voided invoice, seed the first row from that snapshot so the admin
+    // can edit and re-issue without retyping.
     $('#invItems').innerHTML = '';
-    addLineItemRow();
+    if (ctx && ctx.revision) {
+      addLineItemRow({
+        description: ctx.revision.description || '',
+        quantity: ctx.revision.quantity || 1,
+        amount: ctx.revision.amount || '',
+      });
+      if (ctx.revision.description) $('#invDescription').value = ctx.revision.description;
+    } else {
+      addLineItemRow();
+    }
     updateModeUI();
     updateTotalsUI();
     $('#invErr').classList.remove('vis');
@@ -406,7 +417,7 @@
       return;
     }
     const { data, error } = await sb.from('invoices')
-      .select('id, number, kind, status, currency, total_cents, amount_paid_cents, amount_refunded_cents, issued_at, paid_at, hosted_url, pdf_url, description')
+      .select('id, number, kind, status, currency, total_cents, amount_paid_cents, amount_refunded_cents, issued_at, paid_at, hosted_url, pdf_url, description, stripe_invoice_id, email_sent_at, last_resent_at, resend_count, voided_at')
       .eq('submission_id', submissionId)
       .order('created_at', { ascending: false });
     if (error) {
@@ -423,30 +434,167 @@
         <thead>
           <tr>
             <th>Number</th>
-            <th>Kind</th>
             <th>Status</th>
             <th>Amount</th>
-            <th>Issued</th>
+            <th>Send history</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${rows.map((r) => `
-            <tr>
-              <td>${ESC(r.number || '(draft)')}</td>
-              <td>${ESC(KIND_LABEL[r.kind] || r.kind)}</td>
-              <td><span class="bdg ${STATUS_CLASS[r.status] || ''}">${ESC(STATUS_LABEL[r.status] || r.status)}</span></td>
-              <td>${moneyFmt(r.total_cents, r.currency)}</td>
-              <td>${r.issued_at ? new Date(r.issued_at).toLocaleDateString('en-AU') : '—'}</td>
-              <td>
-                ${r.hosted_url ? `<a class="btn-link" href="${ESC(r.hosted_url)}" target="_blank" rel="noopener">Open</a>` : ''}
-                ${r.pdf_url ? ` · <a class="btn-link" href="${ESC(r.pdf_url)}" target="_blank" rel="noopener">PDF</a>` : ''}
-              </td>
-            </tr>
-          `).join('')}
+          ${rows.map((r) => renderInvoiceRow(r)).join('')}
         </tbody>
       </table>
     `;
+    bindInvoiceRowActions(hostEl, () => refreshStudioInvoicesPanel(submissionId), rows);
+  }
+
+  // Shared row renderer used by both the per-studio panel and the global
+  // Invoices list screen. Surfaces the new send-history columns plus
+  // Resend / Revise actions on open invoices.
+  function renderInvoiceRow(r, opts) {
+    const showRecipient = !!(opts && opts.showRecipient);
+    const recipientCell = showRecipient
+      ? `<td>
+          <div>${ESC(r._recipientName || '')}</div>
+          <div class="inv-list-sub">${ESC(r._recipientEmail || '')}${r._isStudio ? '' : ' · <span class="inv-list-tag">External</span>'}</div>
+        </td>`
+      : '';
+    const sentAt = r.email_sent_at || r.issued_at;
+    const sentLine = sentAt
+      ? `Sent ${new Date(sentAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
+      : '<span class="adm-empty">Not sent</span>';
+    const resendLine = r.last_resent_at
+      ? `<div class="inv-list-sub">Resent ${new Date(r.last_resent_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}${r.resend_count > 1 ? ` (×${r.resend_count})` : ''}</div>`
+      : '';
+    const paidLine = r.paid_at
+      ? `<div class="inv-list-sub">Paid ${new Date(r.paid_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>`
+      : '';
+    const voidLine = r.voided_at
+      ? `<div class="inv-list-sub" style="color:#B91C1C;">Voided ${new Date(r.voided_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>`
+      : '';
+    const isOpen = r.status === 'open' || r.status === 'past_due';
+    const isPaid = r.status === 'paid';
+    const acts = [];
+    if (r.hosted_url) acts.push(`<a class="btn-link" href="${ESC(r.hosted_url)}" target="_blank" rel="noopener">Open</a>`);
+    if (r.pdf_url) acts.push(`<a class="btn-link" href="${ESC(r.pdf_url)}" target="_blank" rel="noopener">PDF</a>`);
+    if (isOpen) {
+      acts.push(`<a class="btn-link" href="#" data-inv-act="resend" data-inv-id="${ESC(r.id)}">Resend</a>`);
+      acts.push(`<a class="btn-link" style="color:#B91C1C;" href="#" data-inv-act="revise" data-inv-id="${ESC(r.id)}">Revise</a>`);
+    }
+    if (showRecipient && r._isStudio) {
+      acts.push(`<a class="btn-link" href="#" data-inv-open-studio="${ESC(r.submission_id)}">View studio</a>`);
+    }
+    return `
+      <tr>
+        <td>${ESC(r.number || '(draft)')}</td>
+        ${recipientCell}
+        <td><span class="bdg ${STATUS_CLASS[r.status] || ''}">${ESC(STATUS_LABEL[r.status] || r.status)}</span></td>
+        <td>${moneyFmt(r.total_cents, r.currency)}</td>
+        <td style="font-size:12px;">${sentLine}${resendLine}${paidLine}${voidLine}</td>
+        <td style="display:flex;gap:8px;flex-wrap:wrap;">${acts.join('')}</td>
+      </tr>`;
+  }
+
+  // Delegated click handler. Binds once per host element. The rows array is
+  // re-bound on each render so revise has the current snapshot to prefill.
+  function bindInvoiceRowActions(hostEl, onReload, rows) {
+    hostEl._invRows = rows;
+    if (hostEl._invActionsBound) return;
+    hostEl._invActionsBound = true;
+    hostEl.addEventListener('click', async (e) => {
+      const target = e.target.closest('[data-inv-act]');
+      if (!target) return;
+      e.preventDefault();
+      const act = target.getAttribute('data-inv-act');
+      const id = target.getAttribute('data-inv-id');
+      const row = (hostEl._invRows || []).find((r) => r.id === id);
+      if (!row) return;
+      if (act === 'resend') return doResendInvoice(row, onReload);
+      if (act === 'revise') return doReviseInvoice(row, onReload, hostEl._submission || null);
+    });
+  }
+
+  async function doResendInvoice(row, onReload) {
+    const ok = window.AdminModal
+      ? await window.AdminModal.confirm({
+          title: 'Resend invoice email?',
+          message: `<p>Send the hosted-invoice email to the recipient again for <strong>${ESC(row.number || 'this invoice')}</strong>.</p><p style="color:var(--g6);font-size:12px;">In Stripe test mode the email goes only to your Stripe account email, not the recipient.</p>`,
+          confirmLabel: 'Resend',
+        })
+      : confirm('Resend invoice email?');
+    if (!ok) return;
+    const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/manage-invoice';
+    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': jwt ? `Bearer ${jwt}` : '',
+          'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
+        },
+        body: JSON.stringify({ action: 'resend', invoice_id: row.id }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        await (window.AdminModal ? window.AdminModal.alert({ title: 'Resend failed', message: ESC(data.error || `Status ${resp.status}.`) }) : Promise.resolve());
+        return;
+      }
+      if (typeof onReload === 'function') await onReload();
+    } catch (err) {
+      console.error('resend failed:', err);
+      await (window.AdminModal ? window.AdminModal.alert('Could not resend the invoice. Please try again.') : Promise.resolve());
+    }
+  }
+
+  // Revise: void the existing invoice, then open the create modal pre-
+  // filled with the same line items so the admin can edit and re-issue.
+  // Mirrors the existing reviseQuote pattern in quote.js.
+  async function doReviseInvoice(row, onReload, submission) {
+    const ok = window.AdminModal
+      ? await window.AdminModal.confirm({
+          title: 'Revise invoice?',
+          message: `<p>This voids <strong>${ESC(row.number || 'the existing invoice')}</strong> on Stripe and opens a fresh invoice modal pre-filled with the same line items so you can edit and re-issue.</p><p style="color:var(--g6);font-size:12px;">The original stays in your records as <strong>Void</strong> for audit.</p>`,
+          confirmLabel: 'Void and revise',
+          danger: true,
+        })
+      : confirm('Void this invoice and open a new editable copy?');
+    if (!ok) return;
+    const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/manage-invoice';
+    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': jwt ? `Bearer ${jwt}` : '',
+          'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
+        },
+        body: JSON.stringify({ action: 'void', invoice_id: row.id }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        await (window.AdminModal ? window.AdminModal.alert({ title: 'Void failed', message: ESC(data.error || `Status ${resp.status}.`) }) : Promise.resolve());
+        return;
+      }
+      if (typeof onReload === 'function') await onReload();
+      // Fetch the void'd invoice's line items via Stripe? We don't store
+      // them in our ledger, so the simplest revision prefill is the
+      // description + total as a single line item. Admin edits from there.
+      const prefill = {
+        description: row.description || ('Revision of ' + (row.number || 'previous invoice')),
+        quantity: 1,
+        amount: ((row.total_cents || 0) / 100).toFixed(2),
+      };
+      if (submission) {
+        open({ mode: 'studio', submission, revision: prefill });
+      } else {
+        open({ mode: 'external', revision: prefill });
+      }
+    } catch (err) {
+      console.error('revise failed:', err);
+      await (window.AdminModal ? window.AdminModal.alert('Could not void the invoice. Please try again.') : Promise.resolve());
+    }
   }
 
   function refreshStudioInvoicesPanel(submissionId) {
@@ -547,6 +695,7 @@
         id, number, kind, status, currency, total_cents,
         amount_paid_cents, amount_refunded_cents, issued_at, paid_at,
         hosted_url, pdf_url, description, submission_id, external_contact_id,
+        stripe_invoice_id, email_sent_at, last_resent_at, resend_count, voided_at,
         submission:submissions(id, studio_name, contact_email),
         external_contact:external_contacts(id, name, email)
       `)
@@ -586,34 +735,17 @@
           <tr>
             <th>Number</th>
             <th>Recipient</th>
-            <th>Kind</th>
             <th>Status</th>
             <th>Amount</th>
-            <th>Issued</th>
+            <th>Send history</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${filtered.map((r) => `
-            <tr data-sub-id="${ESC(r.submission_id || '')}">
-              <td>${ESC(r.number || '(draft)')}</td>
-              <td>
-                <div>${ESC(r._recipientName)}</div>
-                <div class="inv-list-sub">${ESC(r._recipientEmail || '')}${r._isStudio ? '' : ' · <span class="inv-list-tag">External</span>'}</div>
-              </td>
-              <td style="font-size:12px;color:var(--g6);">${ESC(KIND_LABEL[r.kind] || r.kind || '')}</td>
-              <td><span class="bdg ${STATUS_CLASS[r.status] || ''}">${ESC(STATUS_LABEL[r.status] || r.status)}</span></td>
-              <td>${moneyFmt(r.total_cents, r.currency)}</td>
-              <td style="font-size:12px;color:var(--g6);">${r.issued_at ? new Date(r.issued_at).toLocaleDateString('en-AU') : '—'}</td>
-              <td style="display:flex;gap:8px;flex-wrap:wrap;">
-                ${r.hosted_url ? `<a class="btn-link" href="${ESC(r.hosted_url)}" target="_blank" rel="noopener">Open</a>` : ''}
-                ${r.pdf_url ? `<a class="btn-link" href="${ESC(r.pdf_url)}" target="_blank" rel="noopener">PDF</a>` : ''}
-                ${r._isStudio ? `<a class="btn-link" href="#" data-inv-open-studio="${ESC(r.submission_id)}">View studio</a>` : ''}
-              </td>
-            </tr>
-          `).join('')}
+          ${filtered.map((r) => renderInvoiceRow(r, { showRecipient: true })).join('')}
         </tbody>
       </table>`;
+    bindInvoiceRowActions(host, async () => { await loadListRows(); renderList(); }, filtered);
     if (!host._invListBound) {
       host._invListBound = true;
       host.addEventListener('click', (e) => {

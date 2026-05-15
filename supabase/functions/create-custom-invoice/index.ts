@@ -359,8 +359,17 @@ Deno.serve(async (req) => {
     // ---- send_invoice: explicitly send the email now. (auto_advance also
     // schedules it, but calling /send guarantees the email is dispatched
     // immediately rather than on Stripe's internal advance schedule.)
+    // Capture whether the send succeeded so we can stamp email_sent_at on
+    // the ledger row below — gives the admin UI a clean "this went out at
+    // <time>" signal instead of inferring from finalized_at.
+    let emailSentAtIso: string | null = null;
     if (collectionMethod === 'send_invoice') {
-      await stripeRequest('POST', `invoices/${encodeURIComponent(invoiceId)}/send`, {}, secretKey);
+      const sendRes = await stripeRequest('POST', `invoices/${encodeURIComponent(invoiceId)}/send`, {}, secretKey);
+      if (sendRes.ok) {
+        emailSentAtIso = new Date().toISOString();
+      } else {
+        console.warn('Stripe /send returned non-ok:', sendRes.error);
+      }
     }
 
     // ---- Write the ledger row immediately. The webhook will also write/
@@ -393,6 +402,7 @@ Deno.serve(async (req) => {
         pdf_url: inv.invoice_pdf,
         description,
         collection_method: collectionMethod,
+        email_sent_at: emailSentAtIso,
         created_by: caller.id,
       }, { onConflict: 'stripe_invoice_id' })
       .select('id')

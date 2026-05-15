@@ -1,0 +1,126 @@
+// Post-issue management of finalized Stripe invoices.
+// Admin-only. Two actions:
+//
+//   resend  - Calls Stripe POST /v1/invoices/:id/send to dispatch the
+//             hosted-invoice email again. Bumps last_resent_at and
+//             resend_count on the invoices row. Useful when a studio
+//             reports "I never got it" or wants a fresh nudge.
+//
+//   void    - Calls Stripe POST /v1/invoices/:id/void to permanently
+//             invalidate the invoice. Writes status='void' + voided_at
+//             on the row. After voiding, the admin UI's Revise flow
+//             opens a fresh invoice modal pre-filled from this one's
+//             line items so the team can edit and re-issue.
+//
+// We don't try to "edit" a finalized invoice in place - Stripe's
+// finalize-then-immutable rule makes that impossible. Voiding and
+// recreating is the supported path.
+
+import { preflight, jsonResponse } from '../_shared/cors.ts';
+import { adminClient } from '../_shared/supabase.ts';
+import { getCallerProfile } from '../_shared/caller.ts';
+import { getStripeKey, stripeRequest } from '../_shared/stripe.ts';
+
+interface RequestBody {
+  action: 'resend' | 'void';
+  invoice_id?: string;
+  stripe_invoice_id?: string;
+}
+
+Deno.serve(async (req) => {
+  const pf = preflight(req); if (pf) return pf;
+  if (req.method !== 'POST') return jsonResponse({ ok: false, error: 'POST required.' }, 405);
+
+  try {
+    const caller = await getCallerProfile(req);
+    if (!caller) return jsonResponse({ ok: false, error: 'Admin sign-in required.' }, 401);
+
+    const body = await req.json().catch(() => ({})) as Partial<RequestBody>;
+    const action = body.action;
+    if (action !== 'resend' && action !== 'void') {
+      return jsonResponse({ ok: false, error: 'action must be resend or void.' }, 400);
+    }
+    const idInput = (body.invoice_id || '').trim();
+    const stripeIdInput = (body.stripe_invoice_id || '').trim();
+    if (!idInput && !stripeIdInput) {
+      return jsonResponse({ ok: false, error: 'invoice_id or stripe_invoice_id is required.' }, 400);
+    }
+
+    const sb = adminClient();
+    const query = idInput
+      ? sb.from('invoices').select('id, stripe_invoice_id, status, submission_id, number, resend_count').eq('id', idInput).maybeSingle()
+      : sb.from('invoices').select('id, stripe_invoice_id, status, submission_id, number, resend_count').eq('stripe_invoice_id', stripeIdInput).maybeSingle();
+    const { data: row } = await query;
+    if (!row) return jsonResponse({ ok: false, error: 'Invoice not found.' }, 404);
+    if (!row.stripe_invoice_id) return jsonResponse({ ok: false, error: 'Invoice is missing a Stripe id.' }, 400);
+
+    const secretKey = await getStripeKey();
+    if (!secretKey) return jsonResponse({ ok: false, error: 'Stripe is not configured.' }, 500);
+
+    if (action === 'resend') {
+      if (row.status !== 'open' && row.status !== 'past_due') {
+        return jsonResponse({
+          ok: false,
+          error: `Cannot resend a ${row.status} invoice. Only open invoices can be resent.`,
+        }, 400);
+      }
+      const sent = await stripeRequest('POST', `invoices/${encodeURIComponent(row.stripe_invoice_id)}/send`, {}, secretKey);
+      if (!sent.ok) {
+        return jsonResponse({ ok: false, error: sent.error || 'Stripe resend failed.' }, 502);
+      }
+      const nowIso = new Date().toISOString();
+      const newCount = (row.resend_count || 0) + 1;
+      const { error: upErr } = await sb.from('invoices').update({
+        last_resent_at: nowIso,
+        resend_count: newCount,
+      }).eq('id', row.id);
+      if (upErr) console.warn('invoices update after resend failed:', upErr);
+
+      try {
+        await sb.from('activity_log').insert({
+          submission_id: row.submission_id,
+          action: 'invoice_resent',
+          actor: caller.email,
+          details: { invoice_id: row.id, stripe_invoice_id: row.stripe_invoice_id, number: row.number, resend_count: newCount },
+        });
+      } catch (e) { console.warn('activity_log insert failed:', e); }
+
+      return jsonResponse({ ok: true, action: 'resend', resent_at: nowIso, resend_count: newCount });
+    }
+
+    // action === 'void'
+    if (row.status === 'paid') {
+      return jsonResponse({
+        ok: false,
+        error: 'Cannot void a paid invoice. Issue a refund through Stripe instead.',
+      }, 400);
+    }
+    if (row.status === 'void') {
+      return jsonResponse({ ok: true, action: 'void', skipped: true, reason: 'Already void.' });
+    }
+    const voided = await stripeRequest('POST', `invoices/${encodeURIComponent(row.stripe_invoice_id)}/void`, {}, secretKey);
+    if (!voided.ok) {
+      return jsonResponse({ ok: false, error: voided.error || 'Stripe void failed.' }, 502);
+    }
+    const nowIso = new Date().toISOString();
+    const { error: upErr } = await sb.from('invoices').update({
+      status: 'void',
+      voided_at: nowIso,
+    }).eq('id', row.id);
+    if (upErr) console.warn('invoices update after void failed:', upErr);
+
+    try {
+      await sb.from('activity_log').insert({
+        submission_id: row.submission_id,
+        action: 'invoice_voided',
+        actor: caller.email,
+        details: { invoice_id: row.id, stripe_invoice_id: row.stripe_invoice_id, number: row.number },
+      });
+    } catch (e) { console.warn('activity_log insert failed:', e); }
+
+    return jsonResponse({ ok: true, action: 'void', voided_at: nowIso });
+  } catch (err) {
+    console.error('manage-invoice error:', err);
+    return jsonResponse({ ok: false, error: String(err) }, 500);
+  }
+});
