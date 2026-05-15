@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/form.css?v=20260513y">
+<link rel="stylesheet" href="/css/form.css?v=20260515r">
 <script>window.PLAN = 'scale'; window.REGION = 'US';</script>
 <link rel="icon" type="image/png" href="/assets/studiolab-icon.png">
 <link rel="apple-touch-icon" href="/assets/studiolab-icon.png">
@@ -65,11 +65,11 @@
 <div id="formWrap" class="form-hidden">
 <nav class="snav" aria-label="Form steps">
   <div class="snav-inner">
-    <button type="button" class="sp active" data-s="1" aria-current="step"><span class="sp-n" aria-hidden="true">1</span><span>Setup</span></button>
-    <button type="button" class="sp" data-s="2" disabled><span class="sp-n" aria-hidden="true">2</span><span>Studio</span></button>
+    <button type="button" class="sp active" data-s="1" aria-current="step"><span class="sp-n" aria-hidden="true">1</span><span>Studio</span></button>
+    <button type="button" class="sp" data-s="2" disabled><span class="sp-n" aria-hidden="true">2</span><span>Contact</span></button>
     <button type="button" class="sp" data-s="3" disabled><span class="sp-n" aria-hidden="true">3</span><span>Voice &amp; email</span></button>
     <button type="button" class="sp" data-s="4" disabled><span class="sp-n" aria-hidden="true">4</span><span>SMS &amp; leads</span></button>
-    <button type="button" class="sp" data-s="5" disabled><span class="sp-n" aria-hidden="true">5</span><span>Review</span></button>
+    <button type="button" class="sp" data-s="5" disabled><span class="sp-n" aria-hidden="true">5</span><span>Review &amp; pay</span></button>
   </nav>
 
 <div class="main" id="fmain">
@@ -104,22 +104,72 @@
     </div>
 
     <div class="card">
-      <div class="ct" id="lbl-setup"><div class="ct-icon" aria-hidden="true">🛠️</div>Setup preference</div>
-      <div class="setup-grid" role="radiogroup" aria-labelledby="lbl-setup">
-        <label class="setup-card sel" id="sc-dfy" data-setup="dfy">
-          <input type="radio" name="setup" value="dfy" aria-label="Done-For-You: our team configures your account, typically 5 to 7 business days" checked>
-          <div class="setup-dot" aria-hidden="true"></div>
-          <div class="setup-name" aria-hidden="true">Done-For-You</div>
-          <div class="setup-desc" aria-hidden="true">Our team configures your entire account. You provide the information, we handle everything else. Typically 5 to 7 business days.</div>
-                  <div class="setup-price" data-price-slot="dfy" aria-hidden="true"></div>
-        </label>
-        <label class="setup-card" id="sc-guided" data-setup="guided">
-          <input type="radio" name="setup" value="guided" aria-label="Guided self-setup: configure your own account with our step-by-step checklist">
-          <div class="setup-dot" aria-hidden="true"></div>
-          <div class="setup-name" aria-hidden="true">Guided (self-setup)</div>
-          <div class="setup-desc" aria-hidden="true">You configure your own account using our step-by-step checklist, with support available if you get stuck. Typically 3 to 5 business days.</div>
-                  <div class="setup-price" data-price-slot="guided" aria-hidden="true"></div>
-        </label>
+      <div class="ct"><div class="ct-icon" aria-hidden="true">🏫</div>Studio</div>
+      <div class="fr x1">
+        <div class="f">
+          <label for="studioName">Studio name <span class="req">*</span></label>
+          <input type="text" id="studioName" data-required placeholder="e.g. Dance Academy Melbourne">
+          <span class="field-err">Please enter your studio name.</span>
+        </div>
+      </div>
+      <div class="fr x1">
+        <div class="f">
+          <label for="legalName">Legal business name <span class="hint">if different</span></label>
+          <input type="text" id="legalName" placeholder="e.g. Dance Academy Pty Ltd">
+        </div>
+      </div>
+      <div class="fr x1">
+        <div class="f">
+          <label for="studioType">Studio type</label>
+          <select id="studioType">
+            <option value="">Select</option>
+            <option>Dance Studio</option>
+            <option>Yoga / Pilates</option>
+            <option>Gymnastics</option>
+            <option>Martial Arts</option>
+            <option>Music School</option>
+            <option>Performing Arts</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="f">
+          <label for="country">Country <span class="req">*</span></label>
+          <select id="country" data-required>
+            <option value="">Select</option>
+            <option value="US">United States</option>
+            <option value="CA">Canada</option>
+            <option value="UK">United Kingdom</option>
+            <option value="NZ">New Zealand</option>
+            <option value="OTHER">Other (enter below)</option>
+          </select>
+          <input id="countryOther" type="text" placeholder="Country name" autocomplete="country-name" hidden style="margin-top:8px;">
+          <span class="field-err">Please select your country.</span>
+        </div>
+        <div class="f">
+          <label for="timezone">Time zone <span class="req">*</span></label>
+          <select id="timezone" data-required>
+            <option value="">Select</option>
+            <optgroup label="United States">
+              <option value="America/New_York">Eastern Time (ET)</option>
+              <option value="America/Chicago">Central Time (CT)</option>
+              <option value="America/Denver">Mountain Time (MT)</option>
+              <option value="America/Los_Angeles">Pacific Time (PT)</option>
+            </optgroup>
+            <optgroup label="Canada">
+              <option value="America/Toronto">Toronto (ET)</option>
+              <option value="America/Vancouver">Vancouver (PT)</option>
+            </optgroup>
+            <optgroup label="United Kingdom">
+              <option value="Europe/London">London (GMT / BST)</option>
+            </optgroup>
+            <optgroup label="New Zealand">
+              <option value="Pacific/Auckland">Auckland (NZST / NZDT)</option>
+            </optgroup>
+          </select>
+          <span class="field-err">Please select your time zone.</span>
+        </div>
       </div>
     </div>
 
@@ -133,80 +183,11 @@
   <div class="panel" id="s2">
     <div class="sh">
       <div class="sh-tag">Step 2 of 5</div>
-      <h2 class="sh-title">Studio details</h2>
-      <div class="sh-desc">This populates your StudioLAB Growth business profile. It's the source of truth for your account name, contact details, and timezone.</div>
+      <h2 class="sh-title">Your contact details</h2>
+      <div class="sh-desc">Who we\'ll talk to and where families can find you online.</div>
     </div>
 
             <div class="cards-grid">
-      <div class="card">
-        <div class="ct"><div class="ct-icon" aria-hidden="true">🏫</div>Studio</div>
-        <div class="fr x1">
-          <div class="f">
-            <label for="studioName">Studio name <span class="req">*</span></label>
-            <input type="text" id="studioName" data-required placeholder="e.g. Dance Academy Melbourne">
-            <span class="field-err">Please enter your studio name.</span>
-          </div>
-        </div>
-        <div class="fr x1">
-          <div class="f">
-            <label for="legalName">Legal business name <span class="hint">if different</span></label>
-            <input type="text" id="legalName" placeholder="e.g. Dance Academy Pty Ltd">
-          </div>
-        </div>
-        <div class="fr x1">
-          <div class="f">
-            <label for="studioType">Studio type</label>
-            <select id="studioType">
-              <option value="">Select</option>
-              <option>Dance Studio</option>
-              <option>Yoga / Pilates</option>
-              <option>Gymnastics</option>
-              <option>Martial Arts</option>
-              <option>Music School</option>
-              <option>Performing Arts</option>
-              <option>Other</option>
-            </select>
-          </div>
-        </div>
-        <div class="fr">
-          <div class="f">
-            <label for="country">Country <span class="req">*</span></label>
-            <select id="country" data-required>
-              <option value="">Select</option>
-              <option value="US">United States</option>
-              <option value="CA">Canada</option>
-              <option value="UK">United Kingdom</option>
-              <option value="NZ">New Zealand</option>
-              <option value="OTHER">Other (enter below)</option>
-            </select>
-            <input id="countryOther" type="text" placeholder="Country name" autocomplete="country-name" hidden style="margin-top:8px;">
-            <span class="field-err">Please select your country.</span>
-          </div>
-          <div class="f">
-            <label for="timezone">Time zone <span class="req">*</span></label>
-            <select id="timezone" data-required>
-              <option value="">Select</option>
-              <optgroup label="United States">
-                <option value="America/New_York">Eastern Time (ET)</option>
-                <option value="America/Chicago">Central Time (CT)</option>
-                <option value="America/Denver">Mountain Time (MT)</option>
-                <option value="America/Los_Angeles">Pacific Time (PT)</option>
-              </optgroup>
-              <optgroup label="Canada">
-                <option value="America/Toronto">Toronto (ET)</option>
-                <option value="America/Vancouver">Vancouver (PT)</option>
-              </optgroup>
-              <optgroup label="United Kingdom">
-                <option value="Europe/London">London (GMT / BST)</option>
-              </optgroup>
-              <optgroup label="New Zealand">
-                <option value="Pacific/Auckland">Auckland (NZST / NZDT)</option>
-              </optgroup>
-            </select>
-            <span class="field-err">Please select your time zone.</span>
-          </div>
-        </div>
-      </div>
 
       <div class="card">
         <div class="ct"><div class="ct-icon" aria-hidden="true">👤</div>Primary contact</div>
@@ -403,7 +384,7 @@
           <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
         </div>
       </div>
-      <div class="co co-amber" style="margin-bottom:0; margin-top:8px;"><strong>Heads up: this needs DNS changes.</strong> We will generate the DKIM and Return Path records and send them across with clear instructions. You will then need to sign in to your domain or email hosting provider (GoDaddy, Crazy Domains, Cloudflare, etc.) and add them to the DNS settings yourself. <span class="dfy-only">Not comfortable with that? Give us admin access during setup and we will add the records for you. </span>Propagation takes 1 to 48 hours once the records are live.</div>
+      <div class="co co-amber" style="margin-bottom:0; margin-top:8px;"><strong>Heads up: this needs DNS changes.</strong> We will generate the DKIM and Return Path records and send them across with clear instructions. You will then need to sign in to your domain or email hosting provider (GoDaddy, Crazy Domains, Cloudflare, etc.) and add them to the DNS settings yourself. <span><strong>If you choose Done-For-You:</strong> Not comfortable with that? Give us admin access during setup and we will add the records for you.</span>Propagation takes 1 to 48 hours once the records are live.</div>
     </div>
     </div>
 
@@ -425,8 +406,8 @@
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">💬</div>SMS phone number</div>
       <div class="co co-blue">An SMS-enabled phone number is used for outbound SMS automations. A2P / 10DLC registration may be required depending on your region.</div>
-      <div class="co co-blue dfy-only" style="margin-top:8px;">As part of your Done-For-You setup, we will purchase and configure an SMS-enabled number for you directly inside the platform. You do not need an existing number.</div>
-      <div class="co co-amber guided-only" style="margin-top:8px;"><strong>Guided setup:</strong> you will purchase an SMS-enabled number yourself directly inside the platform during your guided steps. We will walk you to the right screen — no external provider needed.</div>
+      <div class="co co-blue" style="margin-top:8px;"><strong>If you choose Done-For-You:</strong> As part of your Done-For-You setup, we will purchase and configure an SMS-enabled number for you directly inside the platform. You do not need an existing number.</div>
+      <div class="co co-amber" style="margin-top:8px;"><strong>Guided setup:</strong> you will purchase an SMS-enabled number yourself directly inside the platform during your guided steps. We will walk you to the right screen — no external provider needed.</div>
       <div class="fr x1">
         <div class="f">
           <label for="smsType">Number type preference <span class="req">*</span></label>
@@ -509,9 +490,30 @@
       <div class="sh-desc">Check everything before submitting. Our team will review your information, contact you shortly to begin configuration.</div>
     </div>
 
+
+    <div class="card">
+      <div class="ct" id="lbl-setup-review"><div class="ct-icon" aria-hidden="true">🛠️</div>Choose your setup option</div>
+      <p style="margin:0 0 12px; color:var(--g6); font-size:13px; line-height:1.55;">You can have us build the whole account for you, or follow our guided checklist and configure it yourself. Same outcome either way — pick what fits your time and confidence.</p>
+      <div class="setup-grid" role="radiogroup" aria-labelledby="lbl-setup-review">
+        <label class="setup-card sel" id="sc-dfy" data-setup="dfy">
+          <input type="radio" name="setup" value="dfy" aria-label="Done-For-You: our team configures your account, typically 5 to 7 business days" checked>
+          <div class="setup-dot" aria-hidden="true"></div>
+          <div class="setup-name" aria-hidden="true">Done-For-You</div>
+          <div class="setup-desc" aria-hidden="true">Our team configures your entire account. You provide the information, we handle everything else. Typically 5 to 7 business days.</div>
+          <div class="setup-price" data-price-slot="dfy" aria-hidden="true"></div>
+        </label>
+        <label class="setup-card" id="sc-guided" data-setup="guided">
+          <input type="radio" name="setup" value="guided" aria-label="Guided self-setup: configure your own account with our step-by-step checklist">
+          <div class="setup-dot" aria-hidden="true"></div>
+          <div class="setup-name" aria-hidden="true">Guided (self-setup)</div>
+          <div class="setup-desc" aria-hidden="true">You configure your own account using our step-by-step checklist, with support available if you get stuck. Typically 3 to 5 business days.</div>
+          <div class="setup-price" data-price-slot="guided" aria-hidden="true"></div>
+        </label>
+      </div>
+    </div>
     <div class="sum-grid">
       <div class="sum-sec">
-        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">📦</span><span class="sum-hdr-title">Plan and setup</span><button type="button" class="sum-edit" data-edit-step="1">Edit</button></div>
+        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">📦</span><span class="sum-hdr-title">Plan and setup</span></div>
         <div class="sum-body">
           <div class="sum-f"><div class="sum-k">Plan</div><div class="sum-v" id="sv-plan">Scale</div></div>
           <div class="sum-f"><div class="sum-k">Setup type</div><div class="sum-v" id="sv-setup">Not provided</div></div>
@@ -610,7 +612,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
-<script src="/js/form.js?v=20260515a"></script>
+<script src="/js/form.js?v=20260515r"></script>
 <script src="/js/form-attachments.js?v=20260515a"></script>
 
 </div><!-- /formWrap -->
