@@ -427,7 +427,7 @@
         <tr>
           <td>
             <div class="cat-upg-name">${escapeHtml(r.head.name)}${activeChip}</div>
-            <div class="cat-upg-scope">SKU: <code>${escapeHtml(r.head.sku)}</code>${r.head.description ? ' · ' + escapeHtml(r.head.description) : ''}</div>
+            <div class="cat-upg-scope">${escapeHtml(r.head.description || '')}</div>
           </td>
           <td><span class="bdg bdg-setup">${escapeHtml(GENERAL_CATEGORY_LABEL[cat] || cat)}</span></td>
           <td>${audCell}</td>
@@ -460,6 +460,23 @@
     renderGenerals();
   }
 
+  // Build a SKU from a name without showing it to the admin. The handle is
+  // structural (pairs the AUD + USD currency rows of the same product) but
+  // the team doesn't need to manage it. Suffix is 4 hex chars from
+  // crypto.getRandomValues so duplicate-named products don't collide on the
+  // (sku, currency) unique constraint.
+  function generateGeneralSku(name) {
+    const slug = String(name || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'product';
+    const bytes = new Uint8Array(2);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    const suffix = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+    return `${slug}-${suffix}`;
+  }
+
   async function openGeneralEditor(sku) {
     const isNew = !sku;
     let aud = null, usd = null, head = null;
@@ -479,9 +496,8 @@
       <div class="cat-form" style="margin-top:12px;">
         <div class="cat-form-row" style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
           <div>
-            <label for="catGpSku">SKU</label>
-            <input type="text" id="catGpSku" value="${escapeHtml(draft.sku)}" placeholder="strategy-call-1h" maxlength="80"${isNew ? '' : ' readonly'}>
-            <p class="set-hint">${isNew ? 'Lowercase, dashes. Used as a stable handle when wording changes.' : 'SKU is fixed once created.'}</p>
+            <label for="catGpName">Product name</label>
+            <input type="text" id="catGpName" value="${escapeHtml(draft.name)}" placeholder="Strategy consulting (1 hour)" maxlength="160">
           </div>
           <div>
             <label for="catGpCategory">Category</label>
@@ -489,10 +505,6 @@
               ${GENERAL_CATEGORY_ORDER.map((c) => `<option value="${c}"${draft.category===c?' selected':''}>${GENERAL_CATEGORY_LABEL[c]}</option>`).join('')}
             </select>
           </div>
-        </div>
-        <div class="cat-form-row">
-          <label for="catGpName">Product name</label>
-          <input type="text" id="catGpName" value="${escapeHtml(draft.name)}" placeholder="Strategy consulting (1 hour)" maxlength="160">
         </div>
         <div class="cat-form-row">
           <label for="catGpDesc">Description</label>
@@ -525,21 +537,21 @@
     const ok = await window.AdminModal.confirm({ title: isNew ? 'Add general product' : 'Edit product', message: body, confirmLabel: 'Save', size: 'wide' });
     if (!ok) return;
 
-    const skuVal = $('catGpSku').value.trim();
-    if (!skuVal || !/^[a-z0-9][a-z0-9-]*$/.test(skuVal)) {
-      await window.AdminModal.alert('SKU must be lowercase letters, numbers, and dashes.');
-      return;
-    }
+    const nameVal = $('catGpName').value.trim();
+    if (!nameVal) { await window.AdminModal.alert('Name cannot be blank.'); return; }
+    // SKU is no longer admin-facing. For new products we derive it from
+    // the name + a short hex suffix so duplicate names can coexist; for
+    // edits we keep the existing sku unchanged.
+    const skuVal = isNew ? generateGeneralSku(nameVal) : draft.sku;
     const patch = {
       sku: skuVal,
       category: $('catGpCategory').value,
-      name: $('catGpName').value.trim(),
+      name: nameVal,
       description: $('catGpDesc').value.trim(),
       includes: $('catGpIncl').value.split('\n').map((s) => s.trim()).filter(Boolean),
       sort_order: parseInt($('catGpSort').value, 10) || 100,
       active: $('catGpActive').checked,
     };
-    if (!patch.name) { await window.AdminModal.alert('Name cannot be blank.'); return; }
     const audCents = Math.round((parseFloat($('catGpAud').value) || 0) * 100);
     const usdCents = Math.round((parseFloat($('catGpUsd').value) || 0) * 100);
     if (!audCents && !usdCents) { await window.AdminModal.alert('Set at least one price (AUD or USD).'); return; }
