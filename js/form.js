@@ -433,6 +433,20 @@
     // final step (the picker and the summary now live on the same panel).
     const svSetup = document.getElementById('sv-setup');
     if (svSetup) svSetup.innerHTML = setupFeeSummaryHtml();
+    // Sticky paybar at the top of the review step shows the authoritative
+    // total (with tax + discount). Re-fetch it whenever the toggle changes so
+    // the "Pay now" headline tracks the live selection without waiting for
+    // the user to open the pay modal. refreshPricing is idempotent + fetch-
+    // locked so rapid toggles collapse to one in-flight request.
+    if (typeof refreshPricing === 'function' && document.getElementById('payBar')) {
+      // Optimistic immediate update from the local table so the user sees
+      // an instant change; the async resolve-pricing call follows and
+      // overwrites with the authoritative figure (handles discount codes).
+      const local = priceFor(state.setup);
+      const amtEl = document.getElementById('paybar-amt');
+      if (amtEl && local && local.amount) amtEl.textContent = local.amount + ' ' + local.currency;
+      refreshPricing();
+    }
   }
 
   // Show/hide plan-conditional sections.
