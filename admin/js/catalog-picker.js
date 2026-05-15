@@ -15,10 +15,15 @@
     plan_upgrade: 'Plan upgrade',
     setup_conversion: 'Setup conversion',
     combined_upgrade: 'Combined',
+    consulting: 'Consulting',
+    training: 'Training',
+    addon: 'Add-on',
+    custom: 'Custom',
+    other: 'Other',
   };
 
   let mounted = false;
-  let state = { rows: [], currency: 'AUD', search: '', category: 'all', onPick: null };
+  let state = { rows: [], currency: 'AUD', search: '', category: 'all', source: 'upgrades', onPick: null };
 
   function ensureMounted() {
     if (mounted) return;
@@ -34,16 +39,17 @@
       <div class="cat-picker-backdrop" data-cp-close></div>
       <div class="cat-picker-sheet">
         <header class="cat-picker-hdr">
-          <h3 id="catalogPickerTitle">Pick an upgrade from the catalog</h3>
+          <h3 id="catalogPickerTitle">Pick a product from the catalog</h3>
           <button type="button" class="btn-link" data-cp-close aria-label="Close">×</button>
         </header>
+        <div class="cat-picker-sources" role="tablist" aria-label="Catalog source">
+          <button type="button" class="cat-picker-source active" data-cp-source="upgrades" aria-selected="true">Upgrades</button>
+          <button type="button" class="cat-picker-source" data-cp-source="general" aria-selected="false">General products</button>
+        </div>
         <div class="cat-picker-tools">
-          <input type="search" id="cpSearch" placeholder="Search path, scope, plan…" autocomplete="off">
+          <input type="search" id="cpSearch" placeholder="Search name, scope…" autocomplete="off">
           <select id="cpCategory" aria-label="Filter by category">
             <option value="all">All categories</option>
-            <option value="plan_upgrade">Plan upgrade</option>
-            <option value="setup_conversion">Setup conversion</option>
-            <option value="combined_upgrade">Combined</option>
           </select>
           <select id="cpCurrency" aria-label="Currency">
             <option value="AUD">AUD</option>
@@ -74,6 +80,23 @@
       state.currency = e.target.value || 'AUD';
       load();
     });
+    // Source toggle: Upgrades vs General products. Re-fetches the correct
+    // table and refreshes the category filter options to match.
+    root.querySelectorAll('[data-cp-source]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const next = btn.getAttribute('data-cp-source');
+        if (!next || next === state.source) return;
+        state.source = next;
+        state.category = 'all';
+        root.querySelectorAll('[data-cp-source]').forEach((b) => {
+          const on = b === btn;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        refreshCategoryOptions();
+        load();
+      });
+    });
     root.querySelector('#cpBody').addEventListener('click', (e) => {
       const row = e.target.closest('[data-cp-id]');
       if (!row) return;
@@ -96,9 +119,14 @@
       if (body) body.innerHTML = '<div class="adm-empty" style="padding:40px 0;">Could not connect.</div>';
       return;
     }
+    const isGeneral = state.source === 'general';
+    const table = isGeneral ? 'general_products' : 'upgrade_products';
+    const select = isGeneral
+      ? 'id, sku, category, currency, amount_cents, name, description, includes, sort_order'
+      : 'id, category, from_plan, to_plan, from_setup, to_setup, currency, amount_cents, name, description, includes, sort_order';
     const { data, error } = await client
-      .from('upgrade_products')
-      .select('id, category, from_plan, to_plan, from_setup, to_setup, currency, amount_cents, name, description, includes, sort_order')
+      .from(table)
+      .select(select)
       .eq('active', true)
       .eq('currency', state.currency)
       .order('sort_order');
@@ -108,7 +136,24 @@
       return;
     }
     state.rows = data || [];
+    refreshCategoryOptions();
     render();
+  }
+
+  // Populate the category <select> with the categories present in the
+  // currently loaded source. Keeps the dropdown relevant: setup_conversion
+  // shouldn't appear when General products is active, and vice versa.
+  function refreshCategoryOptions() {
+    const sel = document.getElementById('cpCategory');
+    if (!sel) return;
+    const isGeneral = state.source === 'general';
+    const order = isGeneral
+      ? ['consulting', 'training', 'addon', 'custom', 'other']
+      : ['plan_upgrade', 'setup_conversion', 'combined_upgrade'];
+    const opts = ['<option value="all">All categories</option>'];
+    for (const c of order) opts.push(`<option value="${c}">${CATEGORY_LABEL[c] || c}</option>`);
+    sel.innerHTML = opts.join('');
+    sel.value = state.category || 'all';
   }
 
   function render() {
@@ -117,7 +162,7 @@
     const filtered = state.rows.filter((r) => {
       if (state.category !== 'all' && r.category !== state.category) return false;
       if (!state.search) return true;
-      const hay = [r.name, r.description, r.from_plan, r.to_plan].filter(Boolean).join(' ').toLowerCase();
+      const hay = [r.name, r.description, r.from_plan, r.to_plan, r.sku].filter(Boolean).join(' ').toLowerCase();
       return hay.includes(state.search);
     });
     if (!filtered.length) {
@@ -146,12 +191,18 @@
       currency: opts && opts.currency ? String(opts.currency).toUpperCase() : 'AUD',
       search: '',
       category: 'all',
+      source: opts && opts.source ? opts.source : 'upgrades',
       onPick: opts && typeof opts.onPick === 'function' ? opts.onPick : null,
     };
     const root = document.getElementById('catalogPicker');
     root.hidden = false;
     root.querySelector('#cpSearch').value = '';
-    root.querySelector('#cpCategory').value = 'all';
+    root.querySelectorAll('[data-cp-source]').forEach((b) => {
+      const on = b.getAttribute('data-cp-source') === state.source;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    refreshCategoryOptions();
     root.querySelector('#cpCurrency').value = state.currency;
     setTimeout(() => root.querySelector('#cpSearch')?.focus(), 0);
     load();

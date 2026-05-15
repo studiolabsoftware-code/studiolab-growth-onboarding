@@ -27,6 +27,7 @@
 
   let products = [];
   let upgrades = [];
+  let generals = [];
   let codes = [];
   let bound = false;
   let activeTab = 'products';
@@ -38,11 +39,21 @@
   };
   const UPGRADE_CATEGORY_ORDER = ['plan_upgrade', 'setup_conversion', 'combined_upgrade'];
 
+  const GENERAL_CATEGORY_LABEL = {
+    consulting: 'Consulting',
+    training: 'Training',
+    addon: 'Add-on',
+    custom: 'Custom',
+    other: 'Other',
+  };
+  const GENERAL_CATEGORY_ORDER = ['consulting', 'training', 'addon', 'custom', 'other'];
+
   async function show() {
     bind();
-    await Promise.all([loadProducts(), loadUpgrades(), loadCodes(), loadMode()]);
+    await Promise.all([loadProducts(), loadUpgrades(), loadGenerals(), loadCodes(), loadMode()]);
     renderMatrix();
     renderUpgrades();
+    renderGenerals();
     renderCodes();
   }
 
@@ -55,6 +66,8 @@
     });
 
     $('catCodeNewBtn').addEventListener('click', () => openCodeModal(null));
+    const genBtn = $('catGeneralNewBtn');
+    if (genBtn) genBtn.addEventListener('click', () => openGeneralEditor(null));
 
     // Delegated action handler for product matrix + codes table.
     document.body.addEventListener('click', (e) => {
@@ -74,6 +87,7 @@
     });
     $('catProductsPanel').style.display = tab === 'products' ? '' : 'none';
     $('catUpgradesPanel').style.display = tab === 'upgrades' ? '' : 'none';
+    $('catGeneralPanel').style.display = tab === 'general' ? '' : 'none';
     $('catCodesPanel').style.display = tab === 'codes' ? '' : 'none';
   }
 
@@ -125,8 +139,22 @@
   function renderUpgrades() {
     const tbody = $('catUpgradesTbody');
     if (!tbody) return;
+    // Inject the Add-upgrade button into the panel header once.
+    const panel = $('catUpgradesPanel');
+    if (panel && !panel.querySelector('#catUpgradeNewBtn')) {
+      const hdr = panel.querySelector('.cat-codes-hdr');
+      if (hdr) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-p';
+        btn.id = 'catUpgradeNewBtn';
+        btn.textContent = '+ Add upgrade';
+        btn.addEventListener('click', () => openUpgradeEditor(null));
+        hdr.appendChild(btn);
+      }
+    }
     if (!upgrades.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="adm-empty">No upgrade products. Run migration 021 to seed.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="adm-empty">No upgrade products. Run migration 021 to seed, or click <strong>+ Add upgrade</strong>.</td></tr>';
       return;
     }
     const rows = groupedUpgrades();
@@ -141,16 +169,20 @@
       const pathLabel = escapeHtml(r.head.name);
       const audCell = renderUpgradePriceCell(r.aud);
       const usdCell = renderUpgradePriceCell(r.usd);
+      const editKey = `${r.head.from_plan}|${r.head.to_plan}|${r.head.from_setup}|${r.head.to_setup}`;
+      const activeChip = (r.aud && r.aud.active) || (r.usd && r.usd.active)
+        ? ''
+        : ' <span class="cat-chip cat-chip-off" style="margin-left:6px;">Inactive</span>';
       html.push(`
         <tr>
           <td>
-            <div class="cat-upg-name">${pathLabel}</div>
+            <div class="cat-upg-name">${pathLabel}${activeChip}</div>
             <div class="cat-upg-scope">${escapeHtml(r.head.description || '')}</div>
           </td>
           <td><span class="bdg bdg-setup">${escapeHtml(UPGRADE_CATEGORY_LABEL[cat] || cat)}</span></td>
           <td>${audCell}</td>
           <td>${usdCell}</td>
-          <td></td>
+          <td><button class="btn-link" data-cat-action="edit-upgrade-details" data-key="${escapeHtml(editKey)}">Edit details</button></td>
         </tr>`);
     }
     tbody.innerHTML = html.join('');
@@ -171,8 +203,13 @@
   }
 
   async function handleEditUpgradePrice(id) {
-    const row = upgrades.find((u) => u.id === id);
+    // The price cell renderer is shared between Upgrades and General, so a
+    // click here might target either table. Resolve which one owns the id.
+    const upgradeRow = upgrades.find((u) => u.id === id);
+    const generalRow = !upgradeRow ? generals.find((g) => g.id === id) : null;
+    const row = upgradeRow || generalRow;
     if (!row) return;
+    const tableName = upgradeRow ? 'upgrade_products' : 'general_products';
     const current = (row.amount_cents / 100).toFixed(2);
     const raw = window.prompt(
       `New price for ${row.name} (${row.currency}, ex GST).\nCurrent: ${current}`,
@@ -187,13 +224,349 @@
     const newCents = Math.round(parsed * 100);
     if (newCents === row.amount_cents) return;
     const client = sb();
-    const { error } = await client.from('upgrade_products').update({ amount_cents: newCents }).eq('id', id);
+    const { error } = await client.from(tableName).update({ amount_cents: newCents }).eq('id', id);
     if (error) {
       await (window.AdminModal ? window.AdminModal.alert({ title: 'Update failed', message: escapeHtml(error.message) }) : Promise.resolve());
       return;
     }
+    if (upgradeRow) { await loadUpgrades(); renderUpgrades(); }
+    else            { await loadGenerals(); renderGenerals(); }
+  }
+
+  // Full edit modal for an upgrade SKU (or a fresh new path). Pass `null`
+  // to open the editor in "new upgrade" mode; pass a {from_plan,to_plan,
+  // from_setup,to_setup} key to edit an existing path.
+  async function openUpgradeEditor(key) {
+    const isNew = !key;
+    let aud = null, usd = null, head = null;
+    if (!isNew) {
+      const parts = key.split('|');
+      const [fp, tp, fs, ts] = parts;
+      const matches = upgrades.filter((u) => u.from_plan===fp && u.to_plan===tp && u.from_setup===fs && u.to_setup===ts);
+      aud = matches.find((u) => u.currency === 'AUD') || null;
+      usd = matches.find((u) => u.currency === 'USD') || null;
+      head = aud || usd;
+      if (!head) return;
+    }
+    const draft = head || { category: 'plan_upgrade', from_plan: 'launch', to_plan: 'scale', from_setup: 'guided', to_setup: 'guided', name: '', description: '', includes: [], active: true, sort_order: 100 };
+    const includesText = (draft.includes || []).join('\n');
+    const audAmt = aud ? ((aud.amount_cents||0)/100).toFixed(2) : '';
+    const usdAmt = usd ? ((usd.amount_cents||0)/100).toFixed(2) : '';
+    const body = `
+      <p>${isNew ? 'Define a new upgrade path. Both AUD and USD rows are created.' : 'Edit this upgrade. Changes apply to both AUD and USD rows so they stay in sync.'}</p>
+      <div class="cat-form" style="margin-top:12px;">
+        <div class="cat-form-row">
+          <label for="catUpName">Path name</label>
+          <input type="text" id="catUpName" value="${escapeHtml(draft.name)}" placeholder="e.g. Launch → Scale (Guided)" maxlength="160">
+        </div>
+        <div class="cat-form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label for="catUpCategory">Category</label>
+            <select id="catUpCategory">
+              <option value="plan_upgrade"${draft.category==='plan_upgrade'?' selected':''}>Plan upgrade</option>
+              <option value="setup_conversion"${draft.category==='setup_conversion'?' selected':''}>Setup conversion</option>
+              <option value="combined_upgrade"${draft.category==='combined_upgrade'?' selected':''}>Combined</option>
+            </select>
+          </div>
+          <div>
+            <label for="catUpSort">Sort order</label>
+            <input type="number" id="catUpSort" min="0" step="10" value="${draft.sort_order || 100}">
+          </div>
+        </div>
+        <div class="cat-form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label for="catUpFromPlan">From plan</label>
+            <select id="catUpFromPlan">
+              <option value="launch"${draft.from_plan==='launch'?' selected':''}>Launch</option>
+              <option value="scale"${draft.from_plan==='scale'?' selected':''}>Scale</option>
+              <option value="ai"${draft.from_plan==='ai'?' selected':''}>Dominate AI</option>
+            </select>
+          </div>
+          <div>
+            <label for="catUpToPlan">To plan</label>
+            <select id="catUpToPlan">
+              <option value="launch"${draft.to_plan==='launch'?' selected':''}>Launch</option>
+              <option value="scale"${draft.to_plan==='scale'?' selected':''}>Scale</option>
+              <option value="ai"${draft.to_plan==='ai'?' selected':''}>Dominate AI</option>
+            </select>
+          </div>
+        </div>
+        <div class="cat-form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label for="catUpFromSetup">From setup</label>
+            <select id="catUpFromSetup">
+              <option value="guided"${draft.from_setup==='guided'?' selected':''}>Guided</option>
+              <option value="dfy"${draft.from_setup==='dfy'?' selected':''}>Done-For-You</option>
+            </select>
+          </div>
+          <div>
+            <label for="catUpToSetup">To setup</label>
+            <select id="catUpToSetup">
+              <option value="guided"${draft.to_setup==='guided'?' selected':''}>Guided</option>
+              <option value="dfy"${draft.to_setup==='dfy'?' selected':''}>Done-For-You</option>
+            </select>
+          </div>
+        </div>
+        <div class="cat-form-row">
+          <label for="catUpDesc">Scope / description</label>
+          <textarea id="catUpDesc" rows="2" style="width:100%;padding:9px 12px;border:1px solid var(--g2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--g8);">${escapeHtml(draft.description || '')}</textarea>
+          <p class="set-hint">One sentence that appears on the invoice line description.</p>
+        </div>
+        <div class="cat-form-row">
+          <label for="catUpIncl">Inclusions (one per line)</label>
+          <textarea id="catUpIncl" rows="5" style="width:100%;padding:9px 12px;border:1px solid var(--g2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--g8);">${escapeHtml(includesText)}</textarea>
+        </div>
+        <div class="cat-form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label for="catUpAud">AUD price (ex GST)</label>
+            <input type="number" id="catUpAud" min="0" step="0.01" placeholder="0.00" value="${audAmt}">
+          </div>
+          <div>
+            <label for="catUpUsd">USD price</label>
+            <input type="number" id="catUpUsd" min="0" step="0.01" placeholder="0.00" value="${usdAmt}">
+          </div>
+        </div>
+        <div class="cat-form-row">
+          <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="catUpActive"${(isNew || (aud&&aud.active) || (usd&&usd.active)) ? ' checked' : ''}> Active (visible in picker)
+          </label>
+        </div>
+      </div>`;
+    const ok = await window.AdminModal.confirm({ title: isNew ? 'Add upgrade' : 'Edit upgrade', message: body, confirmLabel: 'Save', size: 'wide' });
+    if (!ok) return;
+
+    const patch = {
+      name: $('catUpName').value.trim(),
+      category: $('catUpCategory').value,
+      from_plan: $('catUpFromPlan').value,
+      to_plan: $('catUpToPlan').value,
+      from_setup: $('catUpFromSetup').value,
+      to_setup: $('catUpToSetup').value,
+      description: $('catUpDesc').value.trim(),
+      includes: $('catUpIncl').value.split('\n').map((s) => s.trim()).filter(Boolean),
+      sort_order: parseInt($('catUpSort').value, 10) || 100,
+      active: $('catUpActive').checked,
+    };
+    const audCents = Math.round((parseFloat($('catUpAud').value) || 0) * 100);
+    const usdCents = Math.round((parseFloat($('catUpUsd').value) || 0) * 100);
+    if (!patch.name) { await window.AdminModal.alert('Path name cannot be blank.'); return; }
+    if (!patch.description) { await window.AdminModal.alert('Scope/description cannot be blank.'); return; }
+
+    const client = sb();
+    if (isNew) {
+      const { error } = await client.from('upgrade_products').insert([
+        { ...patch, currency: 'AUD', amount_cents: audCents },
+        { ...patch, currency: 'USD', amount_cents: usdCents },
+      ]);
+      if (error) { await window.AdminModal.alert({ title: 'Could not add', message: escapeHtml(error.message) }); return; }
+    } else {
+      const ops = [];
+      if (aud) ops.push(client.from('upgrade_products').update({ ...patch, amount_cents: audCents }).eq('id', aud.id));
+      else     ops.push(client.from('upgrade_products').insert({ ...patch, currency: 'AUD', amount_cents: audCents }));
+      if (usd) ops.push(client.from('upgrade_products').update({ ...patch, amount_cents: usdCents }).eq('id', usd.id));
+      else     ops.push(client.from('upgrade_products').insert({ ...patch, currency: 'USD', amount_cents: usdCents }));
+      const results = await Promise.all(ops);
+      const failed = results.find((r) => r.error);
+      if (failed) { await window.AdminModal.alert({ title: 'Could not save', message: escapeHtml(failed.error.message) }); return; }
+    }
     await loadUpgrades();
     renderUpgrades();
+  }
+
+  // ── General products ─────────────────────────────────────────────────────
+  async function loadGenerals() {
+    const client = sb(); if (!client) return;
+    const { data, error } = await client
+      .from('general_products')
+      .select('id, sku, category, currency, amount_cents, tax_code, name, description, includes, active, sort_order, updated_at')
+      .order('sort_order')
+      .order('sku')
+      .order('currency');
+    if (error) { generals = []; return; }
+    generals = data || [];
+  }
+
+  function groupedGenerals() {
+    const map = new Map();
+    for (const g of generals) {
+      if (!map.has(g.sku)) map.set(g.sku, { aud: null, usd: null, head: g });
+      const row = map.get(g.sku);
+      if (g.currency === 'AUD') row.aud = g;
+      if (g.currency === 'USD') row.usd = g;
+      row.head = row.aud || row.usd || row.head;
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      const sa = a.head.sort_order || 0, sb = b.head.sort_order || 0;
+      if (sa !== sb) return sa - sb;
+      return (a.head.sku || '').localeCompare(b.head.sku || '');
+    });
+  }
+
+  function renderGenerals() {
+    const tbody = $('catGeneralTbody');
+    if (!tbody) return;
+    if (!generals.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="adm-empty">No general products yet. Click <strong>+ Add product</strong> to create one.</td></tr>';
+      return;
+    }
+    const rows = groupedGenerals();
+    let lastCategory = null;
+    const html = [];
+    for (const r of rows) {
+      const cat = r.head.category || 'other';
+      if (cat !== lastCategory) {
+        html.push(`<tr class="cat-upg-cat"><td colspan="5"><strong>${escapeHtml(GENERAL_CATEGORY_LABEL[cat] || cat)}</strong></td></tr>`);
+        lastCategory = cat;
+      }
+      const audCell = renderUpgradePriceCell(r.aud);
+      const usdCell = renderUpgradePriceCell(r.usd);
+      const activeChip = (r.aud && r.aud.active) || (r.usd && r.usd.active)
+        ? ''
+        : ' <span class="cat-chip cat-chip-off" style="margin-left:6px;">Inactive</span>';
+      html.push(`
+        <tr>
+          <td>
+            <div class="cat-upg-name">${escapeHtml(r.head.name)}${activeChip}</div>
+            <div class="cat-upg-scope">SKU: <code>${escapeHtml(r.head.sku)}</code>${r.head.description ? ' · ' + escapeHtml(r.head.description) : ''}</div>
+          </td>
+          <td><span class="bdg bdg-setup">${escapeHtml(GENERAL_CATEGORY_LABEL[cat] || cat)}</span></td>
+          <td>${audCell}</td>
+          <td>${usdCell}</td>
+          <td><button class="btn-link" data-cat-action="edit-general" data-sku="${escapeHtml(r.head.sku)}">Edit details</button></td>
+        </tr>`);
+    }
+    tbody.innerHTML = html.join('');
+  }
+
+  // Inline price edit for both upgrade and general products (the price cell
+  // is rendered by the same helper for visual consistency).
+  async function handleEditGeneralPrice(id) {
+    const row = generals.find((g) => g.id === id);
+    if (!row) return;
+    const current = (row.amount_cents / 100).toFixed(2);
+    const raw = window.prompt(`New price for ${row.name} (${row.currency}, ex GST).\nCurrent: ${current}`, current);
+    if (raw === null) return;
+    const parsed = parseFloat(String(raw).replace(/[^0-9.]/g, ''));
+    if (!isFinite(parsed) || parsed < 0) {
+      await (window.AdminModal ? window.AdminModal.alert({ title: 'Invalid price', message: 'Enter a positive number.' }) : Promise.resolve());
+      return;
+    }
+    const newCents = Math.round(parsed * 100);
+    if (newCents === row.amount_cents) return;
+    const client = sb();
+    const { error } = await client.from('general_products').update({ amount_cents: newCents }).eq('id', id);
+    if (error) { await window.AdminModal.alert({ title: 'Update failed', message: escapeHtml(error.message) }); return; }
+    await loadGenerals();
+    renderGenerals();
+  }
+
+  async function openGeneralEditor(sku) {
+    const isNew = !sku;
+    let aud = null, usd = null, head = null;
+    if (!isNew) {
+      const matches = generals.filter((g) => g.sku === sku);
+      aud = matches.find((g) => g.currency === 'AUD') || null;
+      usd = matches.find((g) => g.currency === 'USD') || null;
+      head = aud || usd;
+      if (!head) return;
+    }
+    const draft = head || { sku: '', category: 'consulting', name: '', description: '', includes: [], active: true, sort_order: 100 };
+    const includesText = (draft.includes || []).join('\n');
+    const audAmt = aud ? ((aud.amount_cents||0)/100).toFixed(2) : '';
+    const usdAmt = usd ? ((usd.amount_cents||0)/100).toFixed(2) : '';
+    const body = `
+      <p>${isNew ? 'Add a new general product. Both AUD and USD prices can be set.' : 'Edit this product. Changes apply to both AUD and USD rows.'}</p>
+      <div class="cat-form" style="margin-top:12px;">
+        <div class="cat-form-row" style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+          <div>
+            <label for="catGpSku">SKU</label>
+            <input type="text" id="catGpSku" value="${escapeHtml(draft.sku)}" placeholder="strategy-call-1h" maxlength="80"${isNew ? '' : ' readonly'}>
+            <p class="set-hint">${isNew ? 'Lowercase, dashes. Used as a stable handle when wording changes.' : 'SKU is fixed once created.'}</p>
+          </div>
+          <div>
+            <label for="catGpCategory">Category</label>
+            <select id="catGpCategory">
+              ${GENERAL_CATEGORY_ORDER.map((c) => `<option value="${c}"${draft.category===c?' selected':''}>${GENERAL_CATEGORY_LABEL[c]}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="cat-form-row">
+          <label for="catGpName">Product name</label>
+          <input type="text" id="catGpName" value="${escapeHtml(draft.name)}" placeholder="Strategy consulting (1 hour)" maxlength="160">
+        </div>
+        <div class="cat-form-row">
+          <label for="catGpDesc">Description</label>
+          <textarea id="catGpDesc" rows="2" style="width:100%;padding:9px 12px;border:1px solid var(--g2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--g8);">${escapeHtml(draft.description || '')}</textarea>
+        </div>
+        <div class="cat-form-row">
+          <label for="catGpIncl">Inclusions (one per line)</label>
+          <textarea id="catGpIncl" rows="4" style="width:100%;padding:9px 12px;border:1px solid var(--g2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--g8);">${escapeHtml(includesText)}</textarea>
+        </div>
+        <div class="cat-form-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div>
+            <label for="catGpAud">AUD price (ex GST)</label>
+            <input type="number" id="catGpAud" min="0" step="0.01" placeholder="0.00" value="${audAmt}">
+          </div>
+          <div>
+            <label for="catGpUsd">USD price</label>
+            <input type="number" id="catGpUsd" min="0" step="0.01" placeholder="0.00" value="${usdAmt}">
+          </div>
+          <div>
+            <label for="catGpSort">Sort order</label>
+            <input type="number" id="catGpSort" min="0" step="10" value="${draft.sort_order || 100}">
+          </div>
+        </div>
+        <div class="cat-form-row">
+          <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="catGpActive"${(isNew || (aud&&aud.active) || (usd&&usd.active)) ? ' checked' : ''}> Active (visible in picker)
+          </label>
+        </div>
+      </div>`;
+    const ok = await window.AdminModal.confirm({ title: isNew ? 'Add general product' : 'Edit product', message: body, confirmLabel: 'Save', size: 'wide' });
+    if (!ok) return;
+
+    const skuVal = $('catGpSku').value.trim();
+    if (!skuVal || !/^[a-z0-9][a-z0-9-]*$/.test(skuVal)) {
+      await window.AdminModal.alert('SKU must be lowercase letters, numbers, and dashes.');
+      return;
+    }
+    const patch = {
+      sku: skuVal,
+      category: $('catGpCategory').value,
+      name: $('catGpName').value.trim(),
+      description: $('catGpDesc').value.trim(),
+      includes: $('catGpIncl').value.split('\n').map((s) => s.trim()).filter(Boolean),
+      sort_order: parseInt($('catGpSort').value, 10) || 100,
+      active: $('catGpActive').checked,
+    };
+    if (!patch.name) { await window.AdminModal.alert('Name cannot be blank.'); return; }
+    const audCents = Math.round((parseFloat($('catGpAud').value) || 0) * 100);
+    const usdCents = Math.round((parseFloat($('catGpUsd').value) || 0) * 100);
+    if (!audCents && !usdCents) { await window.AdminModal.alert('Set at least one price (AUD or USD).'); return; }
+
+    const client = sb();
+    const ops = [];
+    // Upsert each currency row independently so partial-currency setups
+    // ("AUD only") work without forcing a $0 USD row.
+    for (const [cur, cents] of [['AUD', audCents], ['USD', usdCents]]) {
+      const existing = cur === 'AUD' ? aud : usd;
+      if (cents > 0) {
+        if (existing) {
+          ops.push(client.from('general_products').update({ ...patch, amount_cents: cents }).eq('id', existing.id));
+        } else {
+          ops.push(client.from('general_products').insert({ ...patch, currency: cur, amount_cents: cents }));
+        }
+      } else if (existing) {
+        // Zero amount + existing row: deactivate rather than delete, so
+        // history of prior invoices that reference this row stays intact.
+        ops.push(client.from('general_products').update({ active: false }).eq('id', existing.id));
+      }
+    }
+    const results = await Promise.all(ops);
+    const failed = results.find((r) => r.error);
+    if (failed) { await window.AdminModal.alert({ title: 'Could not save', message: escapeHtml(failed.error.message) }); return; }
+    await loadGenerals();
+    renderGenerals();
   }
 
   async function loadCodes() {
@@ -340,6 +713,8 @@
     const id = btn.dataset.id;
     if (action === 'edit-price') return editPrice(id);
     if (action === 'edit-upgrade-price') return handleEditUpgradePrice(id);
+    if (action === 'edit-upgrade-details') return openUpgradeEditor(btn.dataset.key);
+    if (action === 'edit-general') return openGeneralEditor(btn.dataset.sku);
     if (action === 'edit-details') return editDetails(btn.dataset.plan, btn.dataset.setup);
     if (action === 'history') return showHistory(id);
     if (action === 'toggle-active') return toggleActive(id, btn.dataset.active !== 'true');

@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/form.css">
-<link rel="stylesheet" href="css/admin.css?v=20260515g">
+<link rel="stylesheet" href="css/admin.css?v=20260515h">
 <link rel="icon" type="image/png" href="/assets/studiolab-icon.png">
 <link rel="apple-touch-icon" href="/assets/studiolab-icon.png">
 <link rel="shortcut icon" href="/assets/studiolab-icon.png">
@@ -126,6 +126,7 @@
     <div class="cat-tabs" role="tablist">
       <button type="button" class="cat-tab active" data-tab="products" role="tab" aria-selected="true">Setup products</button>
       <button type="button" class="cat-tab" data-tab="upgrades" role="tab" aria-selected="false">Upgrades</button>
+      <button type="button" class="cat-tab" data-tab="general" role="tab" aria-selected="false">General products</button>
       <button type="button" class="cat-tab" data-tab="codes" role="tab" aria-selected="false">Discount codes</button>
     </div>
 
@@ -151,7 +152,26 @@
           <tbody id="catUpgradesTbody"><tr><td colspan="5" class="adm-empty">Loading upgrades…</td></tr></tbody>
         </table>
       </div>
-      <p class="cat-foot-hint">Click a price to edit it. Edits write directly to <code>upgrade_products</code> and take effect on the next invoice or quote line-item picker open. Australian invoices add 10% GST at invoice time.</p>
+      <p class="cat-foot-hint">Click a price to edit it, or use <strong>Edit details</strong> to update the path label, scope, or inclusions. <strong>+ Add upgrade</strong> creates a new path with an AUD and USD row.</p>
+    </div>
+
+    <div class="cat-panel" id="catGeneralPanel" style="display:none">
+      <div class="cat-codes-hdr">
+        <div>
+          <h3 class="cat-codes-title">General products</h3>
+          <p class="cat-codes-desc">Catch-all for anything outside setup fees and upgrades — consulting, training, custom builds, audits, support packs. Use the invoice or quote picker to drop any of these in as a line item.</p>
+        </div>
+        <button type="button" class="btn btn-p" id="catGeneralNewBtn">+ Add product</button>
+      </div>
+      <div class="users-tablewrap">
+        <table class="adm-table cat-codes-table">
+          <thead>
+            <tr><th>Product</th><th>Category</th><th>AUD ex GST</th><th>USD</th><th aria-label="Actions"></th></tr>
+          </thead>
+          <tbody id="catGeneralTbody"><tr><td colspan="5" class="adm-empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="cat-foot-hint">Click a price to edit it, or use <strong>Edit details</strong> to update the SKU, name, description, inclusions, or active state. AUD invoices add 10% GST at invoice time.</p>
     </div>
 
     <div class="cat-panel" id="catCodesPanel" style="display:none">
@@ -656,12 +676,12 @@
 <script src="js/modal.js?v=20260515a"></script>
 <script src="js/dashboard.js?v=20260513b"></script>
 <script src="js/detail.js?v=20260515d"></script>
-<script src="js/catalog-picker.js?v=20260515g"></script>
+<script src="js/catalog-picker.js?v=20260515h"></script>
 <script src="js/invoice.js?v=20260515g"></script>
 <script src="js/quote.js?v=20260515g"></script>
 <script src="js/change-request.js?v=20260513a"></script>
 <script src="js/users.js?v=20260513b"></script>
-<script src="js/catalog.js?v=20260515g"></script>
+<script src="js/catalog.js?v=20260515h"></script>
 <script src="js/settings.js?v=20260513a"></script>
 <script src="js/inbox.js?v=20260515a"></script>
 </body>
