@@ -15,8 +15,17 @@
 .adm-user { display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.85); font-size: 12px; }
 .adm-user #admUserEmail { color: #fff; font-weight: 500; }
 .btn-link { background: none; border: none; color: var(--mg); font-weight: 600; cursor: pointer; font-size: 12px; padding: 4px 8px; font-family: inherit; border-radius: 4px; }
-.btn-link:hover { color: #fff; text-decoration: underline; }
-.btn-link:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* Default hover (and focus) sits on light card / modal surfaces. Use a
+   darker pink + a faint tint so the action stays legible on pointer-
+   over instead of washing out to white. The legacy "white on purple"
+   look is preserved by the .adm-hdr override below. */
+.btn-link:hover { color: var(--mg-d); background: rgba(225, 28, 132, 0.08); text-decoration: underline; }
+.btn-link:focus-visible { outline: 2px solid var(--mg); outline-offset: 2px; }
+/* Inside the dark admin header bar, swap back to white-on-purple so the
+   header actions still read against the dark backdrop. */
+.adm-hdr .btn-link { color: #fff; }
+.adm-hdr .btn-link:hover { color: #fff; background: rgba(255, 255, 255, 0.14); text-decoration: underline; }
+.adm-hdr .btn-link:focus-visible { outline: 2px solid #fff; }
 
 /* ── Login ─────────────────────────────────────────── */
 .adm-login { max-width: 420px; margin: 80px auto; padding: 0 24px; }
