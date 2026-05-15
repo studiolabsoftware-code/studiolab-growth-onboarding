@@ -22,7 +22,7 @@ import { getCallerProfile } from '../_shared/caller.ts';
 import { getStripeKey, stripeRequest } from '../_shared/stripe.ts';
 
 interface RequestBody {
-  action: 'resend' | 'void';
+  action: 'resend' | 'void' | 'get-snapshot';
   invoice_id?: string;
   stripe_invoice_id?: string;
 }
@@ -37,8 +37,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({})) as Partial<RequestBody>;
     const action = body.action;
-    if (action !== 'resend' && action !== 'void') {
-      return jsonResponse({ ok: false, error: 'action must be resend or void.' }, 400);
+    if (action !== 'resend' && action !== 'void' && action !== 'get-snapshot') {
+      return jsonResponse({ ok: false, error: 'action must be resend, void, or get-snapshot.' }, 400);
     }
     const idInput = (body.invoice_id || '').trim();
     const stripeIdInput = (body.stripe_invoice_id || '').trim();
@@ -56,6 +56,67 @@ Deno.serve(async (req) => {
 
     const secretKey = await getStripeKey();
     if (!secretKey) return jsonResponse({ ok: false, error: 'Stripe is not configured.' }, 500);
+
+    if (action === 'get-snapshot') {
+      // Fetch the full Stripe invoice including its line items so the admin
+      // UI can rehydrate the create-invoice modal as a "revise" prefill
+      // without voiding anything yet. The void only happens later when the
+      // admin actually clicks Send on the revised modal.
+      const snap = await stripeRequest<{
+        id: string;
+        currency?: string;
+        collection_method?: string;
+        days_until_due?: number | null;
+        description?: string | null;
+        customer_email?: string | null;
+        customer_name?: string | null;
+        customer_address?: { country?: string | null } | null;
+        lines?: { data: Array<{
+          description?: string | null;
+          quantity?: number | null;
+          amount?: number | null;            // total cents for the line
+          unit_amount_excluding_tax?: number | null;
+          price?: { unit_amount?: number | null; currency?: string } | null;
+        }> };
+      }>('GET', `invoices/${encodeURIComponent(row.stripe_invoice_id)}?expand[]=lines.data`, undefined, secretKey);
+      if (!snap.ok || !snap.body) {
+        return jsonResponse({ ok: false, error: snap.error || 'Could not fetch Stripe invoice.' }, 502);
+      }
+      const inv = snap.body;
+      const lines = (inv.lines?.data || []).map((l) => {
+        const qty = l.quantity || 1;
+        // Stripe returns the line total in `amount` (cents). For per-unit
+        // amount, prefer unit_amount_excluding_tax (created by our
+        // create-custom-invoice with tax_behavior=exclusive), then fall back
+        // to price.unit_amount, then divide amount by qty as a last resort.
+        const unitCents = (typeof l.unit_amount_excluding_tax === 'number' ? l.unit_amount_excluding_tax
+          : l.price?.unit_amount != null ? l.price.unit_amount
+          : Math.round((l.amount || 0) / Math.max(qty, 1)));
+        return {
+          description: l.description || '',
+          quantity: qty,
+          unit_amount_cents: unitCents,
+        };
+      });
+      return jsonResponse({
+        ok: true,
+        snapshot: {
+          invoice_id: row.id,
+          stripe_invoice_id: row.stripe_invoice_id,
+          status: row.status,
+          number: row.number,
+          submission_id: row.submission_id,
+          description: inv.description || '',
+          currency: (inv.currency || 'aud').toUpperCase(),
+          collection_method: inv.collection_method || 'send_invoice',
+          due_days: inv.days_until_due || 14,
+          customer_email: inv.customer_email || '',
+          customer_name: inv.customer_name || '',
+          customer_country: inv.customer_address?.country || '',
+          lines,
+        },
+      });
+    }
 
     if (action === 'resend') {
       if (row.status !== 'open' && row.status !== 'past_due') {

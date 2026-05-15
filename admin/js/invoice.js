@@ -123,17 +123,33 @@
     $('#invDueDays').value = '14';
     $('#invDescription').value = '';
     $('#invMemo').value = '';
-    // Reset line items. If we're opening as a revision of a previously
-    // voided invoice, seed the first row from that snapshot so the admin
-    // can edit and re-issue without retyping.
+    // Reset line items. If we're opening as a revision of an existing
+    // invoice, rehydrate every line item from the Stripe snapshot so the
+    // admin sees exactly what's on the original. The original is NOT
+    // voided yet — that happens later, on submit, only if the admin
+    // actually sends. Cancelling leaves the original untouched.
     $('#invItems').innerHTML = '';
-    if (ctx && ctx.revision) {
+    const rev = ctx && ctx.revision;
+    if (rev && Array.isArray(rev.lines) && rev.lines.length) {
+      for (const line of rev.lines) {
+        addLineItemRow({
+          description: line.description || '',
+          quantity: line.quantity || 1,
+          amount: (((line.unit_amount_cents != null ? line.unit_amount_cents : 0) / 100) || 0).toFixed(2),
+        });
+      }
+      if (rev.description) $('#invDescription').value = rev.description;
+      if (rev.due_days) $('#invDueDays').value = String(rev.due_days);
+      if (rev.collection_method) $('#invCollection').value = rev.collection_method;
+      if (rev.currency && $('#invCurrency')) $('#invCurrency').value = rev.currency;
+    } else if (rev) {
+      // Legacy single-line fallback (kept so older callers don't break).
       addLineItemRow({
-        description: ctx.revision.description || '',
-        quantity: ctx.revision.quantity || 1,
-        amount: ctx.revision.amount || '',
+        description: rev.description || '',
+        quantity: rev.quantity || 1,
+        amount: rev.amount || '',
       });
-      if (ctx.revision.description) $('#invDescription').value = ctx.revision.description;
+      if (rev.description) $('#invDescription').value = rev.description;
     } else {
       addLineItemRow();
     }
@@ -143,7 +159,11 @@
     $('#invSuccess').hidden = true;
     $('#invForm').hidden = false;
     $('#invSendBtn').disabled = false;
-    $('#invSendBtn').textContent = 'Create and send';
+    // Reframe the CTA when revising so the admin knows the original will
+    // be voided as part of this action.
+    $('#invSendBtn').textContent = rev && rev.pendingVoidId
+      ? 'Void original and re-issue'
+      : 'Create and send';
 
     modal.hidden = false;
     document.body.classList.add('adm-modal-open');
@@ -352,15 +372,42 @@
     btn.textContent = 'Creating…';
 
     try {
-      const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/create-custom-invoice';
       const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+      const apiBase = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url);
+      const anonKey = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '';
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': jwt ? `Bearer ${jwt}` : '',
+        'apikey': anonKey,
+      };
+
+      // Revision flow: void the original FIRST. If void fails (e.g. the
+      // original got paid between opening Revise and clicking Send) we
+      // abort here, leave the original alone, and surface the error. The
+      // admin can cancel out and try again, or pay attention to the new
+      // state of the original.
+      if (currentContext && currentContext.revision && currentContext.revision.pendingVoidId) {
+        btn.textContent = 'Voiding original…';
+        const vResp = await fetch(apiBase + '/functions/v1/manage-invoice', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ action: 'void', invoice_id: currentContext.revision.pendingVoidId }),
+        });
+        const vData = await vResp.json().catch(() => ({}));
+        if (!vResp.ok || !vData.ok) {
+          $('#invErr').textContent = 'Could not void the original (' + (vData.error || vResp.status) + '). The original invoice has not been changed.';
+          $('#invErr').classList.add('vis');
+          btn.disabled = false;
+          btn.textContent = orig;
+          return;
+        }
+        btn.textContent = 'Creating revised invoice…';
+      }
+
+      const url = apiBase + '/functions/v1/create-custom-invoice';
       const resp = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': jwt ? `Bearer ${jwt}` : '',
-          'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
-        },
+        headers: authHeaders,
         body: JSON.stringify(payload),
       });
       const data = await resp.json().catch(() => ({}));
@@ -547,21 +594,14 @@
     }
   }
 
-  // Revise: void the existing invoice, then open the create modal pre-
-  // filled with the same line items so the admin can edit and re-issue.
-  // Mirrors the existing reviseQuote pattern in quote.js.
+  // Revise: open the create-invoice modal pre-filled with the original
+  // line items. The Stripe void only happens later, inside submit(), iff
+  // the admin actually clicks Send. Cancelling the modal leaves the
+  // original invoice untouched.
   async function doReviseInvoice(row, onReload, submission) {
-    const ok = window.AdminModal
-      ? await window.AdminModal.confirm({
-          title: 'Revise invoice?',
-          message: `<p>This voids <strong>${ESC(row.number || 'the existing invoice')}</strong> on Stripe and opens a fresh invoice modal pre-filled with the same line items so you can edit and re-issue.</p><p style="color:var(--g6);font-size:12px;">The original stays in your records as <strong>Void</strong> for audit.</p>`,
-          confirmLabel: 'Void and revise',
-          danger: true,
-        })
-      : confirm('Void this invoice and open a new editable copy?');
-    if (!ok) return;
     const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/manage-invoice';
     const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+    let snapshot;
     try {
       const resp = await fetch(url, {
         method: 'POST',
@@ -570,31 +610,44 @@
           'Authorization': jwt ? `Bearer ${jwt}` : '',
           'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
         },
-        body: JSON.stringify({ action: 'void', invoice_id: row.id }),
+        body: JSON.stringify({ action: 'get-snapshot', invoice_id: row.id }),
       });
       const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data.ok) {
-        await (window.AdminModal ? window.AdminModal.alert({ title: 'Void failed', message: ESC(data.error || `Status ${resp.status}.`) }) : Promise.resolve());
+      if (!resp.ok || !data.ok || !data.snapshot) {
+        await (window.AdminModal ? window.AdminModal.alert({ title: 'Could not load invoice', message: ESC(data.error || `Status ${resp.status}.`) }) : Promise.resolve());
         return;
       }
-      if (typeof onReload === 'function') await onReload();
-      // Fetch the void'd invoice's line items via Stripe? We don't store
-      // them in our ledger, so the simplest revision prefill is the
-      // description + total as a single line item. Admin edits from there.
-      const prefill = {
-        description: row.description || ('Revision of ' + (row.number || 'previous invoice')),
-        quantity: 1,
-        amount: ((row.total_cents || 0) / 100).toFixed(2),
-      };
-      if (submission) {
-        open({ mode: 'studio', submission, revision: prefill });
-      } else {
-        open({ mode: 'external', revision: prefill });
-      }
+      snapshot = data.snapshot;
     } catch (err) {
-      console.error('revise failed:', err);
-      await (window.AdminModal ? window.AdminModal.alert('Could not void the invoice. Please try again.') : Promise.resolve());
+      console.error('get-snapshot failed:', err);
+      await (window.AdminModal ? window.AdminModal.alert('Could not load the invoice for revision.') : Promise.resolve());
+      return;
     }
+    // Build the revision context that the modal + submit flow consume.
+    // pendingVoidId is what tells submit() to void the original FIRST and
+    // only then issue the replacement.
+    const revision = {
+      pendingVoidId: row.id,
+      pendingVoidNumber: row.number,
+      lines: snapshot.lines || [],
+      description: snapshot.description || row.description || '',
+      currency: snapshot.currency || row.currency || 'AUD',
+      collection_method: snapshot.collection_method,
+      due_days: snapshot.due_days,
+      external: !submission ? {
+        name: snapshot.customer_name,
+        email: snapshot.customer_email,
+        country: snapshot.customer_country,
+      } : null,
+    };
+    if (submission) {
+      open({ mode: 'studio', submission, revision });
+    } else {
+      open({ mode: 'external', revision });
+    }
+    // onReload deferred — nothing changed yet. submit() will trigger a
+    // refresh after a successful void+create round trip.
+    void onReload;
   }
 
   function refreshStudioInvoicesPanel(submissionId) {
