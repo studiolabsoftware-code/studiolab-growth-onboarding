@@ -553,10 +553,16 @@ async function sendPaymentReceiptsOnce(
     }
   } catch (e) { console.error('studio receipt email failed:', e); }
 
-  // Admin notification
+  // Admin notification. Pull the full submission row so the email digest
+  // contains every field — VAs can copy-paste straight from the email into
+  // GHL without round-tripping to the admin UI.
   try {
     const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
     if (admins && admins.length) {
+      const { data: fullRow } = await sb.from('submissions')
+        .select('*')
+        .eq('id', args.submissionId)
+        .maybeSingle();
       const t = adminPaymentLanded({
         studioName: args.studioName || '(no name)',
         plan: PLAN_LABEL[args.plan || ''] || (args.plan || ''),
@@ -566,6 +572,7 @@ async function sendPaymentReceiptsOnce(
         currency,
         includesGst,
         adminUrl: adminUrlFor(args.submissionId),
+        submission: fullRow || undefined,
       });
       await sendGated({ to: admins.map((a) => a.email), subject: t.subject, html: t.html, intent: 'admin notification' });
     }

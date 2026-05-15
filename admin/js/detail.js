@@ -401,15 +401,51 @@
   }
 
   function section(title, rows) {
+    // Section-level Copy button: gathers every row's copy text and writes
+    // a labelled plain-text block to the clipboard. The VA workflow is
+    // typically "copy this whole section, paste into GHL", so the section
+    // button is more useful than per-row copies for bulk work.
     return `
       <div class="det-section">
-        <div class="det-section-hdr">${title}</div>
+        <div class="det-section-hdr">
+          <span>${title}</span>
+          <button type="button" class="copy-section-btn" data-copy-section title="Copy this section as plain text">
+            <span class="copy-btn-ico" aria-hidden="true">⧉</span>Copy section
+          </button>
+        </div>
         <div class="det-section-body">
           <dl>
             ${rows.map(renderRow).join('')}
           </dl>
         </div>
       </div>`;
+  }
+
+  // Walks the section DOM and produces a labelled plain-text block ready
+  // for paste into GHL (or anywhere else). One field per line, blank line
+  // before the section title, label and value on the same line with a
+  // pipe separator so column-style imports still parse cleanly.
+  function buildSectionPlainText(sectionEl) {
+    const titleEl = sectionEl.querySelector('.det-section-hdr > span');
+    const title = titleEl ? titleEl.textContent.trim() : 'Section';
+    const lines = [`# ${title}`, ''];
+    sectionEl.querySelectorAll('.det-row').forEach((row) => {
+      const labelEl = row.querySelector('dt');
+      const copyBtn = row.querySelector('.copy-btn[data-copy]');
+      const label = labelEl ? labelEl.textContent.trim() : '';
+      const value = copyBtn ? copyBtn.getAttribute('data-copy') : '';
+      if (!label) return;
+      // Multi-line values (descriptions, policies, etc.) get a label on a
+      // separate line above the value for readability.
+      if (value.includes('\n') || value.length > 80) {
+        lines.push(`${label}:`);
+        lines.push(value || '—');
+        lines.push('');
+      } else {
+        lines.push(`${label}: ${value || '—'}`);
+      }
+    });
+    return lines.join('\n').trim();
   }
 
   // Each row is [label, renderedHtml, copyText?, editField?]. copyText falls
@@ -514,31 +550,53 @@
     if (cancel) { cancelEdit(cancel.closest('.det-row')); return; }
   }
 
-  async function handleCopyClick(e) {
-    const btn = e.target.closest('.copy-btn');
-    if (!btn) return;
-    const text = btn.dataset.copy || '';
-    if (!text) return;
+  async function writeToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
+      return true;
     } catch (_) {
-      // Fallback for older browsers / non-HTTPS contexts
       const ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position = 'fixed';
       ta.style.opacity = '0';
       document.body.appendChild(ta);
       ta.select();
-      try { document.execCommand('copy'); } catch (_) { /* noop */ }
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
       document.body.removeChild(ta);
+      return ok;
     }
+  }
+
+  function flashCopied(btn, doneLabel) {
     const original = btn.innerHTML;
     btn.classList.add('copied');
-    btn.innerHTML = '<span class="copy-btn-ico" aria-hidden="true">✓</span>Copied';
+    btn.innerHTML = '<span class="copy-btn-ico" aria-hidden="true">✓</span>' + (doneLabel || 'Copied');
     setTimeout(() => {
       btn.classList.remove('copied');
       btn.innerHTML = original;
     }, 1400);
+  }
+
+  async function handleCopyClick(e) {
+    // Section-level copy button — grab every field in the section.
+    const sectionBtn = e.target.closest('[data-copy-section]');
+    if (sectionBtn) {
+      const sectionEl = sectionBtn.closest('.det-section');
+      if (!sectionEl) return;
+      const text = buildSectionPlainText(sectionEl);
+      if (!text) return;
+      const ok = await writeToClipboard(text);
+      flashCopied(sectionBtn, ok ? 'Section copied' : 'Copy failed');
+      return;
+    }
+    // Field-level copy button.
+    const btn = e.target.closest('.copy-btn');
+    if (!btn) return;
+    const text = btn.dataset.copy || '';
+    if (!text) return;
+    const ok = await writeToClipboard(text);
+    flashCopied(btn, ok ? 'Copied' : 'Copy failed');
   }
 
   const PLAN_AUTOMATIONS = {

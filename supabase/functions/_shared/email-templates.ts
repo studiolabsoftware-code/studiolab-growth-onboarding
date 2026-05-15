@@ -164,6 +164,187 @@ export function paymentReceiptSaveCard(opts: {
   return { subject, html: layout({ previewText: `Card saved — ${amountDisplay} will be charged when setup begins`, body }) };
 }
 
+// Submission-row shape (subset). All fields are optional in the email
+// digest — missing values render as "—" without breaking the table.
+export interface SubmissionRowLike {
+  studio_name?: string | null;
+  legal_name?: string | null;
+  country?: string | null;
+  timezone?: string | null;
+  studio_type?: string | null;
+  address?: string | null;
+  website?: string | null;
+  support_url?: string | null;
+
+  first_name?: string | null;
+  last_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  role?: string | null;
+  studiolab_email?: string | null;
+
+  logo_url?: string | null;
+  primary_colour?: string | null;
+  secondary_colour?: string | null;
+  sign_off?: string | null;
+  email_tone?: string | null;
+  footer_notes?: string | null;
+  studio_description?: string | null;
+
+  from_name?: string | null;
+  reply_email?: string | null;
+  custom_domain?: boolean | null;
+  email_domain?: string | null;
+  dns_access?: string | null;
+
+  sms_type?: string | null;
+  area_code?: string | null;
+  port_number?: string | null;
+  sms_tone?: string | null;
+  lead_sources?: unknown;
+
+  kb_greeting?: string | null;
+  kb_assistant_persona_type?: string | null;
+  kb_assistant_persona_name?: string | null;
+  kb_profile?: string | null;
+  kb_classes?: string | null;
+  kb_pricing?: string | null;
+  kb_price_quoting?: string | null;
+  kb_policies?: string | null;
+  kb_events?: string | null;
+  kb_faqs?: string | null;
+  kb_restricted?: string | null;
+  kb_tone?: string | null;
+  voice_hours?: string | null;
+  voice_escalate?: string | null;
+
+  extra_notes?: string | null;
+  plan?: string | null;
+  setup_type?: string | null;
+}
+
+// Builds a rich, copy-friendly HTML digest of the submission. Designed to
+// paste cleanly from Gmail (or any HTML-capable mail client) into GHL — the
+// 2-column tables become TAB-separated rows in plaintext targets, and
+// long-form fields (descriptions, policies) get their own labelled block so
+// they're selectable as one chunk.
+//
+// VAs are the target reader. Each section can be select+copied independently;
+// the layout mirrors the admin detail page's section structure so muscle
+// memory transfers.
+export function submissionDigestHtml(sub: SubmissionRowLike): string {
+  const v = (x: unknown): string => {
+    if (x === null || x === undefined || x === '') return '—';
+    if (Array.isArray(x)) return x.length ? x.join(', ') : '—';
+    if (typeof x === 'boolean') return x ? 'Yes' : 'No';
+    return String(x);
+  };
+  const isAi = sub.plan === 'ai';
+  const isScale = sub.plan === 'scale';
+
+  const rowsTable = (rows: Array<[string, unknown]>) => `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px;color:${COL.g8};">
+      ${rows.map(([label, value]) => `
+        <tr>
+          <td style="padding:8px 12px 8px 0;color:${COL.g6};white-space:nowrap;vertical-align:top;width:38%;">${escape(label)}</td>
+          <td style="padding:8px 0;vertical-align:top;color:${COL.in_d};">${escape(v(value))}</td>
+        </tr>
+      `).join('')}
+    </table>`;
+
+  // Long-form fields get their own labelled card so the value is selectable
+  // as one block (Gmail handles select-around-a-div cleanly).
+  const longField = (label: string, value: unknown) => {
+    const text = v(value);
+    if (text === '—') return '';
+    return `
+      <div style="margin:8px 0 12px;">
+        <div style="font-size:11px;color:${COL.g6};text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;font-weight:700;">${escape(label)}</div>
+        <div style="background:${COL.g1};border:1px solid ${COL.g2};border-radius:8px;padding:10px 12px;white-space:pre-wrap;font-size:13px;line-height:1.55;color:${COL.in_d};">${escape(text)}</div>
+      </div>`;
+  };
+
+  const sectionWrap = (title: string, inner: string) => `
+    <div style="margin:24px 0 0;">
+      <h2 style="margin:0 0 10px;font-size:13px;font-weight:700;color:${COL.in_d};letter-spacing:0.4px;text-transform:uppercase;">${escape(title)}</h2>
+      <div style="border-top:1px solid ${COL.g2};padding-top:10px;">${inner}</div>
+    </div>`;
+
+  const sections: string[] = [];
+
+  sections.push(sectionWrap('Studio details', rowsTable([
+    ['Studio name', sub.studio_name],
+    ['Legal name', sub.legal_name],
+    ['Country', sub.country],
+    ['Timezone', sub.timezone],
+    ['Studio type', sub.studio_type],
+    ['Address', sub.address],
+    ['Website', sub.website],
+    ['Support URL', sub.support_url],
+  ])));
+
+  sections.push(sectionWrap('Primary contact', rowsTable([
+    ['First name', sub.first_name],
+    ['Last name', sub.last_name],
+    ['Email', sub.contact_email],
+    ['Phone', sub.contact_phone],
+    ['Role', sub.role],
+    ['StudioLAB login email', sub.studiolab_email],
+  ])));
+
+  sections.push(sectionWrap('Branding', rowsTable([
+    ['Logo URL', sub.logo_url],
+    ['Primary colour', sub.primary_colour],
+    ['Secondary colour', sub.secondary_colour],
+    ['Sign-off', sub.sign_off],
+    ['Email tone', sub.email_tone],
+  ]) + longField('Studio description', sub.studio_description) + longField('Footer notes', sub.footer_notes)));
+
+  sections.push(sectionWrap('Email setup', rowsTable([
+    ['From name', sub.from_name],
+    ['Reply-to', sub.reply_email],
+    ['Custom domain', sub.custom_domain],
+    ['Email domain', sub.email_domain],
+    ['DNS access', sub.dns_access],
+  ])));
+
+  if (isScale || isAi) {
+    sections.push(sectionWrap('SMS & social', rowsTable([
+      ['Number preference', sub.sms_type],
+      ['Area code', sub.area_code],
+      ['Port number', sub.port_number],
+      ['Lead sources', sub.lead_sources],
+    ]) + longField('SMS tone notes', sub.sms_tone)));
+  }
+
+  if (isAi) {
+    const persona = sub.kb_assistant_persona_type === 'named' && sub.kb_assistant_persona_name
+      ? `Named — ${sub.kb_assistant_persona_name}`
+      : 'Studio name';
+    sections.push(sectionWrap('AI knowledge base', rowsTable([
+      ['Assistant persona', persona],
+      ['AI tone', sub.kb_tone],
+      ['Voice agent hours', sub.voice_hours],
+    ])
+      + longField('Greeting', sub.kb_greeting)
+      + longField('Studio profile', sub.kb_profile)
+      + longField('Classes & timetable', sub.kb_classes)
+      + longField('Pricing', sub.kb_pricing)
+      + longField('Pricing guardrail', sub.kb_price_quoting)
+      + longField('Policies', sub.kb_policies)
+      + longField('Events', sub.kb_events)
+      + longField('FAQs', sub.kb_faqs)
+      + longField('Restricted topics', sub.kb_restricted)
+      + longField('Voice escalation', sub.voice_escalate)));
+  }
+
+  if (sub.extra_notes) {
+    sections.push(sectionWrap('Additional notes', longField('Notes', sub.extra_notes)));
+  }
+
+  return sections.join('');
+}
+
 export function adminPaymentLanded(opts: {
   studioName: string;
   plan: string;
@@ -173,13 +354,14 @@ export function adminPaymentLanded(opts: {
   currency: string;
   includesGst: boolean;
   adminUrl: string;
+  submission?: SubmissionRowLike;
 }): { subject: string; html: string } {
   const modeLabel = opts.mode === 'immediate' ? 'paid (immediate capture)'
     : opts.mode === 'hold' ? 'authorised (manual capture pending)'
     : 'card saved (off-session charge pending)';
   const amountDisplay = formatAmountDisplay(opts);
   const subject = `Payment ${opts.mode === 'immediate' ? 'received' : opts.mode === 'hold' ? 'authorised' : 'card saved'}: ${opts.studioName} (${opts.plan})`;
-  const body = `
+  const summary = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Payment landed</h1>
     <p style="margin:0 0 6px;"><strong>Studio:</strong> ${escape(opts.studioName)}</p>
     <p style="margin:0 0 6px;"><strong>Plan:</strong> ${escape(opts.plan)}</p>
@@ -187,18 +369,26 @@ export function adminPaymentLanded(opts: {
     <p style="margin:0 0 6px;"><strong>Amount:</strong> ${escape(amountDisplay)}</p>
     <p style="margin:0 0 18px;"><strong>Status:</strong> ${escape(modeLabel)}</p>
     ${cta('Open in dashboard', opts.adminUrl)}`;
-  return { subject, html: layout({ previewText: `Payment ${modeLabel} for ${opts.studioName}`, body }) };
+  const digest = opts.submission ? submissionDigestHtml(opts.submission) : '';
+  return { subject, html: layout({ previewText: `Payment ${modeLabel} for ${opts.studioName}`, body: summary + digest }) };
 }
 
-export function adminNewSubmission(opts: { studioName: string; plan: string; setup: string; adminUrl: string }): { subject: string; html: string } {
+export function adminNewSubmission(opts: {
+  studioName: string;
+  plan: string;
+  setup: string;
+  adminUrl: string;
+  submission?: SubmissionRowLike;
+}): { subject: string; html: string } {
   const subject = `New Growth onboarding: ${opts.studioName} (${opts.plan})`;
-  const body = `
+  const summary = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">New onboarding submission</h1>
     <p style="margin:0 0 6px;"><strong>Studio:</strong> ${escape(opts.studioName)}</p>
     <p style="margin:0 0 6px;"><strong>Plan:</strong> ${escape(opts.plan)}</p>
     <p style="margin:0 0 18px;"><strong>Setup:</strong> ${escape(opts.setup)}</p>
     ${cta('Open in dashboard', opts.adminUrl)}`;
-  return { subject, html: layout({ previewText: `New submission from ${opts.studioName}`, body }) };
+  const digest = opts.submission ? submissionDigestHtml(opts.submission) : '';
+  return { subject, html: layout({ previewText: `New submission from ${opts.studioName}`, body: summary + digest }) };
 }
 
 export function changeRequestEmail(opts: { studioName: string; updateUrl: string; message: string; expiresAt: string }): { subject: string; html: string } {

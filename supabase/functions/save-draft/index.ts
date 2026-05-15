@@ -114,6 +114,8 @@ Deno.serve(async (req) => {
             plan: PLAN_LABEL[finalRow.plan as string] || (finalRow.plan as string),
             setup: SETUP_LABEL[finalRow.setup_type as string] || (finalRow.setup_type as string),
             adminUrl: `${appUrl}?id=${saved.id}`,
+            // Full row drives the copy-friendly digest embedded in the email.
+            submission: finalRow as Record<string, unknown>,
           });
           await sendEmail({ to: admins.map((a) => a.email), subject: t.subject, html: t.html });
         }

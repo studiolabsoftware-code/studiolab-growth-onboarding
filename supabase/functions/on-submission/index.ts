@@ -71,7 +71,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Notify all active admins
+    // Notify all active admins. The full submission row is passed so the
+    // email digest includes every field — VAs copy data straight from the
+    // email into GHL profiles without round-tripping to the admin UI.
     const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
     if (admins && admins.length) {
       const t = adminNewSubmission({
@@ -79,6 +81,7 @@ Deno.serve(async (req) => {
         plan: PLAN_LABEL[row.plan] || row.plan,
         setup: SETUP_LABEL[row.setup_type] || row.setup_type,
         adminUrl: `${appUrl}?id=${row.id}`,
+        submission: row,
       });
       await sendGated({
         to: admins.map((a) => a.email), subject: t.subject, html: t.html,
