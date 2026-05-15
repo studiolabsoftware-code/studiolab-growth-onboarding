@@ -392,6 +392,33 @@ body.role-va .adm-preview-link { display: none !important; }
 .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
 @media (max-width: 720px) { .cat-grid { grid-template-columns: 1fr; } }
 
+/* Upgrades tab: category-grouped table of upgrade SKUs with inline price edit. */
+.cat-upg-cat td { background: var(--g1); color: var(--g6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 10px 14px; border-bottom: 1px solid var(--g2); }
+.cat-upg-name { font-weight: 600; color: var(--in-d); }
+.cat-upg-scope { font-size: 11px; color: var(--g6); margin-top: 2px; max-width: 480px; }
+.cat-upg-price { display: flex; flex-direction: column; gap: 2px; }
+.cat-upg-edit { background: var(--g1); border: 1px solid var(--g2); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--in-d); font-family: inherit; display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.cat-upg-edit:hover { background: var(--in-l); border-color: var(--in); color: var(--in); }
+.cat-upg-tax { font-size: 10px; color: var(--g6); }
+
+/* Catalog picker overlay used by invoice + quote modals. */
+.cat-picker { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.cat-picker[hidden] { display: none; }
+.cat-picker-backdrop { position: absolute; inset: 0; background: rgba(19,16,46,0.55); }
+.cat-picker-sheet { position: relative; background: #fff; width: min(720px, 100%); max-height: 80vh; display: flex; flex-direction: column; border-radius: 16px; box-shadow: 0 12px 40px rgba(19,16,46,0.25); overflow: hidden; }
+.cat-picker-hdr { padding: 16px 20px; border-bottom: 1px solid var(--g2); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cat-picker-hdr h3 { margin: 0; font-size: 16px; color: var(--in-d); }
+.cat-picker-tools { display: flex; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--g2); flex-wrap: wrap; align-items: center; }
+.cat-picker-tools input[type=search] { flex: 1; min-width: 160px; padding: 8px 12px; border: 1px solid var(--g2); border-radius: 8px; font-size: 13px; font-family: inherit; }
+.cat-picker-body { overflow-y: auto; padding: 4px 0; }
+.cat-picker-row { padding: 12px 20px; border-bottom: 1px solid var(--g2); cursor: pointer; display: flex; align-items: center; gap: 12px; }
+.cat-picker-row:hover, .cat-picker-row:focus-visible { background: var(--g1); outline: none; }
+.cat-picker-row:last-child { border-bottom: 0; }
+.cat-picker-cat { font-size: 10px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.4px; }
+.cat-picker-name { font-weight: 600; color: var(--in-d); }
+.cat-picker-desc { font-size: 11px; color: var(--g6); margin-top: 2px; }
+.cat-picker-amt { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--in-d); white-space: nowrap; }
+
 .cat-card { background: #fff; border: 1px solid var(--g2); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.15s, box-shadow 0.15s; }
 .cat-card:hover { border-color: var(--in); box-shadow: 0 2px 10px rgba(19,16,46,0.06); }
 

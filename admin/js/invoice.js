@@ -195,6 +195,35 @@
     updateTotalsUI();
   }
 
+  // ── Catalog picker (upgrade SKUs) ────────────────────────────────────────
+  // Opens the shared AdminCatalogPicker. The picked row is converted into a
+  // new line item — manual rows added via "+ Add line" are unaffected and
+  // the admin can still edit any picked row's fields before sending.
+  function openCatalogPicker() {
+    if (!window.AdminCatalogPicker || typeof window.AdminCatalogPicker.open !== 'function') {
+      console.warn('AdminCatalogPicker not loaded yet');
+      return;
+    }
+    const currency = ($('#invCurrency').value || 'AUD').toUpperCase();
+    window.AdminCatalogPicker.open({
+      currency,
+      onPick(row) {
+        // Append a pre-filled line. Amount is in major units (dollars) to
+        // match the existing line-item input format; quantity defaults to 1.
+        const amount = ((row.amount_cents || 0) / 100).toFixed(2);
+        const includesNote = Array.isArray(row.includes) && row.includes.length
+          ? ' — ' + row.includes.join('; ')
+          : '';
+        addLineItemRow({
+          description: row.name + (row.description ? ' · ' + row.description : '') + includesNote,
+          quantity: 1,
+          amount,
+        });
+        updateTotalsUI();
+      },
+    });
+  }
+
   // ── Line items ─────────────────────────────────────────────────────────────
   function addLineItemRow(initial) {
     const row = document.createElement('div');
@@ -432,6 +461,7 @@
     modal.addEventListener('click', (e) => {
       if (e.target.matches('[data-act="close-invoice"]')) close();
       if (e.target.matches('[data-act="add-line"]')) addLineItemRow();
+      if (e.target.matches('[data-act="pick-from-catalog"]')) openCatalogPicker();
       if (e.target.matches('[data-act="send"]')) submit();
     });
     modal.addEventListener('change', (e) => {

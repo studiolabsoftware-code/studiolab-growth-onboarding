@@ -26,14 +26,23 @@
   }
 
   let products = [];
+  let upgrades = [];
   let codes = [];
   let bound = false;
   let activeTab = 'products';
 
+  const UPGRADE_CATEGORY_LABEL = {
+    plan_upgrade: 'Plan upgrade',
+    setup_conversion: 'Setup conversion',
+    combined_upgrade: 'Combined',
+  };
+  const UPGRADE_CATEGORY_ORDER = ['plan_upgrade', 'setup_conversion', 'combined_upgrade'];
+
   async function show() {
     bind();
-    await Promise.all([loadProducts(), loadCodes(), loadMode()]);
+    await Promise.all([loadProducts(), loadUpgrades(), loadCodes(), loadMode()]);
     renderMatrix();
+    renderUpgrades();
     renderCodes();
   }
 
@@ -64,6 +73,7 @@
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     $('catProductsPanel').style.display = tab === 'products' ? '' : 'none';
+    $('catUpgradesPanel').style.display = tab === 'upgrades' ? '' : 'none';
     $('catCodesPanel').style.display = tab === 'codes' ? '' : 'none';
   }
 
@@ -84,6 +94,106 @@
       .order('plan').order('setup_type').order('currency');
     if (error) { products = []; return; }
     products = data || [];
+  }
+
+  async function loadUpgrades() {
+    const client = sb(); if (!client) return;
+    const { data, error } = await client
+      .from('upgrade_products')
+      .select('id, category, from_plan, to_plan, from_setup, to_setup, currency, amount_cents, name, description, includes, active, sort_order')
+      .eq('active', true)
+      .order('sort_order')
+      .order('currency');
+    if (error) { upgrades = []; return; }
+    upgrades = data || [];
+  }
+
+  // Group AUD + USD rows of the same path together so the table reads "one
+  // path per line" with two price cells. Pairing key is the path tuple.
+  function groupedUpgrades() {
+    const map = new Map();
+    for (const u of upgrades) {
+      const key = `${u.from_plan}|${u.to_plan}|${u.from_setup}|${u.to_setup}`;
+      if (!map.has(key)) map.set(key, { aud: null, usd: null, head: u });
+      const row = map.get(key);
+      if (u.currency === 'AUD') row.aud = u;
+      if (u.currency === 'USD') row.usd = u;
+    }
+    return Array.from(map.values()).sort((a, b) => (a.head.sort_order || 0) - (b.head.sort_order || 0));
+  }
+
+  function renderUpgrades() {
+    const tbody = $('catUpgradesTbody');
+    if (!tbody) return;
+    if (!upgrades.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="adm-empty">No upgrade products. Run migration 021 to seed.</td></tr>';
+      return;
+    }
+    const rows = groupedUpgrades();
+    let lastCategory = null;
+    const html = [];
+    for (const r of rows) {
+      const cat = r.head.category;
+      if (cat !== lastCategory) {
+        html.push(`<tr class="cat-upg-cat"><td colspan="5"><strong>${escapeHtml(UPGRADE_CATEGORY_LABEL[cat] || cat)}</strong></td></tr>`);
+        lastCategory = cat;
+      }
+      const pathLabel = escapeHtml(r.head.name);
+      const audCell = renderUpgradePriceCell(r.aud);
+      const usdCell = renderUpgradePriceCell(r.usd);
+      html.push(`
+        <tr>
+          <td>
+            <div class="cat-upg-name">${pathLabel}</div>
+            <div class="cat-upg-scope">${escapeHtml(r.head.description || '')}</div>
+          </td>
+          <td><span class="bdg bdg-setup">${escapeHtml(UPGRADE_CATEGORY_LABEL[cat] || cat)}</span></td>
+          <td>${audCell}</td>
+          <td>${usdCell}</td>
+          <td></td>
+        </tr>`);
+    }
+    tbody.innerHTML = html.join('');
+  }
+
+  function renderUpgradePriceCell(p) {
+    if (!p) return '<span class="adm-empty">—</span>';
+    const amt = (p.amount_cents || 0) / 100;
+    const fmt = amt.toLocaleString('en-AU', { style: 'currency', currency: p.currency, minimumFractionDigits: 2 });
+    const taxNote = p.currency === 'AUD'
+      ? `<div class="cat-upg-tax">${(amt * 1.1).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })} inc GST</div>`
+      : '';
+    return `
+      <div class="cat-upg-price">
+        <button class="cat-upg-edit" data-cat-action="edit-upgrade-price" data-id="${p.id}" title="Edit price">${escapeHtml(fmt)} <span aria-hidden="true">✎</span></button>
+        ${taxNote}
+      </div>`;
+  }
+
+  async function handleEditUpgradePrice(id) {
+    const row = upgrades.find((u) => u.id === id);
+    if (!row) return;
+    const current = (row.amount_cents / 100).toFixed(2);
+    const raw = window.prompt(
+      `New price for ${row.name} (${row.currency}, ex GST).\nCurrent: ${current}`,
+      current
+    );
+    if (raw === null) return;
+    const parsed = parseFloat(String(raw).replace(/[^0-9.]/g, ''));
+    if (!isFinite(parsed) || parsed < 0) {
+      await (window.AdminModal ? window.AdminModal.alert({ title: 'Invalid price', message: 'Enter a positive number.' }) : Promise.resolve());
+      return;
+    }
+    const newCents = Math.round(parsed * 100);
+    if (newCents === row.amount_cents) return;
+    const client = sb();
+    const { error } = await client.from('upgrade_products').update({ amount_cents: newCents }).eq('id', id);
+    if (error) {
+      await (window.AdminModal ? window.AdminModal.alert({ title: 'Update failed', message: escapeHtml(error.message) }) : Promise.resolve());
+      return;
+    }
+    await loadUpgrades();
+    renderUpgrades();
   }
 
   async function loadCodes() {
@@ -229,6 +339,7 @@
     const action = btn.dataset.catAction;
     const id = btn.dataset.id;
     if (action === 'edit-price') return editPrice(id);
+    if (action === 'edit-upgrade-price') return handleEditUpgradePrice(id);
     if (action === 'edit-details') return editDetails(btn.dataset.plan, btn.dataset.setup);
     if (action === 'history') return showHistory(id);
     if (action === 'toggle-active') return toggleActive(id, btn.dataset.active !== 'true');

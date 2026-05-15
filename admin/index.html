@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/form.css">
-<link rel="stylesheet" href="css/admin.css?v=20260515f">
+<link rel="stylesheet" href="css/admin.css?v=20260515g">
 <link rel="icon" type="image/png" href="/assets/studiolab-icon.png">
 <link rel="apple-touch-icon" href="/assets/studiolab-icon.png">
 <link rel="shortcut icon" href="/assets/studiolab-icon.png">
@@ -124,7 +124,8 @@
     </div>
 
     <div class="cat-tabs" role="tablist">
-      <button type="button" class="cat-tab active" data-tab="products" role="tab" aria-selected="true">Products</button>
+      <button type="button" class="cat-tab active" data-tab="products" role="tab" aria-selected="true">Setup products</button>
+      <button type="button" class="cat-tab" data-tab="upgrades" role="tab" aria-selected="false">Upgrades</button>
       <button type="button" class="cat-tab" data-tab="codes" role="tab" aria-selected="false">Discount codes</button>
     </div>
 
@@ -133,6 +134,24 @@
         <div class="adm-empty" style="padding:40px 0;">Loading catalog…</div>
       </div>
       <p class="cat-foot-hint">Stripe sync writes the name and description to Stripe Products for reporting. Prices are not stored on Stripe — every checkout reads the live amount from this catalog.</p>
+    </div>
+
+    <div class="cat-panel" id="catUpgradesPanel" style="display:none">
+      <div class="cat-codes-hdr">
+        <div>
+          <h3 class="cat-codes-title">Upgrade fees</h3>
+          <p class="cat-codes-desc">Plan upgrades, setup conversions (Guided → DFY), and combined moves. Use the picker on the invoice or quote modal to insert any of these as a line item — the AUD or USD row is chosen automatically based on the recipient's country.</p>
+        </div>
+      </div>
+      <div class="users-tablewrap">
+        <table class="adm-table cat-codes-table">
+          <thead>
+            <tr><th>Path</th><th>Category</th><th>AUD ex GST</th><th>USD</th><th aria-label="Actions"></th></tr>
+          </thead>
+          <tbody id="catUpgradesTbody"><tr><td colspan="5" class="adm-empty">Loading upgrades…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="cat-foot-hint">Click a price to edit it. Edits write directly to <code>upgrade_products</code> and take effect on the next invoice or quote line-item picker open. Australian invoices add 10% GST at invoice time.</p>
     </div>
 
     <div class="cat-panel" id="catCodesPanel" style="display:none">
@@ -394,9 +413,12 @@
         </div>
 
         <div class="f">
-          <span class="f-q-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="f-q-label" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
             <span>Line items</span>
-            <button type="button" class="btn-link" data-act="add-line">+ Add line</button>
+            <span style="display:inline-flex;gap:14px;align-items:center;">
+              <button type="button" class="btn-link" data-act="pick-from-catalog" title="Insert a pre-filled line from the upgrade catalog">📦 Pick from catalog</button>
+              <button type="button" class="btn-link" data-act="add-line">+ Add line</button>
+            </span>
           </span>
           <div id="invItems"></div>
         </div>
@@ -520,9 +542,12 @@
         </div>
 
         <div class="f">
-          <span class="f-q-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="f-q-label" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
             <span>Line items</span>
-            <button type="button" class="btn-link" data-act="add-q-line">+ Add line</button>
+            <span style="display:inline-flex;gap:14px;align-items:center;">
+              <button type="button" class="btn-link" data-act="pick-from-catalog-q" title="Insert a pre-filled line from the upgrade catalog">📦 Pick from catalog</button>
+              <button type="button" class="btn-link" data-act="add-q-line">+ Add line</button>
+            </span>
           </span>
           <div id="qItems"></div>
         </div>
@@ -631,11 +656,12 @@
 <script src="js/modal.js?v=20260515a"></script>
 <script src="js/dashboard.js?v=20260513b"></script>
 <script src="js/detail.js?v=20260515d"></script>
-<script src="js/invoice.js?v=20260515e"></script>
-<script src="js/quote.js?v=20260515e"></script>
+<script src="js/catalog-picker.js?v=20260515g"></script>
+<script src="js/invoice.js?v=20260515g"></script>
+<script src="js/quote.js?v=20260515g"></script>
 <script src="js/change-request.js?v=20260513a"></script>
 <script src="js/users.js?v=20260513b"></script>
-<script src="js/catalog.js?v=20260515a"></script>
+<script src="js/catalog.js?v=20260515g"></script>
 <script src="js/settings.js?v=20260513a"></script>
 <script src="js/inbox.js?v=20260515a"></script>
 </body>
