@@ -58,7 +58,7 @@
 .bdg-plan-launch { background: #EEF2FF; color: var(--in); }
 .bdg-plan-scale  { background: #FDE8F4; color: var(--mg-d); }
 .bdg-plan-ai     { background: var(--in-d); color: #fff; }
-.bdg-setup       { background: var(--g1); color: var(--g6); border: 1px solid var(--g2); }
+.bdg-setup       { background: #fff; color: var(--g6); border: 1px solid var(--g2); }
 .bdg-st-submitted        { background: var(--bl-l); color: var(--bl-d); }
 .bdg-st-in_review        { background: var(--in-l); color: var(--in); }
 .bdg-st-changes_requested{ background: var(--am-l); color: var(--am); }
@@ -73,8 +73,8 @@
 .bdg-st-accepted         { background: var(--gr-l); color: var(--gr); }
 .bdg-st-cancelled        { background: #FEE2E2; color: #B91C1C; }
 .bdg-st-declined         { background: #FEE2E2; color: #B91C1C; }
-.bdg-st-expired          { background: var(--g2); color: var(--g6); border: 1px solid var(--g2); }
-.bdg-st-revised          { background: var(--g1); color: var(--g6); border: 1px solid var(--g2); }
+.bdg-st-expired          { background: #fff; color: var(--g6); border: 1px solid var(--g2); }
+.bdg-st-revised          { background: #fff; color: var(--g6); border: 1px solid var(--g2); }
 
 /* ── Detail screen ─────────────────────────────────── */
 .det-top { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
@@ -303,7 +303,7 @@ body.adm-modal-open { overflow: hidden; }
 .bdg-role-admin { background: var(--in-l); color: var(--in); }
 .bdg-role-va    { background: var(--am-l); color: var(--am); }
 .bdg-active     { background: var(--gr-l, #D1FAE5); color: var(--gr-d, #047857); }
-.bdg-inactive   { background: var(--g1); color: var(--g6); border: 1px solid var(--g2); }
+.bdg-inactive   { background: #fff; color: var(--g6); border: 1px solid var(--g2); }
 
 /* VAs don't operate the sheet-sync, preview, or change-request tooling. */
 body.role-va .adm-sheet-sync,
