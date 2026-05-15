@@ -104,7 +104,6 @@
     $('dashboardView').style.display = '';
     $('admUser').style.display = '';
     $('admUserEmail').textContent = email;
-    const qa = $('admQuickActions'); if (qa) qa.style.display = '';
 
     // Load profile so the UI can role-gate.
     await loadProfile();
@@ -403,13 +402,9 @@
       });
     }
 
-    // Header quick-action shortcuts: open the invoice / quote modal in
-    // external (no-studio) mode so admins can bill anyone without first
-    // creating a placeholder submission.
-    const qInv = $('admQuickInvoice');
-    if (qInv) qInv.addEventListener('click', () => window.AdminInvoice && window.AdminInvoice.openExternal());
-    const qQt = $('admQuickQuote');
-    if (qQt) qQt.addEventListener('click', () => window.AdminQuote && window.AdminQuote.openExternal());
+    // Standalone billing actions live as primary buttons inside the
+    // Invoices and Quotes screen headers (matching the Users screen's
+    // "+ Invite user" pattern), not in the global header bar.
 
     // No supabase-js auth-state subscription. Our session lives in
     // localStorage and is read on every page boot via handleSession.

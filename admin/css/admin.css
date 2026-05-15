@@ -129,12 +129,10 @@
 .det-tab-panel[hidden] { display: none; }
 .det-tab-section { margin-bottom: 14px; }
 
-/* Header quick-action button group: standalone invoice/quote shortcuts
-   for billing recipients who aren't studios yet. */
-.adm-quickactions { display: inline-flex; gap: 8px; align-items: center; margin-right: 14px; }
-.btn-sm { height: 32px; padding: 0 12px; font-size: 13px; }
-
-/* Global invoices/quotes list screens — table + filter strip styling */
+/* Global invoices/quotes list screens — table + filter strip styling.
+   The "+ New invoice" / "+ New quote" buttons live inside each screen's
+   header (matching the Users screen's "+ Invite user" pattern), not in
+   the global header bar. */
 .inv-list-host { background: #fff; border: 1px solid var(--g2); border-radius: 12px; overflow: hidden; }
 .inv-list-table { width: 100%; }
 .inv-list-table tbody tr:hover { background: var(--g1); }
