@@ -300,21 +300,51 @@ Deno.serve(async (req) => {
     const idempotencyBase = `slg-quote-${payloadDigest.slice(0, 24)}`;
 
     const useFallbackGst = currency === 'AUD' && !auGstRateId;
-    // AU GST on Stripe Quote line items: we attach the manual tax rate at
-    // the line-item level (sibling of price_data) and set
-    // price_data.tax_behavior='exclusive'. This matches what
-    // create-checkout-session does for the setup-invoice flow.
+    // Stripe Quotes API requires line_items.price_data to reference an
+    // existing `product` ID — `product_data` (inline) is supported on
+    // Checkout Sessions but NOT on Quotes (Stripe returns 400 "unknown
+    // parameter: product_data"). And line_items.description is also not
+    // accepted (Stripe returns 400 "unknown parameter: description").
     //
-    // VERIFY AT LIVE CUTOVER: issue one AUD quote against a sandbox account
-    // and confirm Stripe's hosted-quote page shows three lines:
-    //   Subtotal $X
-    //   GST 10%   $X
-    //   Total     $X
-    // If GST is missing from the breakdown, the `tax_rates` attachment is
-    // being ignored; switch to setting `useFallbackGst = true` for AUD so
-    // the unit_amount includes the 10% (recipient still pays the right
-    // total, just without the itemised GST line).
-    const lineItemsArr = lines.map((li) => {
+    // The cleanest workaround: create a Stripe Product per line item,
+    // named with the line's description. Stripe surfaces the product name
+    // as the line label on the hosted quote and resulting invoice. We tag
+    // each product with metadata.source so they're filterable in the
+    // dashboard and don't get confused with catalog products.
+    //
+    // Idempotency via product_data hash on the line: identical descriptions
+    // within one quote (and across retries thanks to our payload-hash
+    // idempotency key) reuse the same idempotency key on product create.
+    const lineProductIds: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const li = lines[i];
+      const prodCreate = await stripeRequest<{ id: string }>(
+        'POST',
+        'products',
+        {
+          name: li.description,
+          'metadata[source]': 'studiolab-quote-line',
+          tax_code: 'txcd_20030000',
+        },
+        secretKey,
+        `${idempotencyBase}-prod-${i}`,
+      );
+      if (!prodCreate.ok || !prodCreate.body?.id) {
+        console.error('quote line product create failed:', prodCreate.error);
+        return jsonResponse({
+          ok: false,
+          error: 'Could not register the quote line item in Stripe. Please try again.',
+        }, 502);
+      }
+      lineProductIds.push(prodCreate.body.id);
+    }
+
+    // AU GST on Stripe Quote line items: attach the manual tax rate at the
+    // line-item level. The rate's own `inclusive: false` governs the GST
+    // calculation; price_data.tax_behavior='exclusive' is a documented
+    // Stripe-Tax field that Stripe accepts here but doesn't actually drive
+    // the math when manual tax_rates are used.
+    const lineItemsArr = lines.map((li, i) => {
       const unitAmount = useFallbackGst ? Math.round(li.amount_cents * 1.10) : li.amount_cents;
       const item: Record<string, unknown> = {
         quantity: li.quantity ?? 1,
@@ -322,7 +352,7 @@ Deno.serve(async (req) => {
           currency: currency.toLowerCase(),
           unit_amount: unitAmount,
           tax_behavior: 'exclusive',
-          product_data: { name: li.description },
+          product: lineProductIds[i],
         },
       };
       if (currency === 'AUD' && auGstRateId) {
