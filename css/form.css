@@ -748,3 +748,45 @@ body.setup-guided .co.guided-only, body.setup-guided div.guided-only { display: 
 .sms-twilio { margin-top: 14px; padding: 12px 14px; background: var(--g1); border: 1px solid var(--g2); border-radius: 10px; }
 .sms-twilio-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--in-d); }
 .sms-twilio-toggle input { margin: 0; accent-color: var(--in); }
+
+/* ── Attachments card ────────────────────────────────────────────────────
+   Optional file uploads on the Review step. Same visual language as the
+   logo + brand-ref dropzones so it doesn't read as a bolted-on surface. */
+.attach-hint { font-size: 12px; color: var(--g6); line-height: 1.55; margin: -4px 0 14px; }
+.attach-hint strong { color: var(--in-d); font-weight: 600; }
+.attach-retention { display: flex; gap: 10px; padding: 10px 12px; margin-bottom: 12px; background: var(--in-l); border-radius: 8px; font-size: 11px; color: var(--in-d); line-height: 1.5; }
+.attach-retention-ico { font-size: 14px; flex-shrink: 0; line-height: 1.3; }
+
+.attach-zone { position: relative; display: block; padding: 22px; border: 2px dashed var(--g2); border-radius: 12px; background: var(--g1); text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; user-select: none; }
+.attach-zone:hover { border-color: var(--in); background: var(--in-l); }
+.attach-zone:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+.attach-zone-drag { border-color: var(--in); background: var(--in-l); }
+.attach-zone-disabled { cursor: not-allowed; opacity: 0.55; }
+.attach-zone-disabled:hover { border-color: var(--g2); background: var(--g1); }
+.attach-zone-ico { font-size: 22px; margin-bottom: 6px; }
+.attach-zone-primary { font-size: 13px; font-weight: 600; color: var(--in); }
+.attach-zone-secondary { font-size: 11px; color: var(--g6); margin-top: 4px; line-height: 1.5; }
+.attach-zone-input { position: absolute; opacity: 0; width: 1px; height: 1px; overflow: hidden; pointer-events: none; }
+
+.attach-meta-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 8px; }
+.attach-counter { font-size: 11px; color: var(--g6); font-weight: 600; }
+
+.attach-list { display: flex; flex-direction: column; gap: 8px; }
+.attach-empty { font-size: 11px; color: var(--g4); padding: 8px 2px; }
+.attach-chip { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #fff; border: 1px solid var(--g2); border-radius: 10px; }
+.attach-chip-ico { width: 36px; height: 36px; border-radius: 7px; background: var(--in-l); color: var(--in); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; letter-spacing: 0.3px; flex-shrink: 0; }
+.attach-chip-body { flex: 1; min-width: 0; }
+.attach-chip-name { font-size: 12px; color: var(--in-d); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-chip-meta { font-size: 10px; color: var(--g6); margin-top: 2px; }
+.attach-chip-rm { background: transparent; border: none; color: var(--g6); font-weight: 600; font-size: 11px; cursor: pointer; padding: 4px 10px; border-radius: 6px; font-family: inherit; flex-shrink: 0; }
+.attach-chip-rm:hover { color: var(--rd, #B91C1C); background: var(--g1); }
+.attach-chip-rm:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+.attach-chip-locked { font-size: 10px; color: var(--g4); font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; flex-shrink: 0; }
+
+.attach-chip-uploading { background: var(--in-l); border-color: var(--in); }
+.attach-chip-pct { font-size: 11px; color: var(--in); font-weight: 700; flex-shrink: 0; min-width: 36px; text-align: right; }
+.attach-progress { margin-top: 6px; height: 4px; background: rgba(74, 63, 138, 0.15); border-radius: 999px; overflow: hidden; }
+.attach-progress-fill { height: 100%; background: var(--in); border-radius: 999px; transition: width 0.15s linear; }
+
+.attach-err { display: none; margin-top: 10px; padding: 8px 12px; background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; color: var(--rd, #B91C1C); font-size: 11px; font-weight: 600; line-height: 1.5; }
+.attach-err.vis { display: block; }

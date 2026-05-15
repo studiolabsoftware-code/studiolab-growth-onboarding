@@ -482,6 +482,23 @@
       </div>
     </div>
 
+    <div class="card" style="margin-top:14px;">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">📎</div>Attachments <span class="hint">optional</span></div>
+      <p class="attach-hint">Drop in anything that helps us set you up faster — brand guidelines, contracts, exported docs, spreadsheets. <strong>Up to 5 files, 25 MB each.</strong> PDF, PNG, JPG, SVG, DOCX, DOC, XLSX, XLS.</p>
+      <div class="attach-retention"><span class="attach-retention-ico" aria-hidden="true">🔒</span><span>Files we keep auto-delete 7 days after your onboarding is complete, or 90 days from upload — whichever is sooner.</span></div>
+      <div id="attachZone" class="attach-zone" role="button" tabindex="0" aria-label="Upload files. Drag and drop, or press Enter to choose files." aria-describedby="attachZoneSecondary">
+        <div class="attach-zone-ico" aria-hidden="true">⬆️</div>
+        <div class="attach-zone-primary">Drag files here, or click to choose</div>
+        <div class="attach-zone-secondary" id="attachZoneSecondary">PDF, PNG, JPG, SVG, DOCX, DOC, XLSX, XLS · max 25 MB each</div>
+        <input type="file" id="attachInput" class="attach-zone-input" multiple>
+      </div>
+      <div class="attach-meta-row">
+        <span class="attach-counter" id="attachCounter" aria-live="polite">0 of 5 files</span>
+      </div>
+      <div id="attachList" class="attach-list" aria-live="polite"></div>
+      <div id="attachErr" class="attach-err" role="alert"></div>
+    </div>
+
     <div class="hp" aria-hidden="true">
       <label for="hp-company">Company (leave blank)</label>
       <input type="text" id="hp-company" tabindex="-1" autocomplete="off">
@@ -513,7 +530,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
-<script src="/js/form.js?v=20260513y"></script>
+<script src="/js/form.js?v=20260515a"></script>
+<script src="/js/form-attachments.js?v=20260515a"></script>
 
 </div><!-- /formWrap -->
 </body>

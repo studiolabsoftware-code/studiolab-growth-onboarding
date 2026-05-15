@@ -1731,6 +1731,13 @@
         return;
       }
       setSaveIndicator('saved');
+      // After the first successful save-draft the submission row exists.
+      // Push its id into the attachments widget so uploads stop being
+      // blocked by "save your draft first" once auto-save has run.
+      if (window.FormAttachments && r.data.submission && r.data.submission.id) {
+        window.FormAttachments.setSubmissionId(r.data.submission.id);
+        window.FormAttachments.setSessionToken(session.token);
+      }
       // Fade after 1.5s
       setTimeout(() => {
         const el = document.getElementById('saveInd');
@@ -2083,6 +2090,12 @@
       const banner = document.getElementById('restoredBanner');
       if (banner) banner.classList.add('vis');
     }
+    // Wire the attachments widget. New submissions arrive with no rows
+    // yet; returning sessions get their existing chips back.
+    if (window.FormAttachments && submission && submission.id) {
+      const s = loadSession();
+      if (s && s.token) window.FormAttachments.hydrate(submission.id, s.token);
+    }
     // Jump to last completed step (or 1 for new)
     const target = Math.max(1, Math.min(totalSteps(), (submission && submission.last_step_completed) || 1));
     goTo(target);
@@ -2257,6 +2270,11 @@
           return;
         }
         hydrateFromSubmission(r.data.submission);
+        // Hydrate the attachments widget with the existing submission so
+        // any files uploaded in a prior session reappear as chips.
+        if (window.FormAttachments && r.data.submission.id) {
+          window.FormAttachments.hydrate(r.data.submission.id, session.token);
+        }
         const target = Math.max(1, Math.min(totalSteps(), r.data.submission.last_step_completed || 1));
         goTo(target);
         return;
