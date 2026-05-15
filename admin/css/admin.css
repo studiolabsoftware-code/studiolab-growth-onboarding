@@ -90,6 +90,45 @@
 .det-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
 @media (max-width: 880px) { .det-grid { grid-template-columns: 1fr; } }
 
+/* Tab bar for the per-submission detail page. Sticky so the user can
+   switch context without scrolling back to the top of a long panel. */
+.det-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 16px;
+  border-bottom: 1px solid var(--g2);
+  position: sticky; top: 0; z-index: 4;
+  background: var(--g0, #F7F7FB);
+  padding-bottom: 0;
+}
+.det-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border: 0; background: transparent;
+  font: 600 13px/1.2 inherit; color: var(--g6);
+  border-bottom: 2px solid transparent;
+  cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  position: relative; top: 1px;
+}
+.det-tab:hover { color: var(--in); }
+.det-tab.active { color: var(--in); border-bottom-color: var(--in); }
+.det-tab:focus-visible {
+  outline: none; color: var(--in);
+  box-shadow: 0 0 0 3px rgba(74, 63, 138, 0.22);
+  border-radius: 6px 6px 0 0;
+}
+.det-tab-ico { font-size: 14px; line-height: 1; }
+.det-tab-label { white-space: nowrap; }
+.det-tab-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px;
+  background: var(--g1); color: var(--g6);
+  font-size: 11px; font-weight: 700;
+}
+.det-tab.active .det-tab-badge { background: var(--in-l); color: var(--in); }
+.det-tab-badge-unread { background: var(--rd, #DC2626); color: #fff; }
+.det-tab.active .det-tab-badge-unread { background: var(--rd, #DC2626); color: #fff; }
+.det-tab-panel[hidden] { display: none; }
+.det-tab-section { margin-bottom: 14px; }
+
 .det-section { background: #fff; border: 1px solid var(--g2); border-radius: 12px; margin-bottom: 14px; }
 .det-section-hdr { padding: 12px 18px; border-bottom: 1px solid var(--g2); font-size: 13px; font-weight: 700; color: var(--in-d); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .det-section-hdr > span { display: flex; align-items: center; gap: 8px; }

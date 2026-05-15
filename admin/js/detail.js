@@ -24,6 +24,18 @@
   let currentAssignment = null;
   let currentAssignees = [];
 
+  // Tabbed detail view (Phase: 2026-05-15 — replaces the long stacked
+  // page). Lazy-hydrates non-Overview tabs the first time they're shown so
+  // we don't pay for inbox/invoice/quote fetches until the user actually
+  // visits the tab. Overview is always rendered eagerly because it's
+  // template-only and the default landing tab.
+  const DETAIL_TABS = ['overview', 'messages', 'invoices', 'quotes', 'activity'];
+  let currentTab = 'overview';
+  let tabHydrated = { overview: false, messages: false, invoices: false, quotes: false, activity: false };
+  let pendingCounts = { invoices: 0, quotes: 0, messages: 0 };
+  let pendingNotes = [];
+  let pendingLog = [];
+
   const ASSIGNMENT_STATUS_LABEL = {
     assigned: 'Assigned',
     in_progress: 'In progress',
@@ -35,11 +47,22 @@
   async function open(id, opts) {
     const client = sb(); if (!client) return;
     window.AdminDashboard.showDetail();
-    const wantMessagesTab = opts && opts.tab === 'messages';
     const screen = document.getElementById('detailScreen');
     screen.innerHTML = '<div class="adm-empty" style="padding:60px">Loading...</div>';
 
-    const [{ data: sub, error }, { data: notes }, { data: log }, { data: assignees }, { data: assignment }] = await Promise.all([
+    // Pick the initial tab. Explicit opts.tab wins (used by inbox.js deep
+    // links); otherwise honour the URL hash; fall back to Overview.
+    const requestedTab = pickInitialTab(opts && opts.tab);
+
+    const [
+      { data: sub, error },
+      { data: notes },
+      { data: log },
+      { data: assignees },
+      { data: assignment },
+      invoiceCountRes,
+      quoteCountRes,
+    ] = await Promise.all([
       client.from('submissions').select('*').eq('id', id).single(),
       client.from('admin_notes').select('*').eq('submission_id', id).order('created_at', { ascending: false }),
       client.from('activity_log').select('*').eq('submission_id', id).order('created_at', { ascending: false }),
@@ -51,6 +74,9 @@
         .order('assigned_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
+      // Counts for the tab badges. head:true keeps the payload tiny.
+      client.from('invoices').select('id', { count: 'exact', head: true }).eq('submission_id', id),
+      client.from('quotes').select('id', { count: 'exact', head: true }).eq('submission_id', id),
     ]);
     if (error || !sub) {
       screen.innerHTML = '<div class="adm-empty">Could not load this submission.</div>';
@@ -59,33 +85,18 @@
     current = sub;
     currentAssignment = assignment || null;
     currentAssignees = (assignees || []).filter((a) => a.role !== 'owner' || a.is_active);
-    render(sub, notes || [], log || []);
+    pendingNotes = notes || [];
+    pendingLog = log || [];
+    pendingCounts = {
+      invoices: invoiceCountRes?.count || 0,
+      quotes: quoteCountRes?.count || 0,
+      messages: (window.AdminInbox?.getUnreadForSubmission?.(sub.id) || {}).count || 0,
+    };
+    currentTab = requestedTab;
+    tabHydrated = { overview: false, messages: false, invoices: false, quotes: false, activity: false };
 
-    // Hydrate the Messages panel (always-present at the top of det-main).
-    // AdminInbox creates the conversation on demand if it doesn't exist yet.
-    if (window.AdminInbox?.renderThreadInto) {
-      const host = document.getElementById('detMessagesHost');
-      if (host) {
-        window.AdminInbox.renderThreadInto(host, sub.id, { studioName: sub.studio_name || '' });
-      }
-    }
-    if (wantMessagesTab) {
-      // Deep-link from the cross-studio inbox list → scroll to messages.
-      setTimeout(() => {
-        const el = document.querySelector('.det-messages-section');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 0);
-    }
-    // Wire the collapse toggle for the Messages section.
-    document.querySelectorAll('[data-act="toggle-messages"]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const body = document.getElementById('detMessagesHost');
-        const open = body.style.display !== 'none';
-        body.style.display = open ? 'none' : '';
-        btn.textContent = open ? 'Show' : 'Hide';
-        btn.setAttribute('aria-expanded', open ? 'false' : 'true');
-      });
-    });
+    render(sub);
+    activateTab(currentTab);
 
     // Log a 'viewed' activity (best-effort)
     try {
@@ -95,12 +106,29 @@
     } catch (e) { /* ignore */ }
   }
 
-  function render(sub, notes, log) {
-    const isLaunch = sub.plan === 'launch';
-    const isScale = sub.plan === 'scale';
-    const isAi = sub.plan === 'ai';
-    const screen = document.getElementById('detailScreen');
+  function pickInitialTab(explicit) {
+    if (explicit && DETAIL_TABS.includes(explicit)) return explicit;
+    const m = (window.location.hash || '').match(/tab=([a-z]+)/i);
+    if (m && DETAIL_TABS.includes(m[1].toLowerCase())) return m[1].toLowerCase();
+    return 'overview';
+  }
 
+  function writeTabToHash(tab) {
+    // Preserve any existing hash params (e.g. #sub=<id>) so deep links keep
+    // working. Strip a prior tab= and append the new one.
+    const hash = (window.location.hash || '').replace(/^#/, '');
+    const parts = hash.split('&').filter((p) => p && !/^tab=/.test(p));
+    parts.push('tab=' + tab);
+    const next = '#' + parts.join('&');
+    if (window.location.hash !== next) {
+      // replaceState so tab changes don't pollute the browser back stack.
+      try { history.replaceState(null, '', window.location.pathname + window.location.search + next); }
+      catch (_) { window.location.hash = next; }
+    }
+  }
+
+  function render(sub) {
+    const screen = document.getElementById('detailScreen');
     const { STATUS_LABEL, PLAN_LABEL, SETUP_LABEL } = fmt();
     const submitted = new Date(sub.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -125,135 +153,67 @@
         </div>
       </div>
 
+      <div class="det-tabs" role="tablist" aria-label="Submission sections">
+        ${renderTabButton('overview',  '📋', 'Overview',  null)}
+        ${renderTabButton('messages',  '📬', 'Messages',  pendingCounts.messages || null, 'unread')}
+        ${renderTabButton('invoices',  '🧾', 'Invoices',  pendingCounts.invoices || null)}
+        ${renderTabButton('quotes',    '📄', 'Quotes',    pendingCounts.quotes   || null)}
+        ${renderTabButton('activity',  '📊', 'Activity',  null)}
+      </div>
+
       <div class="det-grid">
         <div class="det-main">
-
-          <section class="det-section det-messages-section">
-            <div class="det-section-hdr">
-              <h2 class="det-section-title">📬 Messages</h2>
-              <button type="button" class="btn-link det-msg-collapse" data-act="toggle-messages" aria-expanded="true">Hide</button>
-            </div>
-            <div class="det-section-body" id="detMessagesHost">
-              <div class="adm-empty" style="padding:24px 0;">Loading thread…</div>
-            </div>
-          </section>
-
-          <section class="det-section">
-            <div class="det-section-hdr">
-              <h2 class="det-section-title">🧾 Invoices</h2>
-              <button type="button" class="btn-link" id="detNewInvoiceInline">+ New invoice</button>
-            </div>
-            <div class="det-section-body" id="studioInvoicesHost">
-              <div class="adm-empty" style="padding:16px 0;">Loading invoices…</div>
-            </div>
-          </section>
-
-          <section class="det-section">
-            <div class="det-section-hdr">
-              <h2 class="det-section-title">📄 Quotes</h2>
-              <button type="button" class="btn-link" id="detNewQuoteInline">+ New quote</button>
-            </div>
-            <div class="det-section-body" id="studioQuotesHost">
-              <div class="adm-empty" style="padding:16px 0;">Loading quotes…</div>
-            </div>
-          </section>
-
-          ${section('🏫 Studio details', [
-            ['Studio name', fmtVal(sub.studio_name), undefined, 'studio_name'],
-            ['Legal business name', fmtVal(sub.legal_name), undefined, 'legal_name'],
-            ['Country', fmtVal(sub.country), undefined, 'country'],
-            ['Time zone', fmtVal(sub.timezone), undefined, 'timezone'],
-            ['Studio type', fmtVal(sub.studio_type), undefined, 'studio_type'],
-            ['Address', fmtVal(sub.address), undefined, 'address'],
-            ['Website', sub.website ? `<a href="${ESC(sub.website)}" target="_blank" rel="noopener">${ESC(sub.website)}</a>` : empty, sub.website || '', 'website'],
-            ['Support URL', sub.support_url ? `<a href="${ESC(sub.support_url)}" target="_blank" rel="noopener">${ESC(sub.support_url)}</a>` : empty, sub.support_url || '', 'support_url'],
-          ])}
-
-          ${section('👤 Primary contact', [
-            ['First name', fmtVal(sub.first_name), undefined, 'first_name'],
-            ['Last name', fmtVal(sub.last_name), undefined, 'last_name'],
-            ['Email', sub.contact_email ? `<a href="mailto:${ESC(sub.contact_email)}">${ESC(sub.contact_email)}</a>` : empty, sub.contact_email || '', 'contact_email'],
-            ['Phone', fmtVal(sub.contact_phone), undefined, 'contact_phone'],
-            ['Role', fmtVal(sub.role), undefined, 'role'],
-            ['StudioLAB login email', fmtVal(sub.studiolab_email), undefined, 'studiolab_email'],
-          ])}
-
-          ${section('🎨 Branding', [
-            ['Logo', logoBlock(sub.logo_url), sub.logo_url || ''],
-            ['Primary colour', colourSwatch(sub.primary_colour), sub.primary_colour || '', 'primary_colour'],
-            ['Secondary colour', colourSwatch(sub.secondary_colour), sub.secondary_colour || '', 'secondary_colour'],
-            ['Sign-off', fmtVal(sub.sign_off), undefined, 'sign_off'],
-            ['Email tone', fmtVal(sub.email_tone), undefined, 'email_tone'],
-            ['Footer notes', fmtVal(sub.footer_notes), undefined, 'footer_notes'],
-            ['Studio description', fmtVal(sub.studio_description), undefined, 'studio_description'],
-          ])}
-
-          ${section('✉️ Email setup', [
-            ['From name', fmtVal(sub.from_name), undefined, 'from_name'],
-            ['Reply-to', fmtVal(sub.reply_email), undefined, 'reply_email'],
-            ['Custom domain', fmtBool(sub.custom_domain)],
-            ['Email domain', fmtVal(sub.email_domain), undefined, 'email_domain'],
-            ['DNS access', fmtVal(sub.dns_access), undefined, 'dns_access'],
-          ])}
-
-          ${(isScale || isAi) ? section('💬 SMS & social', [
-            ['Number preference', fmtVal(sub.sms_type), undefined, 'sms_type'],
-            ['Area code', fmtVal(sub.area_code), undefined, 'area_code'],
-            ['Port number', fmtVal(sub.port_number), undefined, 'port_number'],
-            ['SMS tone notes', fmtVal(sub.sms_tone), undefined, 'sms_tone'],
-            ['Lead sources', fmtList(sub.lead_sources)],
-          ]) : planNotice('SMS & social', 'Launch')}
-
-          ${section('⚡ Plan automations', [
-            ['Included', planAutomations(sub.plan), ''],
-            ['Notes', 'Activated automatically once the account is live. Timing is pulled from StudioLAB season data.', ''],
-          ])}
-
-          ${isAi ? section('🤖 AI knowledge base', [
-            ['Greeting', fmtVal(sub.kb_greeting), undefined, 'kb_greeting'],
-            ['Assistant persona',
-              sub.kb_assistant_persona_type === 'named' && sub.kb_assistant_persona_name
-                ? `Named — ${ESC(sub.kb_assistant_persona_name)}`
-                : 'Studio name',
-              ''],
-            ['Studio profile', fmtVal(sub.kb_profile), undefined, 'kb_profile'],
-            ['Classes & timetable', fmtVal(sub.kb_classes), undefined, 'kb_classes'],
-            ['Pricing', fmtVal(sub.kb_pricing), undefined, 'kb_pricing'],
-            ['Pricing guardrail', fmtVal(sub.kb_price_quoting), undefined, 'kb_price_quoting'],
-            ['Policies', fmtVal(sub.kb_policies), undefined, 'kb_policies'],
-            ['Events', fmtVal(sub.kb_events), undefined, 'kb_events'],
-            ['FAQs', fmtVal(sub.kb_faqs), undefined, 'kb_faqs'],
-            ['Restricted topics', fmtVal(sub.kb_restricted), undefined, 'kb_restricted'],
-            ['AI tone', fmtVal(sub.kb_tone), undefined, 'kb_tone'],
-            ['Voice agent hours', fmtVal(sub.voice_hours), undefined, 'voice_hours'],
-            ['Voice escalation', fmtVal(sub.voice_escalate), undefined, 'voice_escalate'],
-            ['Website scrape', sub.kb_scrape_status
-              ? `${ESC(sub.kb_scrape_status)}${sub.kb_scrape_completed_at ? ' · ' + ESC(fmtDate(sub.kb_scrape_completed_at)) : ''}${sub.kb_scrape_pages_count ? ' · ' + sub.kb_scrape_pages_count + ' pages' : ''}`
-              : empty, ''],
-            ['KB intake completed', sub.kb_completed_at ? fmtDate(sub.kb_completed_at) : empty, ''],
-            ['Copy for GHL',
-              `<button type="button" class="btn btn-p" data-kb-copy="${ESC(sub.id)}" style="margin-top:6px">Copy KB as Markdown</button><span id="kb-copy-state" style="margin-left:10px;color:var(--g6);font-size:12px;"></span>`,
-              ''],
-          ]) : planNotice('AI knowledge base', isLaunch ? 'Launch' : 'Scale')}
-
-          ${section('📝 Additional notes', [
-            ['Notes', sub.extra_notes ? ESC(sub.extra_notes) : empty, undefined, 'extra_notes'],
-          ])}
-
-          <section class="det-section">
-            <div class="det-section-hdr">
-              <span>📎 Attachments</span>
-              <button type="button" class="copy-section-btn" id="detAttachUploadTrigger" title="Upload a file to this submission">
-                <span class="copy-btn-ico" aria-hidden="true">+</span>Upload file
-              </button>
-            </div>
-            <div class="det-section-body" id="detAttachmentsHost">
-              <div class="adm-empty" style="padding:16px 0;">Loading attachments…</div>
-            </div>
-            <input type="file" id="detAttachFileInput" multiple
-              accept=".pdf,.png,.jpg,.jpeg,.svg,.docx,.doc,.xlsx,.xls,application/pdf,image/png,image/jpeg,image/svg+xml,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-              hidden>
-          </section>
+          <div class="det-tab-panel" data-panel="overview" role="tabpanel" hidden>
+            ${renderOverviewHtml(sub)}
+          </div>
+          <div class="det-tab-panel" data-panel="messages" role="tabpanel" hidden>
+            <section class="det-section det-tab-section">
+              <div class="det-section-hdr">
+                <h2 class="det-section-title">📬 Messages</h2>
+              </div>
+              <div class="det-section-body" id="detMessagesHost">
+                <div class="adm-empty" style="padding:24px 0;">Loading thread…</div>
+              </div>
+            </section>
+          </div>
+          <div class="det-tab-panel" data-panel="invoices" role="tabpanel" hidden>
+            <section class="det-section det-tab-section">
+              <div class="det-section-hdr">
+                <h2 class="det-section-title">🧾 Invoices</h2>
+                <button type="button" class="btn-link" id="detNewInvoiceInline">+ New invoice</button>
+              </div>
+              <div class="det-section-body" id="studioInvoicesHost">
+                <div class="adm-empty" style="padding:16px 0;">Loading invoices…</div>
+              </div>
+            </section>
+          </div>
+          <div class="det-tab-panel" data-panel="quotes" role="tabpanel" hidden>
+            <section class="det-section det-tab-section">
+              <div class="det-section-hdr">
+                <h2 class="det-section-title">📄 Quotes</h2>
+                <button type="button" class="btn-link" id="detNewQuoteInline">+ New quote</button>
+              </div>
+              <div class="det-section-body" id="studioQuotesHost">
+                <div class="adm-empty" style="padding:16px 0;">Loading quotes…</div>
+              </div>
+            </section>
+          </div>
+          <div class="det-tab-panel" data-panel="activity" role="tabpanel" hidden>
+            <section class="det-section det-tab-section">
+              <div class="det-section-hdr"><h2 class="det-section-title">📝 Internal notes</h2></div>
+              <div class="det-section-body">
+                <textarea id="detNote" rows="3" placeholder="Add a note for the team..." style="width:100%;border:1px solid var(--g2);border-radius:8px;padding:8px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+                <button type="button" class="btn btn-p" id="detAddNote" style="margin-top:8px;">Add note</button>
+                <div class="det-notes-list" id="detNotesList" style="margin-top:12px;"></div>
+              </div>
+            </section>
+            <section class="det-section det-tab-section">
+              <div class="det-section-hdr"><h2 class="det-section-title">📊 Activity log</h2></div>
+              <div class="det-section-body">
+                <div class="det-timeline" id="detTimeline"></div>
+              </div>
+            </section>
+          </div>
         </div>
 
         <div class="det-side">
@@ -271,70 +231,107 @@
               ${sheetSyncRow(sub)}
             </div>
           </div>
-
-          <div class="det-section">
-            <div class="det-section-hdr">Internal notes</div>
-            <div class="det-section-body">
-              <textarea id="detNote" rows="3" placeholder="Add a note for the team..." style="width:100%;border:1px solid var(--g2);border-radius:8px;padding:8px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
-              <button type="button" class="btn btn-p" id="detAddNote" style="margin-top:8px;width:100%;">Add note</button>
-              <div class="det-notes-list" id="detNotesList" style="margin-top:12px;"></div>
-            </div>
-          </div>
-
-          <div class="det-section">
-            <div class="det-section-hdr">Activity</div>
-            <div class="det-section-body">
-              <div class="det-timeline" id="detTimeline"></div>
-            </div>
-          </div>
         </div>
       </div>
     `;
 
-    renderNotes(notes);
-    renderTimeline(log);
-
+    // Always-on bindings (header + side panel + tab bar).
     document.getElementById('detBack').addEventListener('click', () => window.AdminDashboard.showList());
     document.getElementById('detStatus').addEventListener('change', (e) => updateField('status', e.target.value));
     bindAssignmentControls();
-    document.getElementById('detAddNote').addEventListener('click', addNote);
     document.getElementById('detChangeReq').addEventListener('click', () => window.AdminChangeRequest.open(sub));
-    // Invoice creation: both entry points (header button + inline section button) open the same modal.
     const openInvoiceModal = () => window.AdminInvoice && window.AdminInvoice.openForStudio(sub);
     const newInvHeader = document.getElementById('detNewInvoice');
-    const newInvInline = document.getElementById('detNewInvoiceInline');
     if (newInvHeader) newInvHeader.addEventListener('click', openInvoiceModal);
-    if (newInvInline) newInvInline.addEventListener('click', openInvoiceModal);
-    // Hydrate the per-studio Invoices panel from the live ledger.
-    if (window.AdminInvoice) {
-      const host = document.getElementById('studioInvoicesHost');
-      if (host) window.AdminInvoice.renderStudioInvoicesPanel(sub.id, host);
-    }
-    // Quote creation mirrors the invoice flow.
     const openQuoteModal = () => window.AdminQuote && window.AdminQuote.openForStudio(sub);
     const newQuoteHeader = document.getElementById('detNewQuote');
-    const newQuoteInline = document.getElementById('detNewQuoteInline');
     if (newQuoteHeader) newQuoteHeader.addEventListener('click', openQuoteModal);
-    if (newQuoteInline) newQuoteInline.addEventListener('click', openQuoteModal);
-    if (window.AdminQuote) {
-      const qHost = document.getElementById('studioQuotesHost');
-      if (qHost) {
-        // Stash the submission on the host so row-action handlers (Revise)
-        // can read it without depending on dashboard state.
-        qHost._submission = sub;
-        window.AdminQuote.renderStudioQuotesPanel(sub.id, qHost);
-      }
-    }
     const delBtn = document.getElementById('detDelete');
     if (delBtn) delBtn.addEventListener('click', handleDelete);
     const syncOne = document.getElementById('detSheetSync');
     if (syncOne) syncOne.addEventListener('click', syncThisToSheet);
 
+    // Tab bar wiring (delegation for keyboard + click).
+    const tabBar = screen.querySelector('.det-tabs');
+    if (tabBar) {
+      tabBar.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-tab]');
+        if (btn) activateTab(btn.getAttribute('data-tab'));
+      });
+      tabBar.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        const btns = Array.from(tabBar.querySelectorAll('[data-tab]'));
+        const idx = btns.findIndex((b) => b.classList.contains('active'));
+        if (idx < 0) return;
+        const next = e.key === 'ArrowRight'
+          ? btns[(idx + 1) % btns.length]
+          : btns[(idx - 1 + btns.length) % btns.length];
+        if (next) { next.focus(); activateTab(next.getAttribute('data-tab')); }
+      });
+    }
+  }
+
+  function renderTabButton(tab, ico, label, count, badgeKind) {
+    const isActive = tab === currentTab;
+    const badge = count
+      ? `<span class="det-tab-badge${badgeKind === 'unread' ? ' det-tab-badge-unread' : ''}">${count}</span>`
+      : '';
+    return `
+      <button type="button" class="det-tab${isActive ? ' active' : ''}"
+              data-tab="${tab}" role="tab"
+              aria-selected="${isActive ? 'true' : 'false'}"
+              tabindex="${isActive ? '0' : '-1'}">
+        <span class="det-tab-ico" aria-hidden="true">${ico}</span>
+        <span class="det-tab-label">${label}</span>
+        ${badge}
+      </button>`;
+  }
+
+  // Switch the visible tab and hydrate its content on first activation.
+  // Safe to call repeatedly — hydration is gated by tabHydrated[tab].
+  function activateTab(tab) {
+    if (!DETAIL_TABS.includes(tab)) tab = 'overview';
+    currentTab = tab;
+    writeTabToHash(tab);
+
+    const screen = document.getElementById('detailScreen');
+    if (!screen) return;
+
+    screen.querySelectorAll('.det-tab').forEach((btn) => {
+      const active = btn.getAttribute('data-tab') === tab;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      btn.setAttribute('tabindex', active ? '0' : '-1');
+    });
+    screen.querySelectorAll('.det-tab-panel').forEach((panel) => {
+      panel.hidden = panel.getAttribute('data-panel') !== tab;
+    });
+
+    hydrateTab(tab);
+  }
+
+  function hydrateTab(tab) {
+    if (!current) return;
+    if (tabHydrated[tab]) return;
+    tabHydrated[tab] = true;
+    switch (tab) {
+      case 'overview':  return hydrateOverviewTab(current);
+      case 'messages':  return hydrateMessagesTab(current);
+      case 'invoices':  return hydrateInvoicesTab(current);
+      case 'quotes':    return hydrateQuotesTab(current);
+      case 'activity':  return hydrateActivityTab(current);
+    }
+  }
+
+  // -- Per-tab hydration ----------------------------------------------------
+
+  function hydrateOverviewTab(sub) {
+    // Wire kb-copy + section copy buttons (handled by global listeners),
+    // section-level inline edits (global listeners), attachments panel,
+    // and logo preview hydration. Overview HTML is already in the DOM.
     document.querySelectorAll('[data-kb-copy]').forEach((btn) => {
       btn.addEventListener('click', () => copyKbForGhl(btn.getAttribute('data-kb-copy'), btn));
     });
-
-    // Attachments panel: hydrate + wire upload trigger.
     const attachHost = document.getElementById('detAttachmentsHost');
     if (attachHost) renderAttachments(sub.id, attachHost);
     const uploadTrigger = document.getElementById('detAttachUploadTrigger');
@@ -349,8 +346,152 @@
         renderAttachments(sub.id, attachHost);
       });
     }
-
     hydrateLogos();
+  }
+
+  function hydrateMessagesTab(sub) {
+    if (window.AdminInbox?.renderThreadInto) {
+      const host = document.getElementById('detMessagesHost');
+      if (host) window.AdminInbox.renderThreadInto(host, sub.id, { studioName: sub.studio_name || '' });
+    }
+  }
+
+  function hydrateInvoicesTab(sub) {
+    const newInvInline = document.getElementById('detNewInvoiceInline');
+    if (newInvInline) {
+      newInvInline.addEventListener('click', () => window.AdminInvoice && window.AdminInvoice.openForStudio(sub));
+    }
+    if (window.AdminInvoice) {
+      const host = document.getElementById('studioInvoicesHost');
+      if (host) window.AdminInvoice.renderStudioInvoicesPanel(sub.id, host);
+    }
+  }
+
+  function hydrateQuotesTab(sub) {
+    const newQuoteInline = document.getElementById('detNewQuoteInline');
+    if (newQuoteInline) {
+      newQuoteInline.addEventListener('click', () => window.AdminQuote && window.AdminQuote.openForStudio(sub));
+    }
+    if (window.AdminQuote) {
+      const qHost = document.getElementById('studioQuotesHost');
+      if (qHost) {
+        qHost._submission = sub;
+        window.AdminQuote.renderStudioQuotesPanel(sub.id, qHost);
+      }
+    }
+  }
+
+  function hydrateActivityTab(_sub) {
+    const noteBtn = document.getElementById('detAddNote');
+    if (noteBtn) noteBtn.addEventListener('click', addNote);
+    renderNotes(pendingNotes);
+    renderTimeline(pendingLog);
+  }
+
+  // -- Overview HTML (the long-form setup data + attachments) ---------------
+
+  function renderOverviewHtml(sub) {
+    const isLaunch = sub.plan === 'launch';
+    const isScale = sub.plan === 'scale';
+    const isAi = sub.plan === 'ai';
+    return `
+      ${section('🏫 Studio details', [
+        ['Studio name', fmtVal(sub.studio_name), undefined, 'studio_name'],
+        ['Legal business name', fmtVal(sub.legal_name), undefined, 'legal_name'],
+        ['Country', fmtVal(sub.country), undefined, 'country'],
+        ['Time zone', fmtVal(sub.timezone), undefined, 'timezone'],
+        ['Studio type', fmtVal(sub.studio_type), undefined, 'studio_type'],
+        ['Address', fmtVal(sub.address), undefined, 'address'],
+        ['Website', sub.website ? `<a href="${ESC(sub.website)}" target="_blank" rel="noopener">${ESC(sub.website)}</a>` : empty, sub.website || '', 'website'],
+        ['Support URL', sub.support_url ? `<a href="${ESC(sub.support_url)}" target="_blank" rel="noopener">${ESC(sub.support_url)}</a>` : empty, sub.support_url || '', 'support_url'],
+      ])}
+
+      ${section('👤 Primary contact', [
+        ['First name', fmtVal(sub.first_name), undefined, 'first_name'],
+        ['Last name', fmtVal(sub.last_name), undefined, 'last_name'],
+        ['Email', sub.contact_email ? `<a href="mailto:${ESC(sub.contact_email)}">${ESC(sub.contact_email)}</a>` : empty, sub.contact_email || '', 'contact_email'],
+        ['Phone', fmtVal(sub.contact_phone), undefined, 'contact_phone'],
+        ['Role', fmtVal(sub.role), undefined, 'role'],
+        ['StudioLAB login email', fmtVal(sub.studiolab_email), undefined, 'studiolab_email'],
+      ])}
+
+      ${section('🎨 Branding', [
+        ['Logo', logoBlock(sub.logo_url), sub.logo_url || ''],
+        ['Primary colour', colourSwatch(sub.primary_colour), sub.primary_colour || '', 'primary_colour'],
+        ['Secondary colour', colourSwatch(sub.secondary_colour), sub.secondary_colour || '', 'secondary_colour'],
+        ['Sign-off', fmtVal(sub.sign_off), undefined, 'sign_off'],
+        ['Email tone', fmtVal(sub.email_tone), undefined, 'email_tone'],
+        ['Footer notes', fmtVal(sub.footer_notes), undefined, 'footer_notes'],
+        ['Studio description', fmtVal(sub.studio_description), undefined, 'studio_description'],
+      ])}
+
+      ${section('✉️ Email setup', [
+        ['From name', fmtVal(sub.from_name), undefined, 'from_name'],
+        ['Reply-to', fmtVal(sub.reply_email), undefined, 'reply_email'],
+        ['Custom domain', fmtBool(sub.custom_domain)],
+        ['Email domain', fmtVal(sub.email_domain), undefined, 'email_domain'],
+        ['DNS access', fmtVal(sub.dns_access), undefined, 'dns_access'],
+      ])}
+
+      ${(isScale || isAi) ? section('💬 SMS & social', [
+        ['Number preference', fmtVal(sub.sms_type), undefined, 'sms_type'],
+        ['Area code', fmtVal(sub.area_code), undefined, 'area_code'],
+        ['Port number', fmtVal(sub.port_number), undefined, 'port_number'],
+        ['SMS tone notes', fmtVal(sub.sms_tone), undefined, 'sms_tone'],
+        ['Lead sources', fmtList(sub.lead_sources)],
+      ]) : planNotice('SMS & social', 'Launch')}
+
+      ${section('⚡ Plan automations', [
+        ['Included', planAutomations(sub.plan), ''],
+        ['Notes', 'Activated automatically once the account is live. Timing is pulled from StudioLAB season data.', ''],
+      ])}
+
+      ${isAi ? section('🤖 AI knowledge base', [
+        ['Greeting', fmtVal(sub.kb_greeting), undefined, 'kb_greeting'],
+        ['Assistant persona',
+          sub.kb_assistant_persona_type === 'named' && sub.kb_assistant_persona_name
+            ? `Named — ${ESC(sub.kb_assistant_persona_name)}`
+            : 'Studio name',
+          ''],
+        ['Studio profile', fmtVal(sub.kb_profile), undefined, 'kb_profile'],
+        ['Classes & timetable', fmtVal(sub.kb_classes), undefined, 'kb_classes'],
+        ['Pricing', fmtVal(sub.kb_pricing), undefined, 'kb_pricing'],
+        ['Pricing guardrail', fmtVal(sub.kb_price_quoting), undefined, 'kb_price_quoting'],
+        ['Policies', fmtVal(sub.kb_policies), undefined, 'kb_policies'],
+        ['Events', fmtVal(sub.kb_events), undefined, 'kb_events'],
+        ['FAQs', fmtVal(sub.kb_faqs), undefined, 'kb_faqs'],
+        ['Restricted topics', fmtVal(sub.kb_restricted), undefined, 'kb_restricted'],
+        ['AI tone', fmtVal(sub.kb_tone), undefined, 'kb_tone'],
+        ['Voice agent hours', fmtVal(sub.voice_hours), undefined, 'voice_hours'],
+        ['Voice escalation', fmtVal(sub.voice_escalate), undefined, 'voice_escalate'],
+        ['Website scrape', sub.kb_scrape_status
+          ? `${ESC(sub.kb_scrape_status)}${sub.kb_scrape_completed_at ? ' · ' + ESC(fmtDate(sub.kb_scrape_completed_at)) : ''}${sub.kb_scrape_pages_count ? ' · ' + sub.kb_scrape_pages_count + ' pages' : ''}`
+          : empty, ''],
+        ['KB intake completed', sub.kb_completed_at ? fmtDate(sub.kb_completed_at) : empty, ''],
+        ['Copy for GHL',
+          `<button type="button" class="btn btn-p" data-kb-copy="${ESC(sub.id)}" style="margin-top:6px">Copy KB as Markdown</button><span id="kb-copy-state" style="margin-left:10px;color:var(--g6);font-size:12px;"></span>`,
+          ''],
+      ]) : planNotice('AI knowledge base', isLaunch ? 'Launch' : 'Scale')}
+
+      ${section('📝 Additional notes', [
+        ['Notes', sub.extra_notes ? ESC(sub.extra_notes) : empty, undefined, 'extra_notes'],
+      ])}
+
+      <section class="det-section">
+        <div class="det-section-hdr">
+          <span>📎 Attachments</span>
+          <button type="button" class="copy-section-btn" id="detAttachUploadTrigger" title="Upload a file to this submission">
+            <span class="copy-btn-ico" aria-hidden="true">+</span>Upload file
+          </button>
+        </div>
+        <div class="det-section-body" id="detAttachmentsHost">
+          <div class="adm-empty" style="padding:16px 0;">Loading attachments…</div>
+        </div>
+        <input type="file" id="detAttachFileInput" multiple
+          accept=".pdf,.png,.jpg,.jpeg,.svg,.docx,.doc,.xlsx,.xls,application/pdf,image/png,image/jpeg,image/svg+xml,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          hidden>
+      </section>
+    `;
   }
 
   // ── Attachments (admin side) ───────────────────────────────────────────────
@@ -1038,15 +1179,19 @@
       .limit(1)
       .maybeSingle();
     currentAssignment = assignment || null;
-    // Re-render the whole Manage section by re-rendering the screen
-    render(current, [], []);
-    // Notes/timeline weren't passed — refetch them
+    // Re-fetch notes + log so Activity tab has fresh data when shown.
     const [{ data: notes }, { data: log }] = await Promise.all([
       client.from('admin_notes').select('*').eq('submission_id', current.id).order('created_at', { ascending: false }),
       client.from('activity_log').select('*').eq('submission_id', current.id).order('created_at', { ascending: false }),
     ]);
-    renderNotes(notes || []);
-    renderTimeline(log || []);
+    pendingNotes = notes || [];
+    pendingLog = log || [];
+    // Re-render the whole screen and restore the user's current tab so
+    // they don't get bounced to Overview when assignment state changes.
+    const savedTab = currentTab;
+    tabHydrated = { overview: false, messages: false, invoices: false, quotes: false, activity: false };
+    render(current);
+    activateTab(savedTab);
   }
 
   function sheetSyncRow(sub) {
