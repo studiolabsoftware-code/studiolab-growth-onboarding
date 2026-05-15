@@ -22,6 +22,11 @@
   .acct-pill-status-authorised { background: #FEF3C7; color: #B45309; }
   .acct-pill-status-card_saved { background: #DBEAFE; color: #1E40AF; }
   .acct-pill-status-pending { background: var(--g2); color: var(--g6); }
+  /* Quote-specific pill variants. Sent/Viewed = info blue. Cancelled/
+     Declined = red. Expired/Revised = neutral grey. */
+  .acct-pill-status-info { background: #DBEAFE; color: #1E40AF; }
+  .acct-pill-status-crit { background: #FEE2E2; color: #B91C1C; }
+  .acct-pill-status-muted { background: var(--g2); color: var(--g6); }
 
   .acct-card { background: #fff; border-radius: 14px; box-shadow: 0 4px 22px rgba(19,16,46,.06); padding: 22px 24px; margin-bottom: 18px; }
   .acct-card h2 { font-size: 14px; font-weight: 700; color: var(--g6); margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.6px; }
@@ -219,8 +224,9 @@
     const quotes = data.quotes || [];
     const quotesPillClass = (s) =>
       s === 'accepted' ? 'acct-pill-status-paid'
-      : s === 'declined' || s === 'expired' || s === 'cancelled' ? 'acct-pill-status-pending'
-      : 'acct-pill-status-authorised';
+      : s === 'cancelled' || s === 'declined' ? 'acct-pill-status-crit'
+      : s === 'expired' || s === 'revised' ? 'acct-pill-status-muted'
+      : 'acct-pill-status-info'; // sent / viewed / draft
     const quotesPillLabel = (s) =>
       s === 'sent' ? 'Awaiting your reply'
       : s === 'viewed' ? 'Viewed'
@@ -349,7 +355,7 @@
         });
         if (!resp.ok) {
           const j = await resp.json().catch(() => ({}));
-          alert((j && j.error) || 'Could not download your quote.');
+          alert((j && j.error) || 'Could not download your quote. Please try again, or reply to your confirmation email if the issue continues.');
           return;
         }
         const blob = await resp.blob();

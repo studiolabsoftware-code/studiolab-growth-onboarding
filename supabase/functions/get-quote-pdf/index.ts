@@ -80,7 +80,12 @@ Deno.serve(async (req) => {
     if (!stripeResp.ok) {
       const text = await stripeResp.text().catch(() => '');
       console.error('get-quote-pdf: Stripe fetch failed', { status: stripeResp.status, text, actor });
-      return jsonResponse({ ok: false, error: `Stripe responded ${stripeResp.status}.` }, 502);
+      // Don't leak the upstream status to the caller — they can't act on it
+      // and "Stripe" leaks internal infra. Tell them what to do next.
+      return jsonResponse({
+        ok: false,
+        error: 'Could not download the quote PDF right now. Try again in a moment, or email info@studiolabsoftware.com if it keeps failing.',
+      }, 502);
     }
 
     // Re-stream the PDF straight through to the caller. content-disposition
@@ -98,6 +103,9 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error('get-quote-pdf error:', err);
-    return jsonResponse({ ok: false, error: String(err) }, 500);
+    return jsonResponse({
+      ok: false,
+      error: 'Something went wrong on our end. Please try again, or email info@studiolabsoftware.com if the issue continues.',
+    }, 500);
   }
 });

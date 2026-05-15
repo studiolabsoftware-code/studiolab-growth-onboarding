@@ -990,7 +990,7 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
   // invoice side.
   if (ledger && classification.source === 'studiolab-growth-quote' && invoice.quote) {
     const { data: quoteRow } = await sb.from('quotes')
-      .select('id, resulting_invoice_id')
+      .select('id, submission_id, external_contact_id, resulting_invoice_id')
       .eq('stripe_quote_id', invoice.quote)
       .maybeSingle();
     if (quoteRow) {
@@ -1004,8 +1004,20 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
       if (Object.keys(updates).length) {
         await sb.from('quotes').update(updates).eq('id', quoteRow.id);
       }
-      // Stamp quote_id on the invoice row too.
-      await sb.from('invoices').update({ quote_id: quoteRow.id }).eq('id', ledger.id);
+      // Stamp quote_id + the quote's recipient linkage onto the invoice
+      // row. Without copying submission_id (and external_contact_id), a
+      // quote-derived invoice may land in the ledger with both NULL — which
+      // means it never appears on the studio's account.html Invoices
+      // section (filtered by submission_id) and the external contact's
+      // totals don't update.
+      const invoicePatch: Record<string, unknown> = { quote_id: quoteRow.id };
+      if (quoteRow.submission_id && !submission) {
+        invoicePatch.submission_id = quoteRow.submission_id;
+      }
+      if (quoteRow.external_contact_id) {
+        invoicePatch.external_contact_id = quoteRow.external_contact_id;
+      }
+      await sb.from('invoices').update(invoicePatch).eq('id', ledger.id);
     }
   }
 
@@ -1119,11 +1131,27 @@ async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Pr
       if (invRow) updateRow.resulting_invoice_id = invRow.id;
     }
   } else if (eventType === 'quote.canceled') {
-    // Expired vs declined: if expires_at has passed, treat as 'expired';
-    // otherwise it was a manual cancel/decline.
-    const nowSec = Math.floor(Date.now() / 1000);
-    const expired = quote.expires_at && quote.expires_at <= nowSec;
-    nextStatus = expired ? 'expired' : 'declined';
+    // Discriminator priority for the final ledger status:
+    //   1. metadata.cancel_reason set by our cancel-quote function
+    //      ('admin_cancelled' → cancelled, 'replaced_by_revision' → revised,
+    //      'expired' → expired)
+    //   2. expires_at vs now — if the quote's expiry has passed, treat as
+    //      'expired' (the quote-reminders cron auto-cancels at expiry)
+    //   3. Fall back to 'declined' for everything else (recipient-initiated
+    //      cancellations via the Stripe-hosted page, or Stripe dashboard
+    //      cancellations with no metadata)
+    const cancelReason = quote.metadata?.cancel_reason || '';
+    if (cancelReason === 'admin_cancelled') {
+      nextStatus = 'cancelled';
+    } else if (cancelReason === 'replaced_by_revision') {
+      nextStatus = 'revised';
+    } else if (cancelReason === 'expired') {
+      nextStatus = 'expired';
+    } else {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const expired = quote.expires_at && quote.expires_at <= nowSec;
+      nextStatus = expired ? 'expired' : 'declined';
+    }
     const canceledAt = quote.status_transitions?.canceled_at
       ? new Date(quote.status_transitions.canceled_at * 1000).toISOString()
       : new Date().toISOString();
@@ -1166,7 +1194,9 @@ async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Pr
   // Activity log mapping. submission_id is null for external recipients.
   const action = eventType === 'quote.accepted' ? 'quote_accepted'
     : eventType === 'quote.canceled'
-      ? (updateRow.status === 'expired' ? 'quote_expired' : 'quote_declined')
+      ? (updateRow.status === 'expired' ? 'quote_expired'
+        : updateRow.status === 'cancelled' || updateRow.status === 'revised' ? 'quote_cancelled'
+        : 'quote_declined')
       : null;
   if (action) {
     try {

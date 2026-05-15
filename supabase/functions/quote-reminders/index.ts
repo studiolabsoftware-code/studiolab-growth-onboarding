@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     // service_role_key in the Authorization header; manual re-runs from
     // the admin's machine use the same key. See _shared/caller.ts for the
     // two-path verification logic (exact env match OR role-claim JWT check).
-    if (!isServiceRoleCaller(req)) {
+    if (!(await isServiceRoleCaller(req))) {
       return jsonResponse({ ok: false, error: 'Service-role auth required.' }, 401);
     }
 
@@ -139,11 +139,21 @@ Deno.serve(async (req) => {
           await gatedSend(recipient.email, tpl.subject, tpl.html, 'quote nudge (day 7)');
           await sb.from('quotes').update({ reminder_sent_at: nowIso }).eq('id', q.id);
           try {
+            // activity_log has no external_contact_id column — for external
+            // recipients we record the id in details so the audit row is
+            // still searchable. Without this, external-recipient reminders
+            // were orphaned (submission_id null, no other linkage).
             await sb.from('activity_log').insert({
               submission_id: q.submission_id,
               action: 'quote_reminded',
               actor: 'system',
-              details: { quote_id: q.id, number: q.number, stage: 'day_7' },
+              details: {
+                quote_id: q.id,
+                number: q.number,
+                stage: 'day_7',
+                external_contact_id: q.external_contact_id,
+                recipient_type: q.submission_id ? 'studio' : 'external',
+              },
             });
           } catch (e) { console.error('activity_log insert failed:', e); }
           stats.nudged++;
@@ -183,7 +193,14 @@ Deno.serve(async (req) => {
               submission_id: q.submission_id,
               action: 'quote_reminded',
               actor: 'system',
-              details: { quote_id: q.id, number: q.number, stage: 'expiry_warning', days_left: daysLeft },
+              details: {
+                quote_id: q.id,
+                number: q.number,
+                stage: 'expiry_warning',
+                days_left: daysLeft,
+                external_contact_id: q.external_contact_id,
+                recipient_type: q.submission_id ? 'studio' : 'external',
+              },
             });
           } catch (e) { console.error('activity_log insert failed:', e); }
           stats.warned++;
@@ -195,19 +212,28 @@ Deno.serve(async (req) => {
     }
 
     // ===== 3. Auto-cancel expired quotes =====================================
-    // Bypass the cancel-quote edge function and call Stripe directly — we
-    // already have admin context (service-role caller) and the webhook
-    // quote.canceled handler will discriminate expired vs declined from
-    // expires_at, so the ledger correctly lands on status='expired'.
+    // Stamp metadata.cancel_reason='expired' on the Stripe Quote before
+    // cancelling — the webhook quote.canceled handler reads that metadata
+    // first when deciding the final ledger status, so the row reliably
+    // lands on 'expired' (not 'declined'). Also writes the local ledger
+    // optimistically so the admin UI updates immediately rather than
+    // waiting for webhook latency.
     {
       const { data: expiredRows } = await sb.from('quotes')
-        .select('id, stripe_quote_id, number, status, submission_id')
+        .select('id, stripe_quote_id, number, status, submission_id, external_contact_id')
         .in('status', ['draft', 'sent', 'viewed'])
         .lt('expires_at', nowIso);
 
       for (const q of (expiredRows || [])) {
         if (!q.stripe_quote_id) continue;
         try {
+          // Stamp the reason metadata first so the webhook reads it.
+          await stripeRequest(
+            'POST',
+            `quotes/${encodeURIComponent(q.stripe_quote_id)}`,
+            { 'metadata[cancel_reason]': 'expired' },
+            stripeKey,
+          );
           const cancel = await stripeRequest<{ id: string; status: string }>(
             'POST',
             `quotes/${encodeURIComponent(q.stripe_quote_id)}/cancel`,
@@ -221,12 +247,24 @@ Deno.serve(async (req) => {
             // truth and will eventually reconcile.
             console.warn('Stripe quote cancel returned non-OK', { id: q.id, status: cancel.status, error: cancel.error });
           } else {
+            // Optimistic local update — webhook will arrive shortly and
+            // confirm via its downgrade guard.
+            await sb.from('quotes')
+              .update({ status: 'expired', declined_at: new Date().toISOString() })
+              .eq('id', q.id)
+              .in('status', ['draft', 'sent', 'viewed']);
             try {
               await sb.from('activity_log').insert({
                 submission_id: q.submission_id,
                 action: 'quote_expired',
                 actor: 'system',
-                details: { quote_id: q.stripe_quote_id, number: q.number, reason: 'auto_expired' },
+                details: {
+                  quote_id: q.stripe_quote_id,
+                  number: q.number,
+                  reason: 'auto_expired',
+                  external_contact_id: q.external_contact_id,
+                  recipient_type: q.submission_id ? 'studio' : 'external',
+                },
               });
             } catch (e) { console.error('activity_log insert failed:', e); }
             stats.cancelled++;

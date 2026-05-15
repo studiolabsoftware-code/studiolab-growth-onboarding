@@ -45,6 +45,7 @@
 
   // ── State (per-open) ───────────────────────────────────────────────────────
   let currentContext = null; // { mode: 'studio'|'external', submission?: {...} }
+  let detachHygiene = null;
 
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
@@ -135,10 +136,19 @@
 
     modal.hidden = false;
     document.body.classList.add('adm-modal-open');
-    setTimeout(() => {
-      const target = isStudio ? $('#invItems input[data-fld="description"]') : $('#invExtEmail');
-      if (target) target.focus();
-    }, 50);
+    if (window.AdminModal && window.AdminModal.attachDialogHygiene) {
+      detachHygiene = window.AdminModal.attachDialogHygiene(modal, {
+        onEscape: close,
+        initialFocus: () => isStudio
+          ? $('#invItems input[data-fld="description"]')
+          : $('#invExtEmail'),
+      });
+    } else {
+      setTimeout(() => {
+        const target = isStudio ? $('#invItems input[data-fld="description"]') : $('#invExtEmail');
+        if (target) target.focus();
+      }, 50);
+    }
   }
 
   function close() {
@@ -147,6 +157,10 @@
     modal.hidden = true;
     document.body.classList.remove('adm-modal-open');
     currentContext = null;
+    if (typeof detachHygiene === 'function') {
+      detachHygiene();
+      detachHygiene = null;
+    }
   }
 
   function updateModeUI() {

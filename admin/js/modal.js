@@ -110,6 +110,46 @@
     return sel ? sel.value : null;
   }
 
+  // Reusable dialog hygiene for custom modals (the quote + invoice forms
+  // built their own markup rather than using AdminModal.confirm). Wires ESC
+  // to close, traps Tab inside the modal-card, and restores focus to the
+  // trigger element on close. Returns a "teardown" function that detaches
+  // listeners — call it from your modal's close() handler so listeners
+  // don't accumulate across opens.
+  function attachDialogHygiene(modalEl, opts) {
+    const { onEscape, initialFocus } = opts || {};
+    const lastFocused = document.activeElement;
+    const cardEl = modalEl.querySelector('.adm-modal-card') || modalEl;
+
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (typeof onEscape === 'function') onEscape();
+      } else if (e.key === 'Tab') {
+        const items = focusable(cardEl);
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    document.addEventListener('keydown', onKey);
+
+    requestAnimationFrame(() => {
+      const target = (typeof initialFocus === 'function' ? initialFocus() : initialFocus)
+        || focusable(cardEl)[0];
+      if (target && typeof target.focus === 'function') target.focus();
+    });
+
+    return function teardown() {
+      document.removeEventListener('keydown', onKey);
+      if (lastFocused && typeof lastFocused.focus === 'function') {
+        try { lastFocused.focus(); } catch (_) { /* element gone */ }
+      }
+    };
+  }
+
   window.AdminModal = {
     confirm(opts) { return open(Object.assign({ kind: 'confirm' }, opts)); },
     alert(opts) {
@@ -117,5 +157,6 @@
       return open(Object.assign({ kind: 'alert', confirmLabel: 'OK', title: 'Notice' }, o));
     },
     prompt,
+    attachDialogHygiene,
   };
 })();

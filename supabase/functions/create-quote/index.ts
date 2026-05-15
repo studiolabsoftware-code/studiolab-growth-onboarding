@@ -25,7 +25,7 @@
 //     needs internal approval before paying.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
-import { adminClient } from '../_shared/supabase.ts';
+import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { getCallerProfile } from '../_shared/caller.ts';
 import { getAuGstTaxRateId, getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 
@@ -64,6 +64,17 @@ function isoCountryForStripe(stored: string | null | undefined): string | null {
   const c = stored.trim().toUpperCase();
   if (c === 'UK') return 'GB';
   if (/^[A-Z]{2}$/.test(c)) return c;
+  return null;
+}
+
+// Server-side mirror of the admin modal's currency lock. AU recipients must
+// pay AUD with GST; everyone else USD without GST. Returns null if country
+// is unknown (no enforcement — admin's modal default still applies).
+function expectedCurrencyForCountry(country: string | null | undefined): 'AUD' | 'USD' | null {
+  if (!country) return null;
+  const c = country.trim().toUpperCase();
+  if (c === 'AU' || c === 'AUS' || c === 'AUSTRALIA') return 'AUD';
+  if (/^[A-Z]{2,3}$/.test(c) || c.length > 3) return 'USD';
   return null;
 }
 
@@ -121,6 +132,19 @@ Deno.serve(async (req) => {
       submissionId = sub.id;
       recipientEmail = (sub.contact_email || '').toLowerCase();
       recipientCountryIso = isoCountryForStripe(sub.country);
+      // Server-side currency/country validation. The admin modal locks the
+      // currency selector but a DOM edit can bypass that — we re-enforce
+      // here because GST handling is tax-correctness load-bearing: AU
+      // recipients must be billed AUD with GST, everyone else USD without.
+      const expectedCurrency = expectedCurrencyForCountry(sub.country);
+      if (expectedCurrency && currency !== expectedCurrency) {
+        return badRequest(
+          expectedCurrency === 'AUD'
+            ? 'Australian studios must be quoted in AUD (10% GST applies).'
+            : 'Overseas studios must be quoted in USD (no GST).',
+          'currency_country_mismatch',
+        );
+      }
       if (sub.stripe_customer_id) {
         stripeCustomerId = sub.stripe_customer_id;
       } else {
@@ -137,7 +161,7 @@ Deno.serve(async (req) => {
           },
           ...(recipientCountryIso ? { 'address[country]': recipientCountryIso } : {}),
         }, secretKey, `studiolab-customer-${sub.id}`);
-        if (!create.ok) return jsonResponse({ ok: false, error: create.error || 'Stripe customer create failed.' }, 502);
+        if (!create.ok) return jsonResponse({ ok: false, error: 'Could not create the recipient in Stripe. Please try again.' }, 502);
         stripeCustomerId = create.body.id;
         await sb.from('submissions').update({ stripe_customer_id: stripeCustomerId }).eq('id', sub.id);
       }
@@ -189,6 +213,18 @@ Deno.serve(async (req) => {
       externalContactId = contactRow.id;
       recipientEmail = contactRow.email.toLowerCase();
       recipientCountryIso = isoCountryForStripe(contactRow.country);
+      // External recipient currency/country check. Only enforce when we
+      // actually know the country — admins occasionally invoice a new
+      // external contact without specifying country and that's allowed.
+      const expectedExternalCurrency = expectedCurrencyForCountry(contactRow.country);
+      if (expectedExternalCurrency && currency !== expectedExternalCurrency) {
+        return badRequest(
+          expectedExternalCurrency === 'AUD'
+            ? 'Australian recipients must be quoted in AUD (10% GST applies).'
+            : 'Overseas recipients must be quoted in USD (no GST).',
+          'currency_country_mismatch',
+        );
+      }
       if (contactRow.stripe_customer_id) {
         stripeCustomerId = contactRow.stripe_customer_id;
       } else {
@@ -217,7 +253,7 @@ Deno.serve(async (req) => {
             },
             ...(recipientCountryIso ? { 'address[country]': recipientCountryIso } : {}),
           }, secretKey, `studiolab-external-${contactRow.id}`);
-          if (!create.ok) return jsonResponse({ ok: false, error: create.error || 'Stripe customer create failed.' }, 502);
+          if (!create.ok) return jsonResponse({ ok: false, error: 'Could not create the recipient in Stripe. Please try again.' }, 502);
           stripeCustomerId = create.body.id;
         }
         await sb.from('external_contacts')
@@ -244,9 +280,40 @@ Deno.serve(async (req) => {
     }
 
     const expiresAtSec = Math.floor(Date.now() / 1000) + (expiresInDays * 24 * 60 * 60);
-    const idempotencyBase = `slg-quote-${stripeCustomerId}-${Date.now()}`;
+    // Derive idempotency key from the payload shape (not Date.now()) so
+    // network retries hit Stripe's cache and produce one quote, while
+    // intentionally-distinct quotes (different scope, line items, parent)
+    // get fresh keys. Two near-simultaneous identical submissions are also
+    // deduped — which is the desired behaviour for a double-click.
+    const payloadDigest = await sha256Hex(JSON.stringify({
+      cust: stripeCustomerId,
+      sub: submissionId,
+      ext: externalContactId,
+      parent: parentQuoteId,
+      mode: acceptanceMode,
+      currency,
+      expires: expiresAtSec,
+      lines: lines.map((li) => ({ d: li.description, q: li.quantity ?? 1, a: li.amount_cents })),
+      note: coverNote,
+      desc: description,
+    }));
+    const idempotencyBase = `slg-quote-${payloadDigest.slice(0, 24)}`;
 
     const useFallbackGst = currency === 'AUD' && !auGstRateId;
+    // AU GST on Stripe Quote line items: we attach the manual tax rate at
+    // the line-item level (sibling of price_data) and set
+    // price_data.tax_behavior='exclusive'. This matches what
+    // create-checkout-session does for the setup-invoice flow.
+    //
+    // VERIFY AT LIVE CUTOVER: issue one AUD quote against a sandbox account
+    // and confirm Stripe's hosted-quote page shows three lines:
+    //   Subtotal $X
+    //   GST 10%   $X
+    //   Total     $X
+    // If GST is missing from the breakdown, the `tax_rates` attachment is
+    // being ignored; switch to setting `useFallbackGst = true` for AUD so
+    // the unit_amount includes the 10% (recipient still pays the right
+    // total, just without the itemised GST line).
     const lineItemsArr = lines.map((li) => {
       const unitAmount = useFallbackGst ? Math.round(li.amount_cents * 1.10) : li.amount_cents;
       const item: Record<string, unknown> = {
@@ -313,7 +380,13 @@ Deno.serve(async (req) => {
       secretKey,
       `${idempotencyBase}-quote`,
     );
-    if (!draft.ok) return jsonResponse({ ok: false, error: draft.error || 'Stripe quote create failed.' }, 502);
+    if (!draft.ok) {
+      console.error('quote create failed:', draft.error);
+      return jsonResponse({
+        ok: false,
+        error: 'Could not create the quote in Stripe. Please try again — check the Stripe dashboard if it persists.',
+      }, 502);
+    }
     const quoteId = draft.body.id;
 
     // ---- Finalise the quote so it gets a number + hosted URL + PDF.
@@ -330,7 +403,11 @@ Deno.serve(async (req) => {
       };
     }>('POST', `quotes/${encodeURIComponent(quoteId)}/finalize`, {}, secretKey, `${idempotencyBase}-finalize`);
     if (!finalised.ok) {
-      return jsonResponse({ ok: false, error: finalised.error || 'Stripe quote finalize failed.' }, 502);
+      console.error('quote finalise failed:', finalised.error);
+      return jsonResponse({
+        ok: false,
+        error: 'Could not finalise the quote in Stripe. Please try again — check the Stripe dashboard if it persists.',
+      }, 502);
     }
     const q = finalised.body;
 
@@ -351,7 +428,31 @@ Deno.serve(async (req) => {
     // surface — there is no public hosted_url or PDF URL on the Quote
     // object (the /v1/quotes/{id}/pdf endpoint requires API auth, so we
     // do not expose it as a customer-facing link).
-    await stripeRequest('POST', `quotes/${encodeURIComponent(quoteId)}/send`, {}, secretKey);
+    //
+    // CHECK THE RESPONSE: previously fire-and-forget. If Stripe rejects
+    // (e.g. customer has no email), our ledger would say status='sent'
+    // with no email actually delivered. Roll back the Stripe quote and
+    // surface to admin so they can fix the recipient and retry.
+    const sendResp = await stripeRequest(
+      'POST',
+      `quotes/${encodeURIComponent(quoteId)}/send`,
+      null,
+      secretKey,
+    );
+    if (!sendResp.ok) {
+      console.error('quotes/send failed, rolling back:', sendResp.error);
+      await stripeRequest(
+        'POST',
+        `quotes/${encodeURIComponent(quoteId)}/cancel`,
+        null,
+        secretKey,
+      );
+      return jsonResponse({
+        ok: false,
+        error: 'Could not send the quote email. Check that the recipient has an email address in Stripe and try again.',
+        code: 'send_failed',
+      }, 502);
+    }
 
     const hostedUrl: string | null = null;
     const pdfUrl: string | null = null;
@@ -393,12 +494,59 @@ Deno.serve(async (req) => {
       .select('id')
       .single();
 
-    // If revising, mark the parent quote as 'revised' so the admin and
-    // studio panels show the lineage. Cancellation of the parent in Stripe
-    // is triggered from the frontend after we return (or by the cron if the
-    // admin doesn't explicitly revise). Status downgrade guard: only
-    // promote to 'revised' if the parent is still active.
+    // Roll back on ledger failure. The Stripe Quote is already open and the
+    // email is already in flight — but with no ledger row, admin UI can't
+    // see the quote and webhook events for it will hit the "not in ledger"
+    // branch and silently skip. Better to cancel the Stripe Quote and
+    // surface the failure so the admin can retry cleanly.
+    if (ledgerErr || !ledgerRow?.id) {
+      console.error('quotes ledger insert failed, rolling back Stripe Quote:', ledgerErr);
+      await stripeRequest(
+        'POST',
+        `quotes/${encodeURIComponent(q.id)}/cancel`,
+        null,
+        secretKey,
+      );
+      return jsonResponse({
+        ok: false,
+        error: 'Could not record the quote on our side. The Stripe quote was rolled back — please try again.',
+        code: 'ledger_insert_failed',
+      }, 500);
+    }
+
+    // Revision parent handling. ORDER OF OPERATIONS IS LOAD-BEARING:
+    //   1. Cancel the parent in Stripe FIRST (best-effort but synchronous).
+    //   2. Then mark the parent ledger row as 'revised'.
+    // Previously the parent was marked 'revised' before any Stripe-side
+    // cancellation, and the client-side cancel-quote call ran after
+    // create-quote returned. cancel-quote bails on terminal statuses
+    // (including 'revised'), so the parent was never cancelled in Stripe —
+    // recipient could still accept the superseded quote.
     if (parentQuoteId && ledgerRow?.id) {
+      const { data: parentRow } = await sb.from('quotes')
+        .select('stripe_quote_id, status')
+        .eq('id', parentQuoteId)
+        .maybeSingle();
+      if (parentRow?.stripe_quote_id
+          && ['draft', 'sent', 'viewed'].includes(parentRow.status as string)) {
+        const cancel = await stripeRequest<{ id: string; status: string }>(
+          'POST',
+          `quotes/${encodeURIComponent(parentRow.stripe_quote_id)}/cancel`,
+          null,
+          secretKey,
+          `slg-revise-cancel-${parentQuoteId}`,
+        );
+        if (!cancel.ok) {
+          // Log and proceed: we'd rather have the new quote live than crash
+          // the revise flow. The reminder cron's daily auto-cancel sweep
+          // will catch the parent at expiry if Stripe rejected the cancel.
+          console.error('revise: parent quote cancel failed', {
+            parent_id: parentQuoteId,
+            stripe_quote_id: parentRow.stripe_quote_id,
+            error: cancel.error,
+          });
+        }
+      }
       await sb.from('quotes')
         .update({ status: 'revised' })
         .eq('id', parentQuoteId)
@@ -415,9 +563,6 @@ Deno.serve(async (req) => {
           },
         });
       } catch (e) { console.error('activity_log insert failed:', e); }
-    }
-    if (ledgerErr) {
-      console.error('quotes ledger insert failed:', ledgerErr);
     }
 
     // ---- Activity log: drafted → sent in one step (we send immediately).
@@ -469,7 +614,12 @@ Deno.serve(async (req) => {
       stripe_mode: mode,
     });
   } catch (err) {
+    // Log the raw error server-side; don't leak stack/Postgres details to
+    // the admin UI (which alert()s the response).
     console.error('create-quote error:', err);
-    return jsonResponse({ ok: false, error: String(err) }, 500);
+    return jsonResponse({
+      ok: false,
+      error: 'Could not create the quote. Please try again — if it persists, email info@studiolabsoftware.com.',
+    }, 500);
   }
 });

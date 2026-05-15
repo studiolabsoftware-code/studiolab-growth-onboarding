@@ -27,18 +27,23 @@
     revised: 'Revised',
   };
 
+  // Maps quote.status → CSS class for the pill. Aligned with the new
+  // status-specific pill colours in admin.css so terminal states are
+  // visually distinct (cancelled/declined red, expired neutral grey,
+  // revised muted, accepted green, sent/viewed blue).
   const STATUS_CLASS = {
     draft: 'bdg-st-submitted',
-    sent: 'bdg-st-in_review',
-    viewed: 'bdg-st-in_review',
-    accepted: 'bdg-st-complete',
-    declined: 'bdg-st-changes_requested',
-    expired: 'bdg-st-changes_requested',
-    cancelled: 'bdg-st-changes_requested',
-    revised: 'bdg-st-changes_requested',
+    sent: 'bdg-st-sent',
+    viewed: 'bdg-st-viewed',
+    accepted: 'bdg-st-accepted',
+    declined: 'bdg-st-declined',
+    expired: 'bdg-st-expired',
+    cancelled: 'bdg-st-cancelled',
+    revised: 'bdg-st-revised',
   };
 
   let currentContext = null;
+  let detachHygiene = null;
 
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
@@ -150,10 +155,23 @@
 
     modal.hidden = false;
     document.body.classList.add('adm-modal-open');
-    setTimeout(() => {
-      const target = isStudio ? $('#qItems input[data-fld="description"]') : $('#qExtEmail');
-      if (target) target.focus();
-    }, 50);
+    // ESC, focus trap, and focus restore via the shared helper. Replaces
+    // the bare setTimeout(focus, 50) — keyboard users now Tab inside the
+    // dialog and ESC closes; closing returns focus to the triggering
+    // button (+ Quote / + New quote / Revise).
+    if (window.AdminModal && window.AdminModal.attachDialogHygiene) {
+      detachHygiene = window.AdminModal.attachDialogHygiene(modal, {
+        onEscape: close,
+        initialFocus: () => isStudio
+          ? $('#qItems input[data-fld="description"]')
+          : $('#qExtEmail'),
+      });
+    } else {
+      setTimeout(() => {
+        const target = isStudio ? $('#qItems input[data-fld="description"]') : $('#qExtEmail');
+        if (target) target.focus();
+      }, 50);
+    }
   }
 
   function close() {
@@ -162,6 +180,10 @@
     modal.hidden = true;
     document.body.classList.remove('adm-modal-open');
     currentContext = null;
+    if (typeof detachHygiene === 'function') {
+      detachHygiene();
+      detachHygiene = null;
+    }
   }
 
   function updateModeUI() {
@@ -338,26 +360,9 @@
       $('#qSuccessAmount').textContent = moneyFmt(q.total_cents, q.currency);
       $('#qSuccess').hidden = false;
 
-      // Revise flow: cancel the parent quote in the background so the
-      // recipient stops seeing the superseded version. Best-effort — if
-      // cancel fails, the new quote is still live and the admin can cancel
-      // manually from the panel.
-      if (parentQuoteId) {
-        try {
-          const cancelUrl = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/cancel-quote';
-          await fetch(cancelUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': jwt ? `Bearer ${jwt}` : '',
-              'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
-            },
-            body: JSON.stringify({ quote_id: parentQuoteId, reason: 'replaced_by_revision' }),
-          });
-        } catch (e) {
-          console.warn('parent quote cancel after revise failed (non-fatal):', e);
-        }
-      }
+      // Parent-cancellation on revise is now handled server-side inside
+      // create-quote (atomically, before the parent is marked 'revised').
+      // No client-side cancel call needed.
 
       if (payload.recipient.type === 'studio') {
         refreshStudioQuotesPanel(payload.recipient.submission_id);
@@ -381,7 +386,7 @@
       return;
     }
     const { data, error } = await sb.from('quotes')
-      .select('id, number, status, acceptance_mode, currency, total_cents, expires_at, sent_at, accepted_at, hosted_url, pdf_url, cover_note, resulting_invoice_id, stripe_quote_id, submission_id')
+      .select('id, number, status, acceptance_mode, currency, subtotal_cents, total_cents, expires_at, sent_at, accepted_at, hosted_url, pdf_url, cover_note, resulting_invoice_id, stripe_quote_id, submission_id')
       .eq('submission_id', submissionId)
       .order('created_at', { ascending: false });
     if (error) {
@@ -546,16 +551,20 @@
       alert('Supabase client unavailable.');
       return;
     }
-    // Fetch the line items implicitly via the source quote totals — but
-    // public.quotes doesn't store line items directly. Pre-fill the modal
-    // with one row pre-totalled to the original quote's subtotal so the
-    // admin can edit before sending; that's the realistic flow because most
-    // revisions adjust scope or pricing.
+    // public.quotes doesn't store individual line items, so we pre-fill one
+    // row at the source quote's EX-GST SUBTOTAL. Using total_cents would
+    // double-count GST for AUD quotes (the total is already GST-inclusive,
+    // and the manual GST tax_rate gets re-attached when the new quote is
+    // created — recipient would be billed ~21% over scope). Admin can split
+    // this single row into multiple lines before sending.
+    const subtotalCents = Number.isFinite(quote.subtotal_cents)
+      ? quote.subtotal_cents
+      : (quote.currency === 'AUD' ? Math.round(quote.total_cents / 1.1) : quote.total_cents);
     const initial = {
       lineItems: [{
-        description: 'Revised from ' + (quote.number || 'previous quote'),
+        description: 'Revised version of ' + (quote.number || 'previous quote'),
         quantity: 1,
-        amount: (quote.total_cents / 100).toFixed(2),
+        amount: (subtotalCents / 100).toFixed(2),
       }],
       acceptanceMode: quote.acceptance_mode || 'pay_on_accept',
       coverNote: quote.cover_note || '',

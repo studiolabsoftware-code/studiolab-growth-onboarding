@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     //      Authorization: Bearer <service_role_key>) — see
     //      _shared/caller.ts:isServiceRoleCaller for the two-path verify.
     let actorLabel = 'system';
-    if (!isServiceRoleCaller(req)) {
+    if (!(await isServiceRoleCaller(req))) {
       const caller = await getCallerProfile(req);
       if (!caller) return jsonResponse({ ok: false, error: 'Admin sign-in required.' }, 401);
       actorLabel = caller.email;
@@ -64,6 +64,22 @@ Deno.serve(async (req) => {
     const mode = await getStripeMode();
     const secretKey = getStripeKey(mode);
 
+    // Stamp the cancel reason onto the Stripe Quote metadata BEFORE cancel
+    // so the webhook quote.canceled handler can read it and pick the right
+    // ledger status (cancelled vs expired vs declined). Without this, the
+    // webhook falls back to its expires_at heuristic and writes 'declined'
+    // even for admin cancels, leaving the 'cancelled' status enum
+    // unreachable.
+    const stripeReason = reason === 'expired' ? 'expired'
+      : reason === 'replaced_by_revision' ? 'replaced_by_revision'
+      : 'admin_cancelled';
+    await stripeRequest(
+      'POST',
+      `quotes/${encodeURIComponent(quoteRow.stripe_quote_id)}`,
+      { 'metadata[cancel_reason]': stripeReason },
+      secretKey,
+    );
+
     const cancel = await stripeRequest<{ id: string; status: string }>(
       'POST',
       `quotes/${encodeURIComponent(quoteRow.stripe_quote_id)}/cancel`,
@@ -72,18 +88,29 @@ Deno.serve(async (req) => {
       `slg-cancel-quote-${quoteRow.id}`,
     );
     if (!cancel.ok) {
-      return jsonResponse({ ok: false, error: cancel.error || 'Stripe quote cancel failed.' }, 502);
+      console.error('quote cancel failed:', cancel.error);
+      return jsonResponse({
+        ok: false,
+        error: 'Could not cancel the quote in Stripe. It may already be accepted or expired — refresh the panel to see the current status.',
+      }, 502);
     }
 
-    // The Stripe webhook quote.canceled handler will discriminate
-    // expired vs declined from expires_at. For admin-initiated cancellation
-    // we override that decision here so the audit trail records the actual
-    // reason. We write the activity log row but defer the status update to
-    // the webhook (single source of truth).
+    // Write the ledger status here too as an optimistic fallback. If the
+    // webhook arrives first it'll have already set the status using the
+    // metadata.cancel_reason we just stamped; if our update lands first,
+    // the webhook's downgrade guard prevents it from clobbering. Either
+    // way the UI shows the right pill within seconds of admin clicking
+    // Cancel.
+    const targetStatus = stripeReason === 'expired' ? 'expired'
+      : stripeReason === 'replaced_by_revision' ? 'revised'
+      : 'cancelled';
+    await sb.from('quotes')
+      .update({ status: targetStatus, declined_at: new Date().toISOString() })
+      .eq('id', quoteRow.id)
+      .in('status', ['draft', 'sent', 'viewed']);
+
     try {
-      const action = reason === 'expired' ? 'quote_expired'
-        : reason === 'replaced_by_revision' ? 'quote_cancelled'
-        : 'quote_cancelled';
+      const action = stripeReason === 'expired' ? 'quote_expired' : 'quote_cancelled';
       await sb.from('activity_log').insert({
         submission_id: quoteRow.submission_id,
         action,
@@ -91,7 +118,7 @@ Deno.serve(async (req) => {
         details: {
           quote_id: quoteRow.stripe_quote_id,
           number: quoteRow.number,
-          reason,
+          reason: stripeReason,
         },
       });
     } catch (e) { console.error('activity_log insert failed:', e); }
@@ -106,6 +133,9 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error('cancel-quote error:', err);
-    return jsonResponse({ ok: false, error: String(err) }, 500);
+    return jsonResponse({
+      ok: false,
+      error: 'Could not cancel the quote. Please try again — if it persists, check the Stripe dashboard.',
+    }, 500);
   }
 });

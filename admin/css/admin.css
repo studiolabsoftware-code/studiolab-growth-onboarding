@@ -64,6 +64,17 @@
 .bdg-st-changes_requested{ background: var(--am-l); color: var(--am); }
 .bdg-st-setup_in_progress{ background: var(--mg-l); color: var(--mg-d); }
 .bdg-st-complete         { background: var(--gr-l); color: var(--gr); }
+/* Quote-lifecycle terminal states. Differentiated so admin can tell at a
+   glance whether a dead quote was withdrawn by us (cancelled, red),
+   declined by the recipient (declined, red), expired without action
+   (neutral grey), or replaced by a revision (muted info). */
+.bdg-st-sent             { background: var(--bl-l, #DBEAFE); color: var(--bl-d, #1E40AF); }
+.bdg-st-viewed           { background: var(--bl-l, #DBEAFE); color: var(--bl-d, #1E40AF); }
+.bdg-st-accepted         { background: var(--gr-l); color: var(--gr); }
+.bdg-st-cancelled        { background: #FEE2E2; color: #B91C1C; }
+.bdg-st-declined         { background: #FEE2E2; color: #B91C1C; }
+.bdg-st-expired          { background: var(--g2); color: var(--g6); border: 1px solid var(--g2); }
+.bdg-st-revised          { background: var(--g1); color: var(--g6); border: 1px solid var(--g2); }
 
 /* ── Detail screen ─────────────────────────────────── */
 .det-top { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
