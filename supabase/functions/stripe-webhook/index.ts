@@ -125,6 +125,12 @@ Deno.serve(async (req) => {
       case 'invoice.payment_failed':
         await handleInvoiceUpdate(sb, event.data.object as InvoiceObj, event.type, event.id, event);
         break;
+      case 'quote.created':
+      case 'quote.finalized':
+      case 'quote.accepted':
+      case 'quote.canceled':
+        await handleQuoteUpdate(sb, event.data.object as QuoteObj, event.type);
+        break;
       case 'charge.refunded':
         await handleChargeRefunded(sb, event.data.object as ChargeObj, event.id, event);
         break;
@@ -193,6 +199,7 @@ interface InvoiceObj {
   payment_intent: string | null;
   customer: string | null;
   subscription: string | null;      // PRESENT on subscription invoices (GHL SaaS)
+  quote: string | null;             // PRESENT on invoices materialised from accepted quotes
   currency: string | null;
   subtotal: number | null;
   total: number | null;
@@ -210,6 +217,21 @@ interface InvoiceObj {
     voided_at?: number | null;
     marked_uncollectible_at?: number | null;
   } | null;
+}
+
+interface QuoteObj {
+  id: string;
+  number: string | null;
+  status: string | null;            // 'draft' | 'open' | 'accepted' | 'canceled'
+  customer: string | null;
+  invoice: string | null;           // populated after acceptance
+  expires_at: number | null;
+  status_transitions?: {
+    accepted_at?: number | null;
+    canceled_at?: number | null;
+    finalized_at?: number | null;
+  } | null;
+  metadata?: Record<string, string> | null;
 }
 
 interface ChargeObj {
@@ -959,6 +981,34 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
     eventPayload,
   );
 
+  // Back-link quote → invoice. When an accepted quote materialises an
+  // invoice, Stripe sets invoice.quote to the originating quote id. We
+  // record that linkage on our quotes ledger so the admin UI can show the
+  // resulting invoice on the quote row and the studio's account.html can
+  // surface the invoice in the existing Invoices section. Also stamps
+  // quote_id on the invoice ledger row to preserve the lineage from the
+  // invoice side.
+  if (ledger && classification.source === 'studiolab-growth-quote' && invoice.quote) {
+    const { data: quoteRow } = await sb.from('quotes')
+      .select('id, resulting_invoice_id')
+      .eq('stripe_quote_id', invoice.quote)
+      .maybeSingle();
+    if (quoteRow) {
+      const updates: Record<string, unknown> = {};
+      if (!quoteRow.resulting_invoice_id) updates.resulting_invoice_id = ledger.id;
+      // If quote.accepted arrived first, the quote is already 'accepted'.
+      // If invoice.finalized arrives first, advance to 'accepted' here so
+      // the admin/studio UI never shows a "sent" quote that already has an
+      // invoice attached.
+      if (eventType === 'invoice.finalized') updates.status = 'accepted';
+      if (Object.keys(updates).length) {
+        await sb.from('quotes').update(updates).eq('id', quoteRow.id);
+      }
+      // Stamp quote_id on the invoice row too.
+      await sb.from('invoices').update({ quote_id: quoteRow.id }).eq('id', ledger.id);
+    }
+  }
+
   // External-contact totals bump on payment_succeeded.
   if (eventType === 'invoice.payment_succeeded' && ledger?.external_contact_id) {
     await bumpExternalContactOnPayment(sb, ledger.external_contact_id, invoice.amount_paid ?? 0);
@@ -1010,6 +1060,127 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
       number: invoice.number,
       source: classification.source,
     });
+  }
+}
+
+// ============================================================================
+// Quote lifecycle handler
+// ============================================================================
+// Scoped to studiolab-growth-quote via metadata.source — GHL never issues
+// Stripe Quotes, but the gate is explicit for consistency with the invoice
+// handler and to defend against any future GHL feature that does. Conservative
+// default: if metadata.source is missing or unknown, skip silently.
+async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Promise<void> {
+  const metaSource = quote.metadata?.source || '';
+  if (metaSource !== 'studiolab-growth-quote') {
+    // Try a fallback: a row in our quotes table keyed by stripe_quote_id.
+    // Stamps source metadata on every quote we create, but if the metadata
+    // is somehow stripped we still recognise our own quotes by id.
+    const { data: known } = await sb.from('quotes')
+      .select('id')
+      .eq('stripe_quote_id', quote.id)
+      .maybeSingle();
+    if (!known) {
+      console.log(`stripe-webhook: ignoring quote ${quote.id} (${eventType}) — not studiolab-growth-quote`);
+      return;
+    }
+  }
+
+  // Translate Stripe quote.status + cancellation reason into our enum. Stripe
+  // does not distinguish "declined" vs "expired" on the Quote object — both
+  // surface as status='canceled'. We use expires_at vs now to discriminate
+  // when canceled fires, and fall back to 'declined' otherwise.
+  let nextStatus: string | null = null;
+  const updateRow: Record<string, unknown> = {
+    stripe_quote_id: quote.id,
+    number: quote.number,
+    hosted_url: undefined,           // not exposed on the quote payload
+  };
+
+  if (eventType === 'quote.created' || eventType === 'quote.finalized') {
+    // Confirm number + finalized timestamp. Don't downgrade an accepted
+    // quote back to 'sent' if events arrive out of order.
+    nextStatus = 'sent';
+  } else if (eventType === 'quote.accepted') {
+    nextStatus = 'accepted';
+    const acceptedAt = quote.status_transitions?.accepted_at
+      ? new Date(quote.status_transitions.accepted_at * 1000).toISOString()
+      : new Date().toISOString();
+    updateRow.accepted_at = acceptedAt;
+    if (quote.invoice) {
+      // Look up our invoices ledger row for the resulting invoice. The
+      // invoice.finalized handler fires concurrently and writes that row;
+      // if we land first it won't exist yet, so leave resulting_invoice_id
+      // null and let the invoice handler back-link on its way through.
+      const { data: invRow } = await sb.from('invoices')
+        .select('id')
+        .eq('stripe_invoice_id', quote.invoice)
+        .maybeSingle();
+      if (invRow) updateRow.resulting_invoice_id = invRow.id;
+    }
+  } else if (eventType === 'quote.canceled') {
+    // Expired vs declined: if expires_at has passed, treat as 'expired';
+    // otherwise it was a manual cancel/decline.
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expired = quote.expires_at && quote.expires_at <= nowSec;
+    nextStatus = expired ? 'expired' : 'declined';
+    const canceledAt = quote.status_transitions?.canceled_at
+      ? new Date(quote.status_transitions.canceled_at * 1000).toISOString()
+      : new Date().toISOString();
+    updateRow.declined_at = canceledAt;
+  }
+
+  // Read the current row so we don't downgrade status or clobber identity.
+  const { data: current } = await sb.from('quotes')
+    .select('id, submission_id, status, accepted_at, declined_at, resulting_invoice_id')
+    .eq('stripe_quote_id', quote.id)
+    .maybeSingle();
+
+  if (!current) {
+    // The quote came from outside (e.g. created in Stripe dashboard). We do
+    // not insert orphan rows here — admin should use create-quote so the
+    // ledger row exists at issue time. Skip and log.
+    console.log(`stripe-webhook: quote ${quote.id} not in ledger — skipping (event ${eventType})`);
+    return;
+  }
+
+  // Status downgrade guard. accepted > declined/expired > sent > draft.
+  const order: Record<string, number> = {
+    draft: 0, sent: 1, viewed: 1, accepted: 3, declined: 2, expired: 2, cancelled: 2, revised: 2,
+  };
+  if (nextStatus && (order[nextStatus] ?? 0) >= (order[current.status as string] ?? 0)) {
+    updateRow.status = nextStatus;
+  }
+
+  // Clean undefined keys (we used `undefined` as a marker for "don't write").
+  for (const k of Object.keys(updateRow)) {
+    if (updateRow[k] === undefined) delete updateRow[k];
+  }
+
+  const { error } = await sb.from('quotes').update(updateRow).eq('id', current.id);
+  if (error) {
+    console.error('quotes update failed:', error, { quote_id: quote.id, event: eventType });
+    return;
+  }
+
+  // Activity log mapping. submission_id is null for external recipients.
+  const action = eventType === 'quote.accepted' ? 'quote_accepted'
+    : eventType === 'quote.canceled'
+      ? (updateRow.status === 'expired' ? 'quote_expired' : 'quote_declined')
+      : null;
+  if (action) {
+    try {
+      await sb.from('activity_log').insert({
+        submission_id: current.submission_id,
+        action,
+        actor: 'stripe',
+        details: {
+          quote_id: quote.id,
+          number: quote.number,
+          resulting_invoice: quote.invoice,
+        },
+      });
+    } catch (e) { console.error('activity_log insert failed:', e); }
   }
 }
 

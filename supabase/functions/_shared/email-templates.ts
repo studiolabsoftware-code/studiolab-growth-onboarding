@@ -312,6 +312,45 @@ export function inboxMessageEmail(opts: {
   return { subject: '', html: layout({ previewText: opts.previewText, body }) };
 }
 
+// Quote nudge — sent 7 days after the quote was issued if the recipient
+// hasn't accepted or declined. Soft tone; no scarcity. The quote's hosted
+// link comes from the Stripe-sent quote email, so we point the recipient
+// back to that email rather than rebuilding the link ourselves.
+export function quoteReminderNudge(opts: {
+  recipientName: string;
+  quoteNumber: string;
+  amountDisplay: string;        // pre-formatted, e.g. "AUD $1,650.00 incl. GST"
+  expiresInDays: number;
+}): { subject: string; html: string } {
+  const subject = `Following up on your StudioLAB quote ${opts.quoteNumber}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Just checking in</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.recipientName)},</p>
+    <p style="margin:0 0 14px;">A quick follow-up on quote <strong>${escape(opts.quoteNumber)}</strong> for <strong>${escape(opts.amountDisplay)}</strong>. It's still open for the next ${opts.expiresInDays} day${opts.expiresInDays === 1 ? '' : 's'}.</p>
+    <p style="margin:0 0 14px;">If you have any questions about the scope, timing, or what's included, just reply to this email and we'll talk it through. Otherwise, you can accept directly from the original quote email — that creates an invoice with a pay link ready to go.</p>
+    <p style="margin:0 0 14px;">No pressure either way.</p>
+    <p style="margin:0;">— The StudioLAB Growth team</p>`;
+  return { subject, html: layout({ previewText: `Quote ${opts.quoteNumber} is still open — let us know if you need anything.`, body }) };
+}
+
+// Expiry warning — sent 5 days before expires_at as a final heads-up.
+export function quoteExpiryWarning(opts: {
+  recipientName: string;
+  quoteNumber: string;
+  amountDisplay: string;
+  expiresInDays: number;        // typically 5; we pass through what the cron calculates
+}): { subject: string; html: string } {
+  const dayWord = opts.expiresInDays === 1 ? 'tomorrow' : `in ${opts.expiresInDays} days`;
+  const subject = `Quote ${opts.quoteNumber} expires ${dayWord}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Heads-up — quote expires ${escape(dayWord)}</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.recipientName)},</p>
+    <p style="margin:0 0 14px;">Quote <strong>${escape(opts.quoteNumber)}</strong> for <strong>${escape(opts.amountDisplay)}</strong> closes ${escape(dayWord)}. After that the pricing and scope on it will lapse, and we'd need to issue a fresh quote if you want to come back to it.</p>
+    <p style="margin:0 0 14px;">If you're keen to go ahead, you can accept directly from the original quote email. If you'd rather pause or have questions, just reply — we'll work it out.</p>
+    <p style="margin:0;">— The StudioLAB Growth team</p>`;
+  return { subject, html: layout({ previewText: `Quote ${opts.quoteNumber} expires ${dayWord}.`, body }) };
+}
+
 export function kbAbandonmentNudge(opts: { studioName: string; resumeUrl: string }): { subject: string; html: string } {
   const subject = `Your AI is almost ready, ${opts.studioName}`;
   const body = `

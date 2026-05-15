@@ -23,9 +23,9 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { getCallerProfile } from '../_shared/caller.ts';
-import { getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
+import { getAuGstTaxRateId, getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 
-const TAX_CODE_SERVICES = 'txcd_20030000'; // General services
+const TAX_CODE_SERVICES = 'txcd_20030000'; // General services (kept for forward-compat with automatic_tax; harmless under manual rates)
 
 type LineItem = {
   description: string;
@@ -234,6 +234,18 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: 'Could not resolve Stripe customer.' }, 500);
     }
 
+    // ---- Resolve AU GST tax rate (manual). Manual rates work in every
+    // Stripe environment without requiring Stripe Tax + business address
+    // configured first — and they match the pattern create-checkout-session
+    // and create-quote use, so AU GST behaves consistently across all three
+    // flows. Falls back to baking 10% into unit_amount if the rate API call
+    // fails so AU recipients still pay the GST-inclusive total either way.
+    let auGstRateId: string | null = null;
+    if (currency === 'AUD') {
+      auGstRateId = await getAuGstTaxRateId(secretKey);
+    }
+    const useFallbackGst = currency === 'AUD' && !auGstRateId;
+
     // ---- Create the draft invoice FIRST so invoiceitems attach to ours.
     // pending_invoice_items_behavior=exclude is the load-bearing flag: it
     // ensures this invoice only contains items we explicitly add to it, so
@@ -246,7 +258,10 @@ Deno.serve(async (req) => {
       ...(collectionMethod === 'send_invoice' ? { days_until_due: dueInDays } : {}),
       auto_advance: false,
       pending_invoice_items_behavior: 'exclude',
-      automatic_tax: { enabled: true },
+      // automatic_tax is intentionally OFF — GST is handled via the manual
+      // tax rate attached to each line item below. See memory:
+      // project_live_cutover_stripe_tax for the live-mode flip.
+      automatic_tax: { enabled: false },
       description: memo || undefined,
       metadata: {
         source: 'studiolab-growth-custom',
@@ -262,19 +277,24 @@ Deno.serve(async (req) => {
     for (let i = 0; i < lines.length; i++) {
       const li = lines[i];
       const qty = li.quantity ?? 1;
-      const itemRes = await stripeRequest('POST', 'invoiceitems', {
+      const unitAmount = useFallbackGst ? Math.round(li.amount_cents * 1.10) : li.amount_cents;
+      const itemBody: Record<string, unknown> = {
         customer: stripeCustomerId,
         invoice: invoiceId,
         currency: currency.toLowerCase(),
         description: li.description,
         quantity: qty,
-        unit_amount: li.amount_cents,
+        unit_amount: unitAmount,
         tax_code: TAX_CODE_SERVICES,
         tax_behavior: 'exclusive',
         metadata: {
           source: 'studiolab-growth-custom',
         },
-      }, secretKey, `${idempotencyBase}-item-${i}`);
+      };
+      if (currency === 'AUD' && auGstRateId) {
+        itemBody.tax_rates = [auGstRateId];
+      }
+      const itemRes = await stripeRequest('POST', 'invoiceitems', itemBody, secretKey, `${idempotencyBase}-item-${i}`);
       if (!itemRes.ok) {
         // Best-effort void the draft so we don't leave an orphan
         await stripeRequest('POST', `invoices/${encodeURIComponent(invoiceId)}/void`, {}, secretKey);

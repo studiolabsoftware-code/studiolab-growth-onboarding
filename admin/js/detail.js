@@ -119,6 +119,7 @@
         </div>
         <div class="det-actions">
           <button type="button" class="btn btn-p" id="detNewInvoice">+ Invoice</button>
+          <button type="button" class="btn btn-p" id="detNewQuote">+ Quote</button>
           <button type="button" class="btn btn-p" id="detChangeReq">Request changes</button>
           <button type="button" class="btn btn-danger" id="detDelete" title="Delete this submission">Delete</button>
         </div>
@@ -144,6 +145,16 @@
             </div>
             <div class="det-section-body" id="studioInvoicesHost">
               <div class="adm-empty" style="padding:16px 0;">Loading invoices…</div>
+            </div>
+          </section>
+
+          <section class="det-section">
+            <div class="det-section-hdr">
+              <h2 class="det-section-title">📄 Quotes</h2>
+              <button type="button" class="btn-link" id="detNewQuoteInline">+ New quote</button>
+            </div>
+            <div class="det-section-body" id="studioQuotesHost">
+              <div class="adm-empty" style="padding:16px 0;">Loading quotes…</div>
             </div>
           </section>
 
@@ -283,6 +294,21 @@
     if (window.AdminInvoice) {
       const host = document.getElementById('studioInvoicesHost');
       if (host) window.AdminInvoice.renderStudioInvoicesPanel(sub.id, host);
+    }
+    // Quote creation mirrors the invoice flow.
+    const openQuoteModal = () => window.AdminQuote && window.AdminQuote.openForStudio(sub);
+    const newQuoteHeader = document.getElementById('detNewQuote');
+    const newQuoteInline = document.getElementById('detNewQuoteInline');
+    if (newQuoteHeader) newQuoteHeader.addEventListener('click', openQuoteModal);
+    if (newQuoteInline) newQuoteInline.addEventListener('click', openQuoteModal);
+    if (window.AdminQuote) {
+      const qHost = document.getElementById('studioQuotesHost');
+      if (qHost) {
+        // Stash the submission on the host so row-action handlers (Revise)
+        // can read it without depending on dashboard state.
+        qHost._submission = sub;
+        window.AdminQuote.renderStudioQuotesPanel(sub.id, qHost);
+      }
     }
     const delBtn = document.getElementById('detDelete');
     if (delBtn) delBtn.addEventListener('click', handleDelete);

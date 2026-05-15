@@ -141,3 +141,57 @@ function constantTimeEqualHex(a: string, b: string): boolean {
   }
   return diff === 0;
 }
+
+// AU GST is collected via a manual Stripe Tax Rate object, not via
+// automatic_tax. Manual rates work in any Stripe environment (sandbox or
+// live) without requiring the account to have business address + tax
+// registration set up first — which we cannot reliably guarantee in a
+// sandbox. The rate is created on first use and cached for the function's
+// lifetime; Stripe deduplicates on the idempotency key. Returns null if we
+// cannot create/find one — the caller should fall back to embedding GST in
+// the unit_amount so AU recipients always pay the GST-inclusive total.
+//
+// Used by create-checkout-session, create-quote, and (eventually)
+// create-custom-invoice. Shared here so all three converge on the same rate
+// id within a function instance.
+let cachedAuGstRateId: string | null = null;
+export async function getAuGstTaxRateId(secretKey: string): Promise<string | null> {
+  if (cachedAuGstRateId) return cachedAuGstRateId;
+  const list = await stripeRequest<{ data: Array<{ id: string; country: string | null; percentage: number; inclusive: boolean; active: boolean; display_name: string }> }>(
+    'GET',
+    'tax_rates?active=true&limit=100',
+    null,
+    secretKey,
+  );
+  if (list.ok && list.body.data && list.body.data.length) {
+    const found = list.body.data.find((tr) =>
+      tr.country === 'AU' && Math.abs(tr.percentage - 10) < 0.001 && !tr.inclusive
+    );
+    if (found) {
+      cachedAuGstRateId = found.id;
+      return cachedAuGstRateId;
+    }
+  }
+  const create = await stripeRequest<{ id: string }>(
+    'POST',
+    'tax_rates',
+    {
+      display_name: 'GST',
+      description: 'Australian Goods and Services Tax',
+      percentage: '10',
+      country: 'AU',
+      jurisdiction: 'AU',
+      inclusive: 'false',
+      tax_type: 'gst',
+      active: 'true',
+    },
+    secretKey,
+    'studiolab-au-gst-rate-v1',
+  );
+  if (create.ok && create.body.id) {
+    cachedAuGstRateId = create.body.id;
+    return cachedAuGstRateId;
+  }
+  console.error('Failed to create AU GST tax rate:', create.error);
+  return null;
+}

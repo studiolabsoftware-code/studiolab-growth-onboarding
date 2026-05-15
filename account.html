@@ -213,6 +213,44 @@
       </tr>
     `).join('');
 
+    // Quotes are surfaced separately from invoices so the studio can see
+    // pending offers and their expiry. Accepted quotes generate an invoice
+    // (kind='quote_invoice') which appears in the Invoices section above.
+    const quotes = data.quotes || [];
+    const quotesPillClass = (s) =>
+      s === 'accepted' ? 'acct-pill-status-paid'
+      : s === 'declined' || s === 'expired' || s === 'cancelled' ? 'acct-pill-status-pending'
+      : 'acct-pill-status-authorised';
+    const quotesPillLabel = (s) =>
+      s === 'sent' ? 'Awaiting your reply'
+      : s === 'viewed' ? 'Viewed'
+      : s === 'accepted' ? 'Accepted'
+      : s === 'declined' ? 'Declined'
+      : s === 'expired' ? 'Expired'
+      : s === 'cancelled' ? 'Cancelled'
+      : 'Draft';
+    const quotesDaysLeft = (iso, status) => {
+      if (!iso) return '';
+      if (status === 'accepted' || status === 'declined' || status === 'expired' || status === 'cancelled') {
+        return dateFmt(iso);
+      }
+      const days = Math.ceil((new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+      if (days <= 0) return 'Expired';
+      if (days === 1) return '1 day left';
+      return `${days} days left`;
+    };
+    const quoteRows = quotes.map((q) => `
+      <tr>
+        <td>${esc(q.number || '—')}</td>
+        <td><span class="acct-pill ${quotesPillClass(q.status)}">${esc(quotesPillLabel(q.status))}</span></td>
+        <td>${esc(money(q.total_cents, q.currency))}</td>
+        <td>${esc(quotesDaysLeft(q.expires_at, q.status))}</td>
+        <td class="acct-actions">
+          <a href="#" data-q-pdf="${esc(q.id)}">Download PDF</a>
+        </td>
+      </tr>
+    `).join('');
+
     const messagesBlock = conv.portal_url
       ? `<div class="acct-msg">
            <div class="acct-msg-text">
@@ -262,6 +300,20 @@
         }
       </div>
 
+      ${quotes.length === 0 ? '' : `
+      <div class="acct-card">
+        <h2>Quotes</h2>
+        <table class="acct-inv-table">
+          <thead>
+            <tr><th>Number</th><th>Status</th><th>Amount</th><th>Expires</th><th>Actions</th></tr>
+          </thead>
+          <tbody>${quoteRows}</tbody>
+        </table>
+        <p style="margin:14px 0 0;color:var(--g6);font-size:12px;line-height:1.55;">
+          You'll receive your quote by email from Stripe — use the link in that email to view and accept. Accepting creates an invoice with a Pay link, which will also appear in your Invoices above.
+        </p>
+      </div>`}
+
       <div class="acct-card">
         <h2>Your submission</h2>
         <div class="acct-row"><div class="acct-k">Plan</div><div class="acct-v">${esc(PLAN_LABEL[sub.plan] || sub.plan)} · ${esc(SETUP_LABEL[sub.setup_type] || sub.setup_type)}</div></div>
@@ -275,6 +327,47 @@
       <div class="acct-foot">
         Need to reach us? Email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a> or reply to any email from our team.
       </div>`;
+
+    // PDF download handler — POSTs the session_token in the request body
+    // to keep it off the URL bar and server logs. Streams the PDF back as
+    // a Blob and triggers a download with the quote number as filename.
+    document.getElementById('acctRoot').addEventListener('click', async (e) => {
+      const a = e.target.closest('[data-q-pdf]');
+      if (!a) return;
+      e.preventDefault();
+      const quoteId = a.getAttribute('data-q-pdf');
+      const session = readSession();
+      if (!session || !session.token) {
+        alert('Your session has expired. Please verify your email again.');
+        return;
+      }
+      try {
+        const resp = await fetch(FN_BASE + 'get-quote-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quote_id: quoteId, session_token: session.token }),
+        });
+        if (!resp.ok) {
+          const j = await resp.json().catch(() => ({}));
+          alert((j && j.error) || 'Could not download your quote.');
+          return;
+        }
+        const blob = await resp.blob();
+        const objUrl = URL.createObjectURL(blob);
+        const tmp = document.createElement('a');
+        tmp.href = objUrl;
+        // Pull the quote number from the matched row for the filename.
+        const numCell = a.closest('tr')?.firstElementChild?.textContent?.trim();
+        tmp.download = (numCell && numCell !== '—' ? numCell : 'quote') + '.pdf';
+        document.body.appendChild(tmp);
+        tmp.click();
+        tmp.remove();
+        setTimeout(() => URL.revokeObjectURL(objUrl), 5000);
+      } catch (err) {
+        console.error('quote pdf download failed', err);
+        alert('We could not reach the server. Check your connection and try again.');
+      }
+    });
   }
 
   async function load() {

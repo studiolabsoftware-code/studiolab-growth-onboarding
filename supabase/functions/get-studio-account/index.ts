@@ -41,6 +41,15 @@ Deno.serve(async (req) => {
       .eq('submission_id', submission.id)
       .order('issued_at', { ascending: false, nullsFirst: false });
 
+    // Quotes ledger — surfaced separately from invoices so the studio can
+    // see pending offers and their expiry. Accepted quotes also produce an
+    // invoice (kind='quote_invoice') which appears in the invoices array
+    // above; the two sections are deliberately complementary.
+    const { data: quotes } = await sb.from('quotes')
+      .select('id, number, status, acceptance_mode, currency, total_cents, expires_at, sent_at, accepted_at, hosted_url, pdf_url, cover_note')
+      .eq('submission_id', submission.id)
+      .order('sent_at', { ascending: false, nullsFirst: false });
+
     // Conversation token — for the in-portal Messages tab. The studio_token
     // is the magic-link we already email; surfacing it here lets the
     // account page link to portal.html without a separate email round-trip.
@@ -79,6 +88,7 @@ Deno.serve(async (req) => {
         submitted_at: submission.submitted_at,
       },
       invoices: invoices || [],
+      quotes: quotes || [],
       conversation: {
         id: conversation?.id || null,
         unread: conversation?.studio_unread_count || 0,

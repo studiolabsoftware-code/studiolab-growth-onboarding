@@ -58,11 +58,30 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   }
 
-  function defaultCurrencyForCountry(c) {
-    if (!c) return 'AUD';
+  // Strict country-to-currency mapping. AU recipients are always invoiced in
+  // AUD with GST; everyone else is invoiced in USD without GST. This is
+  // load-bearing for tax handling — invoicing an AU recipient in USD would
+  // skip the GST line and invoicing an overseas recipient in AUD would add
+  // GST that shouldn't apply. We enforce this in the UI by locking the
+  // currency selector once a country is known.
+  function currencyForCountry(c) {
+    if (!c) return null;
     const u = c.trim().toUpperCase();
     if (u === 'AU' || u === 'AUS' || u === 'AUSTRALIA') return 'AUD';
     return 'USD';
+  }
+
+  function lockCurrency(currency, reason) {
+    const sel = $('#invCurrency');
+    if (!sel) return;
+    if (currency) {
+      sel.value = currency;
+      sel.disabled = true;
+      sel.title = reason || '';
+    } else {
+      sel.disabled = false;
+      sel.title = '';
+    }
   }
 
   // ── Modal: open / close ────────────────────────────────────────────────────
@@ -83,11 +102,16 @@
         ctx.submission.contact_email,
         COUNTRY_LABEL[(ctx.submission.country || '').toUpperCase()] || ctx.submission.country,
       ].filter(Boolean).join(' · ');
-      $('#invCurrency').value = defaultCurrencyForCountry(ctx.submission.country);
+      const studioCurrency = currencyForCountry(ctx.submission.country) || 'AUD';
+      lockCurrency(studioCurrency,
+        studioCurrency === 'AUD'
+          ? 'Australian studio — AUD with GST is required.'
+          : 'Overseas studio — USD without GST is required.');
     } else {
       $('#invStudioName').textContent = 'No studio selected';
       $('#invStudioMeta').textContent = '';
       $('#invCurrency').value = 'AUD';
+      lockCurrency(null);
     }
     // Reset external fields
     $('#invExtEmail').value = '';
@@ -132,6 +156,29 @@
     // The dueDays row only matters for send_invoice
     const send = $('#invCollection').value === 'send_invoice';
     $('#invDueDaysRow').hidden = !send;
+    // Re-evaluate the currency lock when toggling recipient mode.
+    if (isStudio && currentContext?.submission) {
+      const c = currencyForCountry(currentContext.submission.country) || 'AUD';
+      lockCurrency(c,
+        c === 'AUD'
+          ? 'Australian studio — AUD with GST is required.'
+          : 'Overseas studio — USD without GST is required.');
+    } else {
+      onExternalCountryChange();
+    }
+  }
+
+  function onExternalCountryChange() {
+    const country = $('#invExtCountry').value;
+    const c = currencyForCountry(country);
+    if (c === 'AUD') {
+      lockCurrency('AUD', 'Australian recipient — AUD with GST is required.');
+    } else if (c === 'USD') {
+      lockCurrency('USD', 'Overseas recipient — USD without GST is required.');
+    } else {
+      lockCurrency(null);
+    }
+    updateTotalsUI();
   }
 
   // ── Line items ─────────────────────────────────────────────────────────────
@@ -174,9 +221,9 @@
     const totalCents = subtotalCents + taxCents;
     $('#invSubtotal').textContent = moneyFmt(subtotalCents, currency);
     $('#invTax').textContent = isAud
-      ? `${moneyFmt(taxCents, currency)} GST (calculated at send)`
-      : 'No GST';
-    $('#invTotal').textContent = moneyFmt(totalCents, currency);
+      ? `+ ${moneyFmt(taxCents, currency)} GST (10%)`
+      : 'No GST — overseas recipient';
+    $('#invTotal').textContent = `${moneyFmt(totalCents, currency)}${isAud ? ' incl. GST' : ''}`;
   }
 
   // ── Validation ─────────────────────────────────────────────────────────────
@@ -377,6 +424,7 @@
       if (e.target.name === 'invRecipient') updateModeUI();
       if (e.target.id === 'invCurrency') updateTotalsUI();
       if (e.target.id === 'invCollection') updateModeUI();
+      if (e.target.id === 'invExtCountry') onExternalCountryChange();
     });
   }
 

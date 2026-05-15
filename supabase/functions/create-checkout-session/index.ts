@@ -10,7 +10,7 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { resolvePricing, isAustralianFreeText } from '../_shared/pricing.ts';
-import { getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
+import { getAuGstTaxRateId, getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 
 type Submission = {
   id: string;
@@ -40,59 +40,6 @@ function isoCountryForStripe(stored: string | null | undefined): string | null {
   const c = stored.trim().toUpperCase();
   if (c === 'UK') return 'GB';
   if (/^[A-Z]{2}$/.test(c)) return c;
-  return null;
-}
-
-// AU GST is collected via a manual Stripe Tax Rate object, not via
-// automatic_tax. Manual rates work in any Stripe environment (sandbox or
-// live) without requiring the account to have business address + tax
-// registration set up first — which we cannot reliably guarantee in a
-// sandbox. The rate is created on first use and cached for the function's
-// lifetime; Stripe deduplicates by display_name + percentage + country if we
-// somehow create twice. Returns null if we cannot create/find one, in which
-// case the caller falls back to embedding GST in the unit_amount so AU
-// studios always pay the GST-inclusive total no matter what.
-let cachedAuGstRateId: string | null = null;
-async function getAuGstTaxRateId(secretKey: string): Promise<string | null> {
-  if (cachedAuGstRateId) return cachedAuGstRateId;
-  // Try to find an existing active rate first
-  const list = await stripeRequest<{ data: Array<{ id: string; country: string | null; percentage: number; inclusive: boolean; active: boolean; display_name: string }> }>(
-    'GET',
-    'tax_rates?active=true&limit=100',
-    null,
-    secretKey,
-  );
-  if (list.ok && list.body.data && list.body.data.length) {
-    const found = list.body.data.find((tr) =>
-      tr.country === 'AU' && Math.abs(tr.percentage - 10) < 0.001 && !tr.inclusive
-    );
-    if (found) {
-      cachedAuGstRateId = found.id;
-      return cachedAuGstRateId;
-    }
-  }
-  // Create a new one
-  const create = await stripeRequest<{ id: string }>(
-    'POST',
-    'tax_rates',
-    {
-      display_name: 'GST',
-      description: 'Australian Goods and Services Tax',
-      percentage: '10',
-      country: 'AU',
-      jurisdiction: 'AU',
-      inclusive: 'false',
-      tax_type: 'gst',
-      active: 'true',
-    },
-    secretKey,
-    'studiolab-au-gst-rate-v1',
-  );
-  if (create.ok && create.body.id) {
-    cachedAuGstRateId = create.body.id;
-    return cachedAuGstRateId;
-  }
-  console.error('Failed to create AU GST tax rate:', create.error);
   return null;
 }
 
