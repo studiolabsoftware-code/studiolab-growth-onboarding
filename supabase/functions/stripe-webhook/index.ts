@@ -563,6 +563,19 @@ async function sendPaymentReceiptsOnce(
         .select('*')
         .eq('id', args.submissionId)
         .maybeSingle();
+      const { data: attachmentsRaw } = await sb.from('submission_attachments_view')
+        .select('id, file_name, mime_type, size_bytes, uploaded_at, expires_at')
+        .eq('submission_id', args.submissionId)
+        .order('uploaded_at', { ascending: true });
+      const adminBase = Deno.env.get('ADMIN_APP_URL') || '';
+      const attachments = (attachmentsRaw || []).map((a: Record<string, unknown>) => ({
+        file_name: String(a.file_name),
+        mime_type: a.mime_type as string | null,
+        size_bytes: a.size_bytes as number | null,
+        uploaded_at: a.uploaded_at as string | null,
+        expires_at: a.expires_at as string | null,
+        download_url: `${adminBase}?id=${args.submissionId}#attachment-${a.id}`,
+      }));
       const t = adminPaymentLanded({
         studioName: args.studioName || '(no name)',
         plan: PLAN_LABEL[args.plan || ''] || (args.plan || ''),
@@ -573,6 +586,7 @@ async function sendPaymentReceiptsOnce(
         includesGst,
         adminUrl: adminUrlFor(args.submissionId),
         submission: fullRow || undefined,
+        attachments,
       });
       await sendGated({ to: admins.map((a) => a.email), subject: t.subject, html: t.html, intent: 'admin notification' });
     }

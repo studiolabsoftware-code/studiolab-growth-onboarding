@@ -71,17 +71,33 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Notify all active admins. The full submission row is passed so the
-    // email digest includes every field — VAs copy data straight from the
-    // email into GHL profiles without round-tripping to the admin UI.
+    // Notify all active admins. The full submission row + attachment list
+    // are passed so the email digest is the VA's "everything in one place"
+    // copy-paste surface. Attachment download links route through the admin
+    // app URL so admins click → land in the panel → click Download.
     const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
     if (admins && admins.length) {
+      const { data: attachmentsRaw } = await sb.from('submission_attachments_view')
+        .select('id, file_name, mime_type, size_bytes, uploaded_at, expires_at')
+        .eq('submission_id', row.id)
+        .order('uploaded_at', { ascending: true });
+      const attachments = (attachmentsRaw || []).map((a: Record<string, unknown>) => ({
+        file_name: String(a.file_name),
+        mime_type: a.mime_type as string | null,
+        size_bytes: a.size_bytes as number | null,
+        uploaded_at: a.uploaded_at as string | null,
+        expires_at: a.expires_at as string | null,
+        // Deep-link to the admin detail page; the admin clicks Download
+        // from there to fetch a signed URL via get-attachment-download-url.
+        download_url: `${appUrl}?id=${row.id}#attachment-${a.id}`,
+      }));
       const t = adminNewSubmission({
         studioName: row.studio_name || '(no name)',
         plan: PLAN_LABEL[row.plan] || row.plan,
         setup: SETUP_LABEL[row.setup_type] || row.setup_type,
         adminUrl: `${appUrl}?id=${row.id}`,
         submission: row,
+        attachments,
       });
       await sendGated({
         to: admins.map((a) => a.email), subject: t.subject, html: t.html,

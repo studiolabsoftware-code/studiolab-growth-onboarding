@@ -239,6 +239,21 @@
           ${section('📝 Additional notes', [
             ['Notes', sub.extra_notes ? ESC(sub.extra_notes) : empty, undefined, 'extra_notes'],
           ])}
+
+          <section class="det-section">
+            <div class="det-section-hdr">
+              <span>📎 Attachments</span>
+              <button type="button" class="copy-section-btn" id="detAttachUploadTrigger" title="Upload a file to this submission">
+                <span class="copy-btn-ico" aria-hidden="true">+</span>Upload file
+              </button>
+            </div>
+            <div class="det-section-body" id="detAttachmentsHost">
+              <div class="adm-empty" style="padding:16px 0;">Loading attachments…</div>
+            </div>
+            <input type="file" id="detAttachFileInput" multiple
+              accept=".pdf,.png,.jpg,.jpeg,.svg,.docx,.doc,.xlsx,.xls,application/pdf,image/png,image/jpeg,image/svg+xml,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              hidden>
+          </section>
         </div>
 
         <div class="det-side">
@@ -319,7 +334,192 @@
       btn.addEventListener('click', () => copyKbForGhl(btn.getAttribute('data-kb-copy'), btn));
     });
 
+    // Attachments panel: hydrate + wire upload trigger.
+    const attachHost = document.getElementById('detAttachmentsHost');
+    if (attachHost) renderAttachments(sub.id, attachHost);
+    const uploadTrigger = document.getElementById('detAttachUploadTrigger');
+    const fileInput = document.getElementById('detAttachFileInput');
+    if (uploadTrigger && fileInput) {
+      uploadTrigger.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []);
+        e.target.value = '';
+        if (!files.length) return;
+        await uploadAttachments(sub.id, files);
+        renderAttachments(sub.id, attachHost);
+      });
+    }
+
     hydrateLogos();
+  }
+
+  // ── Attachments (admin side) ───────────────────────────────────────────────
+  const ATTACH_BYTE_FMT = (n) => {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+    return (n / 1024 / 1024).toFixed(1) + ' MB';
+  };
+
+  async function renderAttachments(submissionId, host) {
+    host.innerHTML = '<div class="adm-empty" style="padding:12px 0;">Loading attachments…</div>';
+    const client = sb(); if (!client) { host.innerHTML = '<div class="adm-empty">Client unavailable.</div>'; return; }
+    const { data, error } = await client.from('submission_attachments_view')
+      .select('id, file_name, mime_type, size_bytes, uploaded_by_role, uploaded_at, expires_at, retention_basis, message_id')
+      .eq('submission_id', submissionId)
+      .order('uploaded_at', { ascending: false });
+    if (error) {
+      host.innerHTML = `<div class="adm-empty">Could not load attachments: ${ESC(error.message)}</div>`;
+      return;
+    }
+    const rows = data || [];
+    if (rows.length === 0) {
+      host.innerHTML = '<div class="adm-empty" style="padding:12px 0;">No attachments yet. Use <strong>Upload file</strong> above to add one, or studio uploads will appear here automatically.</div>';
+      return;
+    }
+    host.innerHTML = `
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Size</th>
+            <th>Source</th>
+            <th>Expires</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r) => {
+            const days = Math.max(0, Math.ceil((new Date(r.expires_at).getTime() - Date.now()) / (24*60*60*1000)));
+            const expiryText = r.retention_basis === 'scheduled'
+              ? `<span title="Scheduled — submission completed">${days}d (scheduled)</span>`
+              : `<span title="Orphan backstop — no completion yet" style="color:var(--g6);">${days}d (orphan backstop)</span>`;
+            const source = r.message_id
+              ? '<span title="Uploaded via the messages thread">From message</span>'
+              : r.uploaded_by_role === 'admin'
+                ? '<span title="Uploaded by an admin">By admin</span>'
+                : '<span title="Uploaded by the studio on the form">By studio</span>';
+            return `
+              <tr>
+                <td><span style="font-weight:600;color:var(--in-d);">${ESC(r.file_name)}</span></td>
+                <td style="font-size:12px;color:var(--g6);">${ATTACH_BYTE_FMT(r.size_bytes)}</td>
+                <td style="font-size:12px;color:var(--g6);">${source}</td>
+                <td style="font-size:12px;">${expiryText}</td>
+                <td style="display:flex;gap:10px;flex-wrap:wrap;">
+                  <a class="btn-link" href="#" data-attach-act="download" data-attach-id="${ESC(r.id)}">Download</a>
+                  <a class="btn-link" style="color:#B91C1C;" href="#" data-attach-act="delete" data-attach-id="${ESC(r.id)}" data-attach-name="${ESC(r.file_name)}">Delete</a>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+    if (!host._attachBound) {
+      host._attachBound = true;
+      host.addEventListener('click', async (e) => {
+        const a = e.target.closest('[data-attach-act]');
+        if (!a) return;
+        e.preventDefault();
+        const act = a.getAttribute('data-attach-act');
+        const id = a.getAttribute('data-attach-id');
+        if (act === 'download') await downloadAttachment(id);
+        else if (act === 'delete') {
+          const name = a.getAttribute('data-attach-name') || 'this file';
+          const ok = window.AdminModal
+            ? await window.AdminModal.confirm({
+                title: 'Delete attachment?',
+                message: `<p>This permanently removes <strong>${ESC(name)}</strong> from this submission. The file will also be deleted from storage.</p>`,
+                confirmLabel: 'Delete file',
+                danger: true,
+              })
+            : confirm(`Delete ${name}?`);
+          if (!ok) return;
+          await deleteAttachment(id);
+          renderAttachments(submissionId, host);
+        }
+      });
+    }
+  }
+
+  async function uploadAttachments(submissionId, files) {
+    const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/upload-submission-attachment';
+    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('submission_id', submissionId);
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': jwt ? `Bearer ${jwt}` : '',
+            'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
+          },
+          body: fd,
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          await (window.AdminModal
+            ? window.AdminModal.alert({ title: 'Upload failed', message: ESC(data.error || `Status ${resp.status}.`) })
+            : Promise.resolve(alert(data.error || `Upload failed (${resp.status}).`)));
+        }
+      } catch (err) {
+        console.error('attachment upload failed:', err);
+        await (window.AdminModal
+          ? window.AdminModal.alert('Could not upload that file. Please try again.')
+          : Promise.resolve(alert('Could not upload that file.')));
+      }
+    }
+  }
+
+  async function downloadAttachment(attachmentId) {
+    const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/get-attachment-download-url';
+    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': jwt ? `Bearer ${jwt}` : '',
+          'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
+        },
+        body: JSON.stringify({ attachment_id: attachmentId }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok || !data.url) {
+        alert(data.error || `Could not download (${resp.status}).`);
+        return;
+      }
+      // The signed URL already carries the download disposition + filename;
+      // navigating triggers the browser download.
+      window.location.assign(data.url);
+    } catch (err) {
+      console.error('download attachment failed:', err);
+      alert('Could not download that file.');
+    }
+  }
+
+  async function deleteAttachment(attachmentId) {
+    const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/delete-submission-attachment';
+    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': jwt ? `Bearer ${jwt}` : '',
+          'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
+        },
+        body: JSON.stringify({ attachment_id: attachmentId }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        alert(data.error || `Could not delete (${resp.status}).`);
+      }
+    } catch (err) {
+      console.error('delete attachment failed:', err);
+      alert('Could not delete that file.');
+    }
   }
 
   async function copyKbForGhl(submissionId, btn) {

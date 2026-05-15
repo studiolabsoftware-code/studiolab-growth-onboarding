@@ -223,6 +223,15 @@ export interface SubmissionRowLike {
   setup_type?: string | null;
 }
 
+export interface AttachmentDigestRow {
+  file_name: string;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  uploaded_at?: string | null;
+  expires_at?: string | null;
+  download_url?: string | null;  // when set, rendered as a link
+}
+
 // Builds a rich, copy-friendly HTML digest of the submission. Designed to
 // paste cleanly from Gmail (or any HTML-capable mail client) into GHL — the
 // 2-column tables become TAB-separated rows in plaintext targets, and
@@ -232,7 +241,12 @@ export interface SubmissionRowLike {
 // VAs are the target reader. Each section can be select+copied independently;
 // the layout mirrors the admin detail page's section structure so muscle
 // memory transfers.
-export function submissionDigestHtml(sub: SubmissionRowLike): string {
+//
+// `attachments` is optional — when provided, an Attachments section is
+// appended to the digest with filename, size, and a download link per file.
+// Download URLs should be the admin-side dashboard URL (or pre-signed
+// Storage URL) — anything that opens to the file when an admin clicks.
+export function submissionDigestHtml(sub: SubmissionRowLike, attachments?: AttachmentDigestRow[]): string {
   const v = (x: unknown): string => {
     if (x === null || x === undefined || x === '') return '—';
     if (Array.isArray(x)) return x.length ? x.join(', ') : '—';
@@ -342,6 +356,34 @@ export function submissionDigestHtml(sub: SubmissionRowLike): string {
     sections.push(sectionWrap('Additional notes', longField('Notes', sub.extra_notes)));
   }
 
+  if (attachments && attachments.length) {
+    const bytes = (n?: number | null) => {
+      if (!n) return '—';
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+      return `${(n / 1024 / 1024).toFixed(1)} MB`;
+    };
+    const attachRows = attachments.map((a) => `
+      <tr>
+        <td style="padding:8px 12px 8px 0;vertical-align:top;color:${COL.in_d};">${escape(a.file_name)}</td>
+        <td style="padding:8px 12px 8px 0;vertical-align:top;color:${COL.g6};white-space:nowrap;">${escape(bytes(a.size_bytes))}</td>
+        <td style="padding:8px 0;vertical-align:top;">
+          ${a.download_url
+            ? `<a href="${escape(a.download_url)}" style="color:${COL.in};font-weight:600;text-decoration:none;">Download →</a>`
+            : `<span style="color:${COL.g6};">Open admin to download</span>`}
+        </td>
+      </tr>
+    `).join('');
+    sections.push(sectionWrap('Attachments', `
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px;">
+        ${attachRows}
+      </table>
+      <p style="margin:10px 0 0;color:${COL.g6};font-size:11px;line-height:1.55;">
+        Files auto-delete 7 days after the submission is marked complete, or after 90 days if it doesn't complete.
+      </p>
+    `));
+  }
+
   return sections.join('');
 }
 
@@ -355,6 +397,7 @@ export function adminPaymentLanded(opts: {
   includesGst: boolean;
   adminUrl: string;
   submission?: SubmissionRowLike;
+  attachments?: AttachmentDigestRow[];
 }): { subject: string; html: string } {
   const modeLabel = opts.mode === 'immediate' ? 'paid (immediate capture)'
     : opts.mode === 'hold' ? 'authorised (manual capture pending)'
@@ -369,7 +412,7 @@ export function adminPaymentLanded(opts: {
     <p style="margin:0 0 6px;"><strong>Amount:</strong> ${escape(amountDisplay)}</p>
     <p style="margin:0 0 18px;"><strong>Status:</strong> ${escape(modeLabel)}</p>
     ${cta('Open in dashboard', opts.adminUrl)}`;
-  const digest = opts.submission ? submissionDigestHtml(opts.submission) : '';
+  const digest = opts.submission ? submissionDigestHtml(opts.submission, opts.attachments) : '';
   return { subject, html: layout({ previewText: `Payment ${modeLabel} for ${opts.studioName}`, body: summary + digest }) };
 }
 
@@ -379,6 +422,7 @@ export function adminNewSubmission(opts: {
   setup: string;
   adminUrl: string;
   submission?: SubmissionRowLike;
+  attachments?: AttachmentDigestRow[];
 }): { subject: string; html: string } {
   const subject = `New Growth onboarding: ${opts.studioName} (${opts.plan})`;
   const summary = `
@@ -387,7 +431,7 @@ export function adminNewSubmission(opts: {
     <p style="margin:0 0 6px;"><strong>Plan:</strong> ${escape(opts.plan)}</p>
     <p style="margin:0 0 18px;"><strong>Setup:</strong> ${escape(opts.setup)}</p>
     ${cta('Open in dashboard', opts.adminUrl)}`;
-  const digest = opts.submission ? submissionDigestHtml(opts.submission) : '';
+  const digest = opts.submission ? submissionDigestHtml(opts.submission, opts.attachments) : '';
   return { subject, html: layout({ previewText: `New submission from ${opts.studioName}`, body: summary + digest }) };
 }
 
