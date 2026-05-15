@@ -442,12 +442,170 @@
     });
   }
 
+  // ── Global Invoices screen ────────────────────────────────────────────────
+  // Top-level admin nav entry that lists every invoice across all studios
+  // and external contacts. The per-studio panel (renderStudioInvoicesPanel)
+  // stays — this is the standalone surface for issuing one-off invoices
+  // and reviewing the full ledger without going through a studio profile.
+  const LIST_STATUS_FILTERS = ['all', 'draft', 'open', 'paid', 'void'];
+  const listState = { status: 'all', search: '', rows: [] };
+
+  async function openListScreen() {
+    const screen = ensureListScreen();
+    screen.style.display = '';
+    document.getElementById('listScreen').style.display = 'none';
+    document.getElementById('detailScreen').style.display = 'none';
+    const cat = document.getElementById('catalogScreen'); if (cat) cat.style.display = 'none';
+    await loadListRows();
+    renderList();
+  }
+
+  function ensureListScreen() {
+    let screen = document.getElementById('invoicesScreen');
+    if (screen) return screen;
+    screen = document.createElement('div');
+    screen.id = 'invoicesScreen';
+    screen.className = 'inbox-screen';
+    screen.innerHTML = `
+      <div class="inbox-hdr">
+        <div>
+          <h2 class="users-title">Invoices</h2>
+          <p class="users-desc">Every invoice across studios and external contacts. Open one to view it on Stripe, or create a new one for someone who isn't a studio yet.</p>
+        </div>
+        <button type="button" class="btn btn-p" id="invListNew">+ New invoice</button>
+      </div>
+      <div class="inbox-toolbar">
+        <div class="adm-pills" id="invListPills" role="group" aria-label="Filter invoices">
+          ${LIST_STATUS_FILTERS.map((s, i) => `
+            <button type="button" class="pill${i === 0 ? ' active' : ''}" data-f="${s}" aria-pressed="${i === 0 ? 'true' : 'false'}">${s === 'all' ? 'All' : (STATUS_LABEL[s] || s)}</button>
+          `).join('')}
+        </div>
+        <div class="adm-search" role="search">
+          <label class="sr-only" for="invListSearch">Search</label>
+          <input type="search" id="invListSearch" placeholder="Search number, recipient, email…">
+        </div>
+      </div>
+      <div class="inv-list-host" id="invListBody"><div class="adm-empty" style="padding:40px 0;">Loading…</div></div>`;
+    document.querySelector('main.adm-main').appendChild(screen);
+
+    screen.querySelector('#invListNew').addEventListener('click', () => open({ mode: 'external' }));
+    screen.querySelector('#invListPills').addEventListener('click', (e) => {
+      const p = e.target.closest('.pill'); if (!p) return;
+      listState.status = p.dataset.f;
+      screen.querySelectorAll('#invListPills .pill').forEach((b) => {
+        const active = b === p;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      renderList();
+    });
+    screen.querySelector('#invListSearch').addEventListener('input', (e) => {
+      listState.search = (e.target.value || '').toLowerCase();
+      renderList();
+    });
+    return screen;
+  }
+
+  async function loadListRows() {
+    const sb = window.initSupabase && window.initSupabase();
+    if (!sb) { listState.rows = []; return; }
+    // PostgREST FK sugar pulls the recipient label without a second round
+    // trip. Studio invoices have submission_id set; external invoices have
+    // external_contact_id set. We tolerate either being null.
+    const { data, error } = await sb.from('invoices')
+      .select(`
+        id, number, kind, status, currency, total_cents,
+        amount_paid_cents, amount_refunded_cents, issued_at, paid_at,
+        hosted_url, pdf_url, description, submission_id, external_contact_id,
+        submission:submissions(id, studio_name, contact_email),
+        external_contact:external_contacts(id, name, email)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (error) {
+      console.error('loadListRows invoices:', error);
+      listState.rows = [];
+      return;
+    }
+    listState.rows = (data || []).map((r) => {
+      const isStudio = !!r.submission_id;
+      const recipientName = isStudio
+        ? (r.submission?.studio_name || r.submission?.contact_email || 'Unknown studio')
+        : (r.external_contact?.name || r.external_contact?.email || 'External recipient');
+      const recipientEmail = isStudio ? (r.submission?.contact_email || '') : (r.external_contact?.email || '');
+      return { ...r, _isStudio: isStudio, _recipientName: recipientName, _recipientEmail: recipientEmail };
+    });
+  }
+
+  function renderList() {
+    const host = document.getElementById('invListBody');
+    if (!host) return;
+    const filtered = listState.rows.filter((r) => {
+      if (listState.status !== 'all' && r.status !== listState.status) return false;
+      if (!listState.search) return true;
+      const hay = [r.number, r._recipientName, r._recipientEmail, r.description].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(listState.search);
+    });
+    if (!filtered.length) {
+      host.innerHTML = `<div class="adm-empty" style="padding:40px 0;">${listState.search || listState.status !== 'all' ? 'No invoices match.' : 'No invoices yet. Click + New invoice to issue one.'}</div>`;
+      return;
+    }
+    host.innerHTML = `
+      <table class="inv-table inv-list-table">
+        <thead>
+          <tr>
+            <th>Number</th>
+            <th>Recipient</th>
+            <th>Kind</th>
+            <th>Status</th>
+            <th>Amount</th>
+            <th>Issued</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map((r) => `
+            <tr data-sub-id="${ESC(r.submission_id || '')}">
+              <td>${ESC(r.number || '(draft)')}</td>
+              <td>
+                <div>${ESC(r._recipientName)}</div>
+                <div class="inv-list-sub">${ESC(r._recipientEmail || '')}${r._isStudio ? '' : ' · <span class="inv-list-tag">External</span>'}</div>
+              </td>
+              <td style="font-size:12px;color:var(--g6);">${ESC(KIND_LABEL[r.kind] || r.kind || '')}</td>
+              <td><span class="bdg ${STATUS_CLASS[r.status] || ''}">${ESC(STATUS_LABEL[r.status] || r.status)}</span></td>
+              <td>${moneyFmt(r.total_cents, r.currency)}</td>
+              <td style="font-size:12px;color:var(--g6);">${r.issued_at ? new Date(r.issued_at).toLocaleDateString('en-AU') : '—'}</td>
+              <td style="display:flex;gap:8px;flex-wrap:wrap;">
+                ${r.hosted_url ? `<a class="btn-link" href="${ESC(r.hosted_url)}" target="_blank" rel="noopener">Open</a>` : ''}
+                ${r.pdf_url ? `<a class="btn-link" href="${ESC(r.pdf_url)}" target="_blank" rel="noopener">PDF</a>` : ''}
+                ${r._isStudio ? `<a class="btn-link" href="#" data-inv-open-studio="${ESC(r.submission_id)}">View studio</a>` : ''}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+    if (!host._invListBound) {
+      host._invListBound = true;
+      host.addEventListener('click', (e) => {
+        const studioLink = e.target.closest('[data-inv-open-studio]');
+        if (studioLink) {
+          e.preventDefault();
+          const id = studioLink.getAttribute('data-inv-open-studio');
+          if (id && window.AdminDetail && window.AdminDetail.open) {
+            window.AdminDetail.open(id, { tab: 'invoices' });
+          }
+        }
+      });
+    }
+  }
+
   // Public surface
   window.AdminInvoice = {
     openForStudio(submission) { open({ mode: 'studio', submission }); },
     openExternal() { open({ mode: 'external' }); },
     close,
     renderStudioInvoicesPanel,
+    openListScreen,
   };
 
   if (document.readyState === 'loading') {

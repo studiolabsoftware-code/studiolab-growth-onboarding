@@ -104,6 +104,7 @@
     $('dashboardView').style.display = '';
     $('admUser').style.display = '';
     $('admUserEmail').textContent = email;
+    const qa = $('admQuickActions'); if (qa) qa.style.display = '';
 
     // Load profile so the UI can role-gate.
     await loadProfile();
@@ -141,8 +142,12 @@
     const users = $('usersScreen');
     const settings = $('settingsScreen');
     const catalog = $('catalogScreen');
+    const invoicesScreen = document.getElementById('invoicesScreen');
+    const quotesScreen = document.getElementById('quotesScreen');
+    const inboxScreen = document.getElementById('inboxScreen');
     const hide = (el) => { if (el) el.style.display = 'none'; };
     hide(list); hide(detail); hide(users); hide(settings); hide(catalog);
+    hide(invoicesScreen); hide(quotesScreen); hide(inboxScreen);
     if (name === 'users') {
       if (users) users.style.display = '';
       if (window.AdminUsers && window.AdminUsers.show) window.AdminUsers.show();
@@ -154,10 +159,12 @@
       if (window.AdminCatalog && window.AdminCatalog.show) window.AdminCatalog.show();
     } else if (name === 'inbox') {
       if (window.AdminInbox && window.AdminInbox.openListScreen) window.AdminInbox.openListScreen();
+    } else if (name === 'invoices') {
+      if (window.AdminInvoice && window.AdminInvoice.openListScreen) window.AdminInvoice.openListScreen();
+    } else if (name === 'quotes') {
+      if (window.AdminQuote && window.AdminQuote.openListScreen) window.AdminQuote.openListScreen();
     } else {
       if (list) list.style.display = '';
-      const inboxScreen = document.getElementById('inboxScreen');
-      if (inboxScreen) inboxScreen.style.display = 'none';
     }
     document.querySelectorAll('.adm-nav-link').forEach((b) => {
       b.classList.toggle('active', b.dataset.section === name);
@@ -395,6 +402,14 @@
         showSection(btn.dataset.section);
       });
     }
+
+    // Header quick-action shortcuts: open the invoice / quote modal in
+    // external (no-studio) mode so admins can bill anyone without first
+    // creating a placeholder submission.
+    const qInv = $('admQuickInvoice');
+    if (qInv) qInv.addEventListener('click', () => window.AdminInvoice && window.AdminInvoice.openExternal());
+    const qQt = $('admQuickQuote');
+    if (qQt) qQt.addEventListener('click', () => window.AdminQuote && window.AdminQuote.openExternal());
 
     // No supabase-js auth-state subscription. Our session lives in
     // localStorage and is read on every page boot via handleSession.

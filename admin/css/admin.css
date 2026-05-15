@@ -129,6 +129,18 @@
 .det-tab-panel[hidden] { display: none; }
 .det-tab-section { margin-bottom: 14px; }
 
+/* Header quick-action button group: standalone invoice/quote shortcuts
+   for billing recipients who aren't studios yet. */
+.adm-quickactions { display: inline-flex; gap: 8px; align-items: center; margin-right: 14px; }
+.btn-sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
+/* Global invoices/quotes list screens — table + filter strip styling */
+.inv-list-host { background: #fff; border: 1px solid var(--g2); border-radius: 12px; overflow: hidden; }
+.inv-list-table { width: 100%; }
+.inv-list-table tbody tr:hover { background: var(--g1); }
+.inv-list-sub { font-size: 11px; color: var(--g6); margin-top: 2px; }
+.inv-list-tag { display: inline-block; padding: 1px 6px; border-radius: 999px; background: var(--in-l); color: var(--in); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+
 .det-section { background: #fff; border: 1px solid var(--g2); border-radius: 12px; margin-bottom: 14px; }
 .det-section-hdr { padding: 12px 18px; border-bottom: 1px solid var(--g2); font-size: 13px; font-weight: 700; color: var(--in-d); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .det-section-hdr > span { display: flex; align-items: center; gap: 8px; }

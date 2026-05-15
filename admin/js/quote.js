@@ -590,11 +590,173 @@
     });
   }
 
+  // ── Global Quotes screen ──────────────────────────────────────────────────
+  // Top-level admin nav entry that lists every quote across all studios and
+  // external contacts. Mirrors invoice.js openListScreen so the two ledgers
+  // share a consistent shape.
+  const QLIST_STATUS_FILTERS = ['all', 'draft', 'sent', 'viewed', 'accepted', 'declined', 'expired', 'cancelled'];
+  const qListState = { status: 'all', search: '', rows: [] };
+
+  async function openListScreen() {
+    const screen = ensureQuoteListScreen();
+    screen.style.display = '';
+    document.getElementById('listScreen').style.display = 'none';
+    document.getElementById('detailScreen').style.display = 'none';
+    const cat = document.getElementById('catalogScreen'); if (cat) cat.style.display = 'none';
+    await loadQuoteListRows();
+    renderQuoteList();
+  }
+
+  function ensureQuoteListScreen() {
+    let screen = document.getElementById('quotesScreen');
+    if (screen) return screen;
+    screen = document.createElement('div');
+    screen.id = 'quotesScreen';
+    screen.className = 'inbox-screen';
+    screen.innerHTML = `
+      <div class="inbox-hdr">
+        <div>
+          <h2 class="users-title">Quotes</h2>
+          <p class="users-desc">Every quote across studios and external contacts. Open one to view the hosted page, or create a new one for someone who isn't a studio yet.</p>
+        </div>
+        <button type="button" class="btn btn-p" id="qListNew">+ New quote</button>
+      </div>
+      <div class="inbox-toolbar">
+        <div class="adm-pills" id="qListPills" role="group" aria-label="Filter quotes">
+          ${QLIST_STATUS_FILTERS.map((s, i) => `
+            <button type="button" class="pill${i === 0 ? ' active' : ''}" data-f="${s}" aria-pressed="${i === 0 ? 'true' : 'false'}">${s === 'all' ? 'All' : (STATUS_LABEL[s] || s)}</button>
+          `).join('')}
+        </div>
+        <div class="adm-search" role="search">
+          <label class="sr-only" for="qListSearch">Search</label>
+          <input type="search" id="qListSearch" placeholder="Search number, recipient, email…">
+        </div>
+      </div>
+      <div class="inv-list-host" id="qListBody"><div class="adm-empty" style="padding:40px 0;">Loading…</div></div>`;
+    document.querySelector('main.adm-main').appendChild(screen);
+
+    screen.querySelector('#qListNew').addEventListener('click', () => open({ mode: 'external' }));
+    screen.querySelector('#qListPills').addEventListener('click', (e) => {
+      const p = e.target.closest('.pill'); if (!p) return;
+      qListState.status = p.dataset.f;
+      screen.querySelectorAll('#qListPills .pill').forEach((b) => {
+        const active = b === p;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      renderQuoteList();
+    });
+    screen.querySelector('#qListSearch').addEventListener('input', (e) => {
+      qListState.search = (e.target.value || '').toLowerCase();
+      renderQuoteList();
+    });
+    return screen;
+  }
+
+  async function loadQuoteListRows() {
+    const sb = window.initSupabase && window.initSupabase();
+    if (!sb) { qListState.rows = []; return; }
+    const { data, error } = await sb.from('quotes')
+      .select(`
+        id, number, status, acceptance_mode, currency, subtotal_cents, total_cents,
+        expires_at, sent_at, accepted_at, hosted_url, pdf_url, cover_note,
+        resulting_invoice_id, stripe_quote_id, submission_id, external_contact_id,
+        submission:submissions(id, studio_name, contact_email),
+        external_contact:external_contacts(id, name, email)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (error) {
+      console.error('loadQuoteListRows:', error);
+      qListState.rows = [];
+      return;
+    }
+    qListState.rows = (data || []).map((r) => {
+      const isStudio = !!r.submission_id;
+      const recipientName = isStudio
+        ? (r.submission?.studio_name || r.submission?.contact_email || 'Unknown studio')
+        : (r.external_contact?.name || r.external_contact?.email || 'External recipient');
+      const recipientEmail = isStudio ? (r.submission?.contact_email || '') : (r.external_contact?.email || '');
+      return { ...r, _isStudio: isStudio, _recipientName: recipientName, _recipientEmail: recipientEmail };
+    });
+  }
+
+  function renderQuoteList() {
+    const host = document.getElementById('qListBody');
+    if (!host) return;
+    const filtered = qListState.rows.filter((r) => {
+      if (qListState.status !== 'all' && r.status !== qListState.status) return false;
+      if (!qListState.search) return true;
+      const hay = [r.number, r._recipientName, r._recipientEmail, r.cover_note].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(qListState.search);
+    });
+    if (!filtered.length) {
+      host.innerHTML = `<div class="adm-empty" style="padding:40px 0;">${qListState.search || qListState.status !== 'all' ? 'No quotes match.' : 'No quotes yet. Click + New quote to issue one.'}</div>`;
+      return;
+    }
+    host.innerHTML = `
+      <table class="inv-table inv-list-table">
+        <thead>
+          <tr>
+            <th>Number</th>
+            <th>Recipient</th>
+            <th>Status</th>
+            <th>Amount</th>
+            <th>Acceptance</th>
+            <th>Expires</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map((r) => {
+            const days = daysUntil(r.expires_at);
+            const expiryText = !r.expires_at ? '—'
+              : (r.status === 'accepted' || r.status === 'declined' || r.status === 'expired' || r.status === 'cancelled') ? new Date(r.expires_at).toLocaleDateString('en-AU')
+              : (days != null && days <= 0) ? 'Expired'
+              : (days === 1) ? '1 day left'
+              : `${days} days left`;
+            return `
+              <tr>
+                <td>${ESC(r.number || '(draft)')}</td>
+                <td>
+                  <div>${ESC(r._recipientName)}</div>
+                  <div class="inv-list-sub">${ESC(r._recipientEmail || '')}${r._isStudio ? '' : ' · <span class="inv-list-tag">External</span>'}</div>
+                </td>
+                <td><span class="bdg ${STATUS_CLASS[r.status] || ''}">${ESC(STATUS_LABEL[r.status] || r.status)}</span></td>
+                <td>${moneyFmt(r.total_cents, r.currency)}</td>
+                <td style="font-size:12px;color:var(--g6);">${r.acceptance_mode === 'pay_on_invoice' ? 'Pay on invoice' : 'Pay on accept'}</td>
+                <td style="font-size:12px;">${ESC(expiryText)}</td>
+                <td style="display:flex;gap:8px;flex-wrap:wrap;">
+                  ${r.hosted_url ? `<a class="btn-link" href="${ESC(r.hosted_url)}" target="_blank" rel="noopener">Open</a>` : ''}
+                  ${r.pdf_url ? `<a class="btn-link" href="${ESC(r.pdf_url)}" target="_blank" rel="noopener">PDF</a>` : ''}
+                  ${r._isStudio ? `<a class="btn-link" href="#" data-q-open-studio="${ESC(r.submission_id)}">View studio</a>` : ''}
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>`;
+    if (!host._qListBound) {
+      host._qListBound = true;
+      host.addEventListener('click', (e) => {
+        const studioLink = e.target.closest('[data-q-open-studio]');
+        if (studioLink) {
+          e.preventDefault();
+          const id = studioLink.getAttribute('data-q-open-studio');
+          if (id && window.AdminDetail && window.AdminDetail.open) {
+            window.AdminDetail.open(id, { tab: 'quotes' });
+          }
+        }
+      });
+    }
+  }
+
   window.AdminQuote = {
     openForStudio(submission) { open({ mode: 'studio', submission }); },
     openExternal() { open({ mode: 'external' }); },
     close,
     renderStudioQuotesPanel,
+    openListScreen,
   };
 
   if (document.readyState === 'loading') {
