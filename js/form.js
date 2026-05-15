@@ -428,6 +428,11 @@
     // Done-For-You is selected. Mirrored on the body so CSS can target it.
     document.body.classList.toggle('setup-dfy', setupName === 'dfy');
     document.body.classList.toggle('setup-guided', setupName === 'guided');
+    // The setup-fee + tax shown in the review summary depends on state.setup.
+    // Refresh it live so the checkout figure tracks the user's choice on the
+    // final step (the picker and the summary now live on the same panel).
+    const svSetup = document.getElementById('sv-setup');
+    if (svSetup) svSetup.innerHTML = setupFeeSummaryHtml();
   }
 
   // Show/hide plan-conditional sections.
