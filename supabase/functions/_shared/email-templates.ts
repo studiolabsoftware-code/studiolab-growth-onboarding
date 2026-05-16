@@ -597,6 +597,79 @@ export function kbAbandonmentNudge(opts: { studioName: string; resumeUrl: string
   return { subject, html: layout({ previewText: 'Your AI knowledge base is waiting on a final five-minute review.', body }) };
 }
 
+// ---------------------------------------------------------------------------
+// Deliverable lifecycle emails (Phase 6.4). One template per state move
+// surfaced to a human:
+//   * submitted_for_review → client (recipient)
+//   * revisions_requested  → admin / team
+//   * approved             → admin / team
+// All called from manage-deliverable / portal-project, gated on stripe_mode
+// in test (per project_email_gating_test_mode memory).
+// ---------------------------------------------------------------------------
+
+export function deliverableSubmittedForReview(opts: {
+  recipientName: string;
+  projectName: string;
+  deliverableTitle: string;
+  description?: string | null;
+  dueDate?: string | null;
+  projectUrl: string;
+}): { subject: string; html: string } {
+  const subject = `Ready for your review: ${opts.deliverableTitle}`;
+  const dueLine = opts.dueDate
+    ? `<p style="margin:0 0 14px;color:${COL.g6};font-size:13px;">Due ${escape(opts.dueDate)}.</p>`
+    : '';
+  const descBlock = opts.description
+    ? `<p style="margin:0 0 14px;white-space:pre-wrap;">${escape(opts.description)}</p>`
+    : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Ready for your review</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.recipientName)},</p>
+    <p style="margin:0 0 14px;">We've just submitted a deliverable on your <strong>${escape(opts.projectName)}</strong> project for you to look over.</p>
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Deliverable</p>
+    <p style="margin:0 0 14px;font-weight:600;font-size:16px;color:${COL.in_d};">${escape(opts.deliverableTitle)}</p>
+    ${descBlock}
+    ${dueLine}
+    <p style="margin:0 0 14px;">Open your project page to approve it or request revisions:</p>
+    ${cta('Review on your project page', opts.projectUrl)}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">If you have questions, reply to this email — it goes straight to the team.</p>`;
+  return { subject, html: layout({ previewText: `${opts.deliverableTitle} is ready for your review on ${opts.projectName}.`, body }) };
+}
+
+export function deliverableRevisionsRequestedAdmin(opts: {
+  recipientName: string;
+  projectName: string;
+  deliverableTitle: string;
+  notes: string;
+  adminUrl: string;
+}): { subject: string; html: string } {
+  const subject = `Revisions requested: ${opts.deliverableTitle}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Revisions requested</h1>
+    <p style="margin:0 0 14px;"><strong>${escape(opts.recipientName)}</strong> has asked for revisions on a deliverable in <strong>${escape(opts.projectName)}</strong>.</p>
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Deliverable</p>
+    <p style="margin:0 0 14px;font-weight:600;font-size:16px;color:${COL.in_d};">${escape(opts.deliverableTitle)}</p>
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">What they said</p>
+    <div style="margin:0 0 18px;padding:14px 16px;background:${COL.g1};border-left:3px solid ${COL.in};border-radius:6px;white-space:pre-wrap;font-size:14px;">${escape(opts.notes)}</div>
+    ${cta('Open project in admin', opts.adminUrl)}`;
+  return { subject, html: layout({ previewText: `${opts.recipientName} requested revisions on ${opts.deliverableTitle}.`, body }) };
+}
+
+export function deliverableApprovedAdmin(opts: {
+  recipientName: string;
+  projectName: string;
+  deliverableTitle: string;
+  adminUrl: string;
+}): { subject: string; html: string } {
+  const subject = `Approved: ${opts.deliverableTitle}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Deliverable approved</h1>
+    <p style="margin:0 0 14px;"><strong>${escape(opts.recipientName)}</strong> just approved <strong>${escape(opts.deliverableTitle)}</strong> on <strong>${escape(opts.projectName)}</strong>.</p>
+    <p style="margin:0 0 14px;">No action required — this is a heads-up. Mark it delivered when you ship the final asset.</p>
+    ${cta('Open project in admin', opts.adminUrl)}`;
+  return { subject, html: layout({ previewText: `${opts.recipientName} approved ${opts.deliverableTitle}.`, body }) };
+}
+
 function escape(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
 }

@@ -13,6 +13,8 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { verifyProjectToken } from '../_shared/projects.ts';
+import { sendEmail } from '../_shared/mailgun.ts';
+import { deliverableApprovedAdmin, deliverableRevisionsRequestedAdmin } from '../_shared/email-templates.ts';
 
 interface RequestBody {
   action: 'load' | 'approve-deliverable' | 'request-revisions';
@@ -203,6 +205,12 @@ async function actApproveDeliverable(sb: any, projectId: string, payload: Partia
     });
   } catch (_) {}
 
+  try {
+    await notifyAdminsOfDeliverableEvent(sb, projectId, row.title, 'approved');
+  } catch (e) {
+    console.warn('admin deliverable_approved email failed:', e);
+  }
+
   return jsonResponse({ ok: true, approved_at: nowIso });
 }
 
@@ -243,5 +251,75 @@ async function actRequestRevisions(sb: any, projectId: string, payload: Partial<
     });
   } catch (_) {}
 
+  try {
+    await notifyAdminsOfDeliverableEvent(sb, projectId, row.title, 'revisions', notes);
+  } catch (e) {
+    console.warn('admin deliverable_revisions_requested email failed:', e);
+  }
+
   return jsonResponse({ ok: true });
+}
+
+// deno-lint-ignore no-explicit-any
+async function notifyAdminsOfDeliverableEvent(
+  sb: any,
+  projectId: string,
+  deliverableTitle: string,
+  kind: 'approved' | 'revisions',
+  notes?: string,
+) {
+  const { data: project } = await sb.from('projects')
+    .select(`
+      id, name, submission_id, external_contact_id,
+      submission:submissions(studio_name, contact_email, first_name, last_name),
+      external_contact:external_contacts(name, email)
+    `)
+    .eq('id', projectId)
+    .maybeSingle();
+  if (!project) return;
+
+  const recipientName = project.submission_id
+    ? (project.submission?.studio_name
+      || [project.submission?.first_name, project.submission?.last_name].filter(Boolean).join(' ')
+      || project.submission?.contact_email
+      || 'Client')
+    : (project.external_contact?.name || project.external_contact?.email || 'Client');
+
+  const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
+  const to = (admins || []).map((a: { email: string }) => a.email).filter(Boolean);
+  if (to.length === 0) return;
+
+  const adminOrigin = (Deno.env.get('ADMIN_APP_URL') || 'https://app.studiolabgrowth.com/admin/').replace(/\/$/, '/');
+  const adminUrl = `${adminOrigin}#projects/${encodeURIComponent(projectId)}`;
+
+  const t = kind === 'approved'
+    ? deliverableApprovedAdmin({
+        recipientName,
+        projectName: project.name,
+        deliverableTitle,
+        adminUrl,
+      })
+    : deliverableRevisionsRequestedAdmin({
+        recipientName,
+        projectName: project.name,
+        deliverableTitle,
+        notes: notes || '',
+        adminUrl,
+      });
+
+  const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+  const isLive = (settings?.stripe_mode || 'test') === 'live';
+  const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+
+  if (isLive) {
+    await sendEmail({ to, subject: t.subject, html: t.html });
+  } else if (testRecipient) {
+    await sendEmail({
+      to: testRecipient,
+      subject: `[TEST · admin deliverable ${kind}] ${t.subject}`,
+      html: t.html,
+    });
+  } else {
+    await sendEmail({ to, subject: t.subject, html: t.html });
+  }
 }

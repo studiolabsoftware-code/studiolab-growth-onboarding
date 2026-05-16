@@ -17,6 +17,8 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { getCallerProfile } from '../_shared/caller.ts';
+import { sendEmail } from '../_shared/mailgun.ts';
+import { deliverableSubmittedForReview } from '../_shared/email-templates.ts';
 
 type Action =
   | 'create' | 'update'
@@ -176,7 +178,73 @@ async function doSubmitForReview(sb: any, row: any, caller: any) {
     title: row.title,
   });
 
+  // Fire-and-forget client email. Gated on stripe_mode in test per
+  // project_email_gating_test_mode memory.
+  try {
+    await notifyClientSubmittedForReview(sb, row.id);
+  } catch (e) {
+    console.warn('client submitted-for-review email failed:', e);
+  }
+
   return jsonResponse({ ok: true, action: 'submit-for-review', submitted_at: nowIso });
+}
+
+// deno-lint-ignore no-explicit-any
+async function notifyClientSubmittedForReview(sb: any, deliverableId: string) {
+  const { data: d } = await sb.from('deliverables')
+    .select('id, title, description, due_date, visibility, project_id')
+    .eq('id', deliverableId)
+    .maybeSingle();
+  if (!d || d.visibility !== 'client') return;
+
+  const { data: project } = await sb.from('projects')
+    .select(`
+      id, name, token, token_expires_at, submission_id, external_contact_id,
+      submission:submissions(contact_email, studio_name, first_name, last_name),
+      external_contact:external_contacts(name, email)
+    `)
+    .eq('id', d.project_id)
+    .maybeSingle();
+  if (!project || !project.token) return;
+
+  const recipientEmail = project.submission_id
+    ? project.submission?.contact_email
+    : project.external_contact?.email;
+  if (!recipientEmail) return;
+  const recipientName = project.submission_id
+    ? (project.submission?.studio_name
+      || [project.submission?.first_name, project.submission?.last_name].filter(Boolean).join(' ')
+      || 'there')
+    : (project.external_contact?.name || 'there');
+
+  const origin = (Deno.env.get('PUBLIC_APP_ORIGIN') || 'https://app.studiolabgrowth.com').replace(/\/$/, '');
+  const projectUrl = `${origin}/project/?p=${encodeURIComponent(project.id)}&t=${encodeURIComponent(project.token)}`;
+
+  const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+  const isLive = (settings?.stripe_mode || 'test') === 'live';
+  const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+
+  const t = deliverableSubmittedForReview({
+    recipientName,
+    projectName: project.name,
+    deliverableTitle: d.title,
+    description: d.description,
+    dueDate: d.due_date,
+    projectUrl,
+  });
+
+  if (isLive) {
+    await sendEmail({ to: recipientEmail, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com' });
+  } else if (testRecipient) {
+    await sendEmail({
+      to: testRecipient,
+      subject: `[TEST · deliverable ready] ${t.subject}`,
+      html: t.html,
+      replyTo: 'info@studiolabsoftware.com',
+    });
+  } else {
+    await sendEmail({ to: recipientEmail, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com' });
+  }
 }
 
 // deno-lint-ignore no-explicit-any
