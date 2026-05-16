@@ -662,8 +662,8 @@
       : '';
 
     return `
-      <tr>
-        <td>${ESC(r.number || (isDraft ? '(draft)' : '—'))}</td>
+      <tr data-inv-row="${ESC(r.id)}" class="inv-row-clickable">
+        <td><button type="button" class="inv-row-num" data-inv-open="${ESC(r.id)}">${ESC(r.number || (isDraft ? '(draft)' : '—'))}</button></td>
         ${recipientCell}
         <td><span class="bdg ${STATUS_CLASS[r.status] || ''}">${ESC(STATUS_LABEL[r.status] || r.status)}</span></td>
         <td>${moneyFmt(r.total_cents, r.currency)}</td>
@@ -770,6 +770,17 @@
     if (hostEl._invActionsBound) return;
     hostEl._invActionsBound = true;
     hostEl.addEventListener('click', async (e) => {
+      // Row-Number click opens the detail drawer.
+      const openBtn = e.target.closest('[data-inv-open]');
+      if (openBtn) {
+        e.preventDefault();
+        const id = openBtn.getAttribute('data-inv-open');
+        const row = (hostEl._invRows || []).find((r) => r.id === id);
+        if (row) openInvoiceDrawer(row, () => {
+          if (typeof onReload === 'function') return onReload();
+        });
+        return;
+      }
       // Kebab opens the menu.
       const kebab = e.target.closest('[data-inv-kebab]');
       if (kebab) {
@@ -1405,6 +1416,206 @@
       </table>`;
     host._showRecipient = true;
     bindInvoiceRowActions(host, async () => { await loadListRows(); renderList(); }, filtered);
+  }
+
+  // ── Invoice detail drawer (Phase 6.1b) ─────────────────────────────────
+  // Side-panel summary of one invoice. Reuses the kebab action set as the
+  // drawer's action surface so the row stays a clean overview and every
+  // lifecycle action has a spacious home. Line items come from the Stripe
+  // snapshot; activity events come from activity_log filtered to this
+  // invoice (matched by stripe_invoice_id inside details, or invoice_id).
+  let activeDrawer = null;
+  function closeDrawer() {
+    if (!activeDrawer) return;
+    const { el, dismiss } = activeDrawer;
+    document.removeEventListener('keydown', dismiss, true);
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    document.body.classList.remove('adm-drawer-open');
+    activeDrawer = null;
+  }
+
+  async function openInvoiceDrawer(row, onReload) {
+    closeDrawer();
+    const el = document.createElement('div');
+    el.className = 'inv-drawer-wrap';
+    el.innerHTML = `
+      <div class="inv-drawer-backdrop"></div>
+      <aside class="inv-drawer" role="dialog" aria-labelledby="invDrawerTitle">
+        <header class="inv-drawer-hdr">
+          <div class="inv-drawer-hdr-text">
+            <div class="inv-drawer-eyebrow">${ESC(KIND_LABEL[row.kind] || 'Invoice')}</div>
+            <h2 id="invDrawerTitle" class="inv-drawer-title">${ESC(row.number || (row.status === 'draft' ? 'Draft invoice' : '—'))}</h2>
+            <div class="inv-drawer-sub">
+              <span class="bdg ${STATUS_CLASS[row.status] || ''}">${ESC(STATUS_LABEL[row.status] || row.status)}</span>
+              <span class="inv-drawer-total">${moneyFmt(row.total_cents, row.currency)}</span>
+            </div>
+          </div>
+          <button type="button" class="inv-drawer-close" aria-label="Close" data-act="close">×</button>
+        </header>
+        <div class="inv-drawer-body" id="invDrawerBody">
+          <div class="adm-empty" style="padding:24px 0;">Loading invoice…</div>
+        </div>
+      </aside>`;
+    document.body.appendChild(el);
+    document.body.classList.add('adm-drawer-open');
+
+    const close = () => closeDrawer();
+    el.querySelector('[data-act="close"]').addEventListener('click', close);
+    el.querySelector('.inv-drawer-backdrop').addEventListener('click', close);
+    const dismiss = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+    };
+    document.addEventListener('keydown', dismiss, true);
+    activeDrawer = { el, dismiss };
+
+    // Body content — render twice. First with the data we already have on
+    // the row (line items unknown), then once the Stripe snapshot returns,
+    // re-render with line items + final totals.
+    const body = el.querySelector('#invDrawerBody');
+    body.innerHTML = renderDrawerBody(row, null, []);
+
+    // Wire action buttons + kebab inside the drawer.
+    bindDrawerActions(body, row, onReload);
+
+    // Fetch the Stripe snapshot for line items.
+    let snapshot = null;
+    if (row.stripe_invoice_id) {
+      try {
+        const { resp, data } = await callManage({ action: 'get-snapshot', invoice_id: row.id });
+        if (resp.ok && data.ok) snapshot = data.snapshot;
+      } catch (e) { console.warn('drawer snapshot failed:', e); }
+    }
+
+    // Fetch the activity feed for this invoice.
+    let activity = [];
+    try {
+      const sb = window.initSupabase && window.initSupabase();
+      if (sb && row.stripe_invoice_id) {
+        const { data } = await sb.from('activity_log')
+          .select('id, action, actor, details, created_at')
+          .or(`details->>invoice_id.eq.${row.stripe_invoice_id},details->>invoice_id.eq.${row.id}`)
+          .order('created_at', { ascending: false })
+          .limit(30);
+        activity = data || [];
+      }
+    } catch (e) { console.warn('drawer activity failed:', e); }
+
+    body.innerHTML = renderDrawerBody(row, snapshot, activity);
+    bindDrawerActions(body, row, onReload);
+  }
+
+  function renderDrawerBody(r, snapshot, activity) {
+    const lines = snapshot?.lines || [];
+    const sentAt = r.email_sent_at || r.issued_at;
+    const recipientLine = r._recipientName
+      ? `<div><strong>${ESC(r._recipientName)}</strong>${r._recipientEmail ? ` · ${ESC(r._recipientEmail)}` : ''}${r._isStudio ? '' : ' · <span class="inv-list-tag">External</span>'}</div>`
+      : '';
+    const linesBlock = lines.length === 0
+      ? `<div class="adm-empty" style="padding:8px 0;">Loading line items…</div>`
+      : `<table class="inv-drawer-lines"><thead><tr>
+          <th style="text-align:left;">Description</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Amount</th>
+        </tr></thead><tbody>
+          ${lines.map((l) => `<tr>
+            <td>${ESC(l.description || '')}</td>
+            <td style="text-align:right;">${l.quantity || 1}</td>
+            <td style="text-align:right;">${moneyFmt((l.unit_amount_cents || 0) * (l.quantity || 1), r.currency)}</td>
+          </tr>`).join('')}
+        </tbody></table>`;
+
+    const sendHistory = [
+      sentAt ? `<div>Sent ${shortDate(sentAt)}</div>` : '',
+      r.last_resent_at ? `<div>Resent ${shortDate(r.last_resent_at)}${r.resend_count > 1 ? ` (×${r.resend_count})` : ''}</div>` : '',
+      r.paid_at ? `<div>${r.marked_paid_manually ? 'Marked paid' : 'Paid'} ${shortDate(r.paid_at)}${r.marked_paid_manually && r.manual_payment_method ? ' · ' + ESC(PAYMENT_METHOD_LABEL[r.manual_payment_method] || r.manual_payment_method) : ''}${r.manual_payment_reference ? ' · ref ' + ESC(r.manual_payment_reference) : ''}</div>` : '',
+      r.voided_at ? `<div style="color:#B91C1C;">Voided ${shortDate(r.voided_at)}</div>` : '',
+      (r.amount_refunded_cents || 0) > 0 ? `<div style="color:#B91C1C;">Refunded ${moneyFmt(r.amount_refunded_cents, r.currency)}</div>` : '',
+    ].filter(Boolean).join('');
+
+    const { primary, menu } = rowActionConfig(r, !!r._isStudio || !!r._recipientName);
+    const allActs = [...primary, ...menu].filter((a) => !a.divider);
+    const actionsHtml = allActs.map((a) => {
+      if (a.studioOpenId) {
+        return `<button type="button" class="btn btn-g" data-drawer-studio="${ESC(a.studioOpenId)}">${ESC(a.label)}</button>`;
+      }
+      if (a.href) {
+        return `<a class="btn btn-g" href="${ESC(a.href)}"${a.external ? ' target="_blank" rel="noopener"' : ''}>${ESC(a.label)}</a>`;
+      }
+      const cls = a.destructive ? 'btn btn-danger' : 'btn btn-g';
+      return `<button type="button" class="${cls}" data-drawer-act="${ESC(a.act)}">${ESC(a.label)}</button>`;
+    }).join('');
+
+    const projectBlock = r.project_id
+      ? `<button type="button" class="btn btn-p" data-drawer-act="open-project">Open project →</button>`
+      : `<button type="button" class="btn btn-g" data-drawer-act="create-project">Create project from this invoice</button>`;
+
+    return `
+      ${recipientLine ? `<section class="inv-drawer-sec">${recipientLine}</section>` : ''}
+
+      <section class="inv-drawer-sec">
+        <h3 class="inv-drawer-sec-title">Project</h3>
+        ${projectBlock}
+      </section>
+
+      <section class="inv-drawer-sec">
+        <h3 class="inv-drawer-sec-title">Line items</h3>
+        ${linesBlock}
+      </section>
+
+      <section class="inv-drawer-sec">
+        <h3 class="inv-drawer-sec-title">Send history</h3>
+        <div class="inv-drawer-history">${sendHistory || '<span class="adm-empty">No send activity yet.</span>'}</div>
+      </section>
+
+      ${r.description ? `<section class="inv-drawer-sec">
+        <h3 class="inv-drawer-sec-title">Internal note</h3>
+        <p style="margin:0;color:#13102E;">${ESC(r.description)}</p>
+      </section>` : ''}
+
+      <section class="inv-drawer-sec">
+        <h3 class="inv-drawer-sec-title">Actions</h3>
+        <div class="inv-drawer-actions">${actionsHtml || '<span class="adm-empty">No actions available for this status.</span>'}</div>
+      </section>
+
+      <section class="inv-drawer-sec">
+        <h3 class="inv-drawer-sec-title">Activity</h3>
+        ${activity.length === 0
+          ? '<span class="adm-empty">No activity yet.</span>'
+          : `<ul class="inv-drawer-activity">${activity.map((a) => `<li>
+              <span class="inv-drawer-when">${shortDate(a.created_at)}</span>
+              <span class="inv-drawer-what">${ESC(a.action.replace(/_/g, ' '))}${a.actor ? ` · ${ESC(a.actor)}` : ''}</span>
+            </li>`).join('')}</ul>`
+        }
+      </section>`;
+  }
+
+  function bindDrawerActions(body, row, onReload) {
+    body.addEventListener('click', async (e) => {
+      const studio = e.target.closest('[data-drawer-studio]');
+      if (studio) {
+        e.preventDefault();
+        closeDrawer();
+        if (window.AdminDetail?.open) window.AdminDetail.open(studio.getAttribute('data-drawer-studio'), { tab: 'invoices' });
+        return;
+      }
+      const btn = e.target.closest('[data-drawer-act]');
+      if (!btn) return;
+      e.preventDefault();
+      const act = btn.getAttribute('data-drawer-act');
+      const wrappedReload = async () => {
+        if (typeof onReload === 'function') await onReload();
+        closeDrawer();
+      };
+      // Open-project and Create-project navigate away; close drawer immediately.
+      if (act === 'open-project') {
+        closeDrawer();
+        if (window.AdminProjects?.openDetail && row.project_id) {
+          window.AdminProjects.openDetail(row.project_id);
+        }
+        return;
+      }
+      // Hand off to the same dispatcher the kebab uses.
+      const hostStub = { _submission: null };
+      dispatchRowItem({ act }, row, wrappedReload, hostStub);
+    });
   }
 
   // Public surface
