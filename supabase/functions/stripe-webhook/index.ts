@@ -1286,6 +1286,46 @@ async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Pr
     // not insert orphan rows here — admin should use create-quote so the
     // ledger row exists at issue time. Skip and log.
     console.log(`stripe-webhook: quote ${quote.id} not in ledger — skipping (event ${eventType})`);
+    // Surface dashboard-initiated cancels to admin (audit finding). The
+    // skip-and-log default is silent and admins had no way to learn when
+    // a Stripe-side action drifted from the StudioLAB ledger. Other event
+    // types (created/finalized/accepted) are noisier, so only escalate
+    // canceled — that's the case where money was potentially in motion
+    // and the recipient now thinks the quote is dead.
+    if (eventType === 'quote.canceled') {
+      try {
+        const { adminQuoteCanceledOrphan } = await import('../_shared/email-templates.ts');
+        const { data: admins } = await sb.from('admin_users')
+          .select('email')
+          .eq('is_active', true);
+        if (admins && admins.length) {
+          const adminUrl = Deno.env.get('ADMIN_APP_URL') || '';
+          const recipientHint = (quote as { customer_email?: string | null }).customer_email
+            || (quote.metadata?.email as string | undefined)
+            || null;
+          const tpl = adminQuoteCanceledOrphan({
+            stripeQuoteId: quote.id,
+            number: quote.number,
+            recipientHint,
+            adminUrl,
+          });
+          // Self-contained gated sender: handleQuoteUpdate doesn't have
+          // access to the per-checkout sendGated. Same gating logic — test
+          // mode without STRIPE_TEST_EMAIL_RECIPIENT falls back to the
+          // real recipient.
+          const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+          const isLive = (settings?.stripe_mode || 'test') === 'live';
+          const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+          const send = createGatedSender({ isLive, testRecipient });
+          await send({
+            to: admins.map((a) => a.email),
+            subject: tpl.subject,
+            html: tpl.html,
+            intent: 'orphan quote cancel',
+          });
+        }
+      } catch (e) { console.error('orphan-cancel admin email failed:', e); }
+    }
     return;
   }
 

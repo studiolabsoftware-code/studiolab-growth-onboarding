@@ -31,7 +31,12 @@ import { adminClient } from '../_shared/supabase.ts';
 import { isServiceRoleCaller } from '../_shared/caller.ts';
 import { getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
-import { quoteReminderNudge, quoteExpiryWarning } from '../_shared/email-templates.ts';
+import {
+  quoteReminderNudge,
+  quoteExpiryWarning,
+  quoteAutoCancelDigest,
+  type AutoCancelDigestRow,
+} from '../_shared/email-templates.ts';
 
 const NUDGE_AFTER_DAYS = 7;
 const EXPIRY_WARNING_WITHIN_DAYS = 5;
@@ -110,6 +115,10 @@ Deno.serve(async (req) => {
       cancelled: 0,
       errors: [] as string[],
     };
+    // Rows we'll bundle into a single admin digest email at the end of the
+    // run. Each cancellation collects enough context for admins to triage
+    // without round-tripping to the admin UI.
+    const cancelDigest: AutoCancelDigestRow[] = [];
 
     const nowIso = new Date().toISOString();
     const cutoff7d = new Date(Date.now() - NUDGE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -220,7 +229,7 @@ Deno.serve(async (req) => {
     // waiting for webhook latency.
     {
       const { data: expiredRows } = await sb.from('quotes')
-        .select('id, stripe_quote_id, number, status, submission_id, external_contact_id')
+        .select('id, stripe_quote_id, number, status, submission_id, external_contact_id, currency, total_cents, expires_at')
         .in('status', ['draft', 'sent', 'viewed'])
         .lt('expires_at', nowIso);
 
@@ -267,12 +276,60 @@ Deno.serve(async (req) => {
                 },
               });
             } catch (e) { console.error('activity_log insert failed:', e); }
+            // Resolve a recipient label for the digest. Best-effort, falls
+            // back to a placeholder so a missing submission/contact does
+            // not break the email.
+            let recipientLabel = '(unknown)';
+            try {
+              if (q.submission_id) {
+                const { data: sub } = await sb.from('submissions')
+                  .select('studio_name, contact_email')
+                  .eq('id', q.submission_id)
+                  .maybeSingle();
+                recipientLabel = sub?.studio_name || sub?.contact_email || recipientLabel;
+              } else if (q.external_contact_id) {
+                const { data: ec } = await sb.from('external_contacts')
+                  .select('name, email')
+                  .eq('id', q.external_contact_id)
+                  .maybeSingle();
+                recipientLabel = ec?.name || ec?.email || recipientLabel;
+              }
+            } catch (e) { console.error('recipient resolve failed:', e); }
+            cancelDigest.push({
+              number: q.number,
+              recipientLabel,
+              amountDisplay: formatAmount(q.currency, q.total_cents),
+              expiresAt: q.expires_at,
+            });
             stats.cancelled++;
           }
         } catch (e) {
           console.error('auto-cancel failed for quote', q.id, e);
           stats.errors.push(`expire:${q.id}`);
         }
+      }
+    }
+
+    // ===== 4. Admin auto-cancel digest =====================================
+    // One email per cron run, only when at least one quote was cancelled.
+    // Skipped silently when nothing lapsed (the default case once the
+    // backlog burns down).
+    if (cancelDigest.length > 0) {
+      try {
+        const { data: admins } = await sb.from('admin_users')
+          .select('email')
+          .eq('is_active', true);
+        if (admins && admins.length) {
+          const adminUrl = Deno.env.get('ADMIN_APP_URL') || '';
+          const tpl = quoteAutoCancelDigest({ rows: cancelDigest, adminUrl });
+          // Digest goes to all active admins. Same gating as the other
+          // emails in this function.
+          await Promise.all(admins.map((a) =>
+            gatedSend(a.email, tpl.subject, tpl.html, 'admin auto-cancel digest')));
+        }
+      } catch (e) {
+        console.error('auto-cancel digest send failed:', e);
+        stats.errors.push('digest_send_failed');
       }
     }
 

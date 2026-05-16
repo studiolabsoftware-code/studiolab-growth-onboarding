@@ -122,10 +122,21 @@ Deno.serve(async (req) => {
     if (!recipient) return badRequest('Recipient is required.');
     if (currency !== 'AUD' && currency !== 'USD') return badRequest('Currency must be AUD or USD.');
     if (lines.length === 0) return badRequest('At least one line item is required.');
+    // Hard caps. Matches create-quote so the two flows behave the same.
+    const MAX_LINE_ITEMS = 50;
+    const MAX_TOTAL_CENTS = 100_000_000;  // $1,000,000.00 in either currency
+    if (lines.length > MAX_LINE_ITEMS) {
+      return badRequest(`Invoices are capped at ${MAX_LINE_ITEMS} line items. Split into multiple invoices if you genuinely need more.`, 'too_many_line_items');
+    }
+    let runningTotal = 0;
     for (const li of lines) {
       if (!li.description || typeof li.description !== 'string') return badRequest('Each line item needs a description.');
       if (!Number.isInteger(li.amount_cents) || li.amount_cents <= 0) return badRequest('Each line item needs a positive integer amount in cents.');
       if (li.quantity !== undefined && (!Number.isInteger(li.quantity) || li.quantity <= 0)) return badRequest('Quantity must be a positive integer.');
+      runningTotal += li.amount_cents * (li.quantity ?? 1);
+      if (runningTotal > MAX_TOTAL_CENTS) {
+        return badRequest('Invoice total exceeds the $1,000,000 cap. Split into multiple invoices if this is intentional.', 'total_exceeds_cap');
+      }
     }
     if (collectionMethod !== 'send_invoice' && collectionMethod !== 'charge_automatically') {
       return badRequest('collection_method must be send_invoice or charge_automatically.');

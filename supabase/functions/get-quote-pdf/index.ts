@@ -88,6 +88,19 @@ Deno.serve(async (req) => {
       }, 502);
     }
 
+    // Activity log. Best-effort — if it fails the user still gets the PDF.
+    // Records the download against the quote so admins can audit who has
+    // pulled which quote and when. submission_id is null when the quote
+    // is for an external recipient; that's expected.
+    try {
+      await sb.from('activity_log').insert({
+        submission_id: quoteRow.submission_id,
+        action: 'quote_pdf_downloaded',
+        actor,
+        details: { quote_id: quoteRow.id, stripe_quote_id: quoteRow.stripe_quote_id, number: quoteRow.number },
+      });
+    } catch (e) { console.error('activity_log insert failed:', e); }
+
     // Re-stream the PDF straight through to the caller. content-disposition
     // = attachment so browsers download rather than render in-tab; the
     // filename uses the human-friendly quote number when available.

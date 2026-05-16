@@ -91,15 +91,66 @@ Deno.serve(async (req) => {
     if (!recipient) return badRequest('Recipient is required.');
     if (currency !== 'AUD' && currency !== 'USD') return badRequest('Currency must be AUD or USD.');
     if (lines.length === 0) return badRequest('At least one line item is required.');
+    // Hard caps. 50 line items is well beyond any realistic StudioLAB
+    // engagement (typical quotes are 1-6 lines) and protects against a
+    // fat-finger paste that would otherwise create an unmanageable quote
+    // in Stripe. The total cap is denominated in cents and applied
+    // regardless of currency — $1m AUD ~= $650k USD which is also
+    // comfortably above any realistic single quote we'd issue.
+    const MAX_LINE_ITEMS = 50;
+    const MAX_TOTAL_CENTS = 100_000_000;  // $1,000,000.00 in either currency
+    if (lines.length > MAX_LINE_ITEMS) {
+      return badRequest(`Quotes are capped at ${MAX_LINE_ITEMS} line items. Split into multiple quotes if you genuinely need more.`, 'too_many_line_items');
+    }
+    let runningTotal = 0;
     for (const li of lines) {
       if (!li.description || typeof li.description !== 'string') return badRequest('Each line item needs a description.');
       if (!Number.isInteger(li.amount_cents) || li.amount_cents <= 0) return badRequest('Each line item needs a positive integer amount in cents.');
       if (li.quantity !== undefined && (!Number.isInteger(li.quantity) || li.quantity <= 0)) return badRequest('Quantity must be a positive integer.');
+      runningTotal += li.amount_cents * (li.quantity ?? 1);
+      if (runningTotal > MAX_TOTAL_CENTS) {
+        return badRequest('Quote total exceeds the $1,000,000 cap. Split into multiple quotes if this is intentional.', 'total_exceeds_cap');
+      }
     }
 
     const sb = adminClient();
     const mode = await getStripeMode();
     const secretKey = getStripeKey(mode);
+
+    // ---- Revision-chain depth guard. parent_quote_id is the head of a
+    // singly-linked revision chain (this quote -> parent -> grandparent -> ...).
+    // The API only ever sets parent_quote_id on insert, never on update,
+    // so a true cycle is impossible by construction. But an unbounded
+    // chain is a smell — typically caused by a bug looping the revise
+    // flow — and a long chain is unreadable in the admin UI. Walk up to
+    // a sensible cap and refuse if we hit it; also confirms the parent
+    // actually exists, which the previous code took for granted.
+    const MAX_REVISION_DEPTH = 10;
+    if (parentQuoteId) {
+      let cursor: string | null = parentQuoteId;
+      let depth = 0;
+      while (cursor) {
+        depth += 1;
+        if (depth > MAX_REVISION_DEPTH) {
+          return badRequest(
+            `Revision chain is more than ${MAX_REVISION_DEPTH} deep. Start a fresh quote instead.`,
+            'revision_chain_too_deep',
+          );
+        }
+        const { data: parentRow }: { data: { parent_quote_id: string | null } | null } =
+          await sb.from('quotes')
+            .select('parent_quote_id')
+            .eq('id', cursor)
+            .maybeSingle();
+        if (!parentRow) {
+          if (depth === 1) {
+            return badRequest('Parent quote not found.', 'parent_quote_not_found');
+          }
+          break;
+        }
+        cursor = parentRow.parent_quote_id;
+      }
+    }
 
     // ---- Resolve recipient: Stripe Customer + submission/external_contact ids
     let stripeCustomerId: string | null = null;

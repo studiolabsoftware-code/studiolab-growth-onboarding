@@ -672,6 +672,78 @@ export function deliverableApprovedAdmin(opts: {
 }
 
 // ---------------------------------------------------------------------------
+// Admin notification - daily digest of quotes the cron auto-cancelled at
+// expiry. Sent once per cron run when one or more quotes lapsed, so admins
+// can decide whether to follow up with the recipient or let it go.
+// ---------------------------------------------------------------------------
+export interface AutoCancelDigestRow {
+  number: string | null;
+  recipientLabel: string;        // studio name or external contact email
+  amountDisplay: string;         // pre-formatted, e.g. "AUD $1,650.00 incl. GST"
+  expiresAt: string | null;      // ISO; rendered as a date
+}
+export function quoteAutoCancelDigest(opts: {
+  rows: AutoCancelDigestRow[];
+  adminUrl: string;
+}): { subject: string; html: string } {
+  const n = opts.rows.length;
+  const subject = `${n} quote${n === 1 ? '' : 's'} auto-cancelled at expiry`;
+  const tableRows = opts.rows.map((r) => `
+    <tr>
+      <td style="padding:8px 12px 8px 0;vertical-align:top;color:${COL.in_d};font-weight:600;">${escape(r.number || '(unnumbered)')}</td>
+      <td style="padding:8px 12px 8px 0;vertical-align:top;color:${COL.g8};">${escape(r.recipientLabel)}</td>
+      <td style="padding:8px 12px 8px 0;vertical-align:top;color:${COL.g8};">${escape(r.amountDisplay)}</td>
+      <td style="padding:8px 0;vertical-align:top;color:${COL.g6};font-size:12px;">${r.expiresAt ? escape(new Date(r.expiresAt).toLocaleDateString('en-AU')) : '-'}</td>
+    </tr>
+  `).join('');
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Auto-cancelled quotes</h1>
+    <p style="margin:0 0 14px;">The daily quote sweep cancelled ${n} quote${n === 1 ? '' : 's'} that reached their expiry without being accepted or declined.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 18px;">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:6px 12px 6px 0;color:${COL.g6};font-size:11px;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;border-bottom:1px solid ${COL.g2};">Number</th>
+          <th style="text-align:left;padding:6px 12px 6px 0;color:${COL.g6};font-size:11px;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;border-bottom:1px solid ${COL.g2};">Recipient</th>
+          <th style="text-align:left;padding:6px 12px 6px 0;color:${COL.g6};font-size:11px;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;border-bottom:1px solid ${COL.g2};">Amount</th>
+          <th style="text-align:left;padding:6px 0;color:${COL.g6};font-size:11px;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;border-bottom:1px solid ${COL.g2};">Expired</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    <p style="margin:0 0 14px;color:${COL.g6};font-size:13px;">No action required. Open admin to revisit any of these (re-issue, re-quote, or just close out).</p>
+    ${cta('Open Quotes in admin', opts.adminUrl)}`;
+  return { subject, html: layout({ previewText: `${n} quote${n === 1 ? '' : 's'} reached expiry today and were auto-cancelled.`, body }) };
+}
+
+// ---------------------------------------------------------------------------
+// Admin notification - a Stripe quote was canceled in the Stripe dashboard
+// (or some other path outside our cancel-quote function) for which we have
+// no ledger row. Surfaces the orphan to admins so they can decide whether
+// to follow up or ignore - previously this went to console.log only.
+// ---------------------------------------------------------------------------
+export function adminQuoteCanceledOrphan(opts: {
+  stripeQuoteId: string;
+  number: string | null;
+  recipientHint?: string | null;
+  adminUrl: string;
+}): { subject: string; html: string } {
+  const label = opts.number || opts.stripeQuoteId;
+  const subject = `Orphan quote cancel: ${label}`;
+  const recipientLine = opts.recipientHint
+    ? `<p style="margin:0 0 6px;"><strong>Recipient hint:</strong> ${escape(opts.recipientHint)}</p>`
+    : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Orphan quote cancellation</h1>
+    <p style="margin:0 0 14px;">Stripe reported a <strong>quote.canceled</strong> event for a quote we have no ledger row for. This usually means someone cancelled it directly in the Stripe dashboard, or the original quote was created outside StudioLAB Growth.</p>
+    <p style="margin:0 0 6px;"><strong>Stripe quote id:</strong> <code style="background:${COL.g1};padding:2px 6px;border-radius:4px;">${escape(opts.stripeQuoteId)}</code></p>
+    <p style="margin:0 0 6px;"><strong>Number:</strong> ${escape(label)}</p>
+    ${recipientLine}
+    <p style="margin:14px 0;color:${COL.g6};font-size:13px;">No action required from us. If you cancelled this on purpose, ignore the email. If not, the Stripe dashboard has the full event timeline.</p>
+    ${cta('Open Quotes in admin', opts.adminUrl)}`;
+  return { subject, html: layout({ previewText: `Stripe reported a quote.canceled for ${label} but we have no ledger row for it.`, body }) };
+}
+
+// ---------------------------------------------------------------------------
 // Admin notification — Stripe reported invoice.payment_failed. Stripe will
 // retry on its own schedule and the recipient gets Stripe's own dunning
 // email, but we surface the event to admins so a VA can decide whether to
