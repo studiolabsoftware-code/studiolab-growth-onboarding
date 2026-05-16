@@ -24,6 +24,10 @@ import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { getCallerProfile } from '../_shared/caller.ts';
 import { getAuGstTaxRateId, getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
+import {
+  isoCountryForStripe,
+  validateCurrencyForCountry,
+} from '../_shared/recipient.ts';
 
 const TAX_CODE_SERVICES = 'txcd_20030000'; // General services (kept for forward-compat with automatic_tax; harmless under manual rates)
 
@@ -66,26 +70,6 @@ interface RequestBody {
   // materialises each linked SKU's deliverable_template as deliverables
   // on the spawned project. Free-text lines produce no entries.
   source_sku_links?: Array<{ kind: 'upgrade' | 'general'; id: string }>;
-}
-
-function isoCountryForStripe(stored: string | null | undefined): string | null {
-  if (!stored) return null;
-  const c = stored.trim().toUpperCase();
-  if (c === 'UK') return 'GB';
-  if (/^[A-Z]{2}$/.test(c)) return c;
-  return null;
-}
-
-// Server-side mirror of the admin modal's currency lock. AU → AUD with
-// GST, everyone else → USD without GST. Returns null when country is
-// unknown so a new external contact (admin didn't specify country) can
-// still be invoiced without a forced currency.
-function expectedCurrencyForCountry(country: string | null | undefined): 'AUD' | 'USD' | null {
-  if (!country) return null;
-  const c = country.trim().toUpperCase();
-  if (c === 'AU' || c === 'AUS' || c === 'AUSTRALIA') return 'AUD';
-  if (/^[A-Z]{2,3}$/.test(c) || c.length > 3) return 'USD';
-  return null;
 }
 
 function badRequest(msg: string, code?: string) {
@@ -167,17 +151,15 @@ Deno.serve(async (req) => {
       submissionId = sub.id;
       recipientEmail = (sub.contact_email || '').toLowerCase();
       recipientCountryIso = isoCountryForStripe(sub.country);
-      // Server-side currency/country validation — see create-quote for
-      // rationale. GST handling is tax-correctness load-bearing.
-      const expectedCurrency = expectedCurrencyForCountry(sub.country);
-      if (expectedCurrency && currency !== expectedCurrency) {
-        return badRequest(
-          expectedCurrency === 'AUD'
-            ? 'Australian studios must be invoiced in AUD (10% GST applies).'
-            : 'Overseas studios must be invoiced in USD (no GST).',
-          'currency_country_mismatch',
-        );
-      }
+      // Server-side currency/country validation. See create-quote for
+      // rationale; GST handling is tax-correctness load-bearing.
+      const mismatch = validateCurrencyForCountry({
+        currency,
+        country: sub.country,
+        recipientLabel: 'studio',
+        verb: 'invoiced',
+      });
+      if (mismatch) return badRequest(mismatch.error, mismatch.code);
       if (sub.stripe_customer_id) {
         stripeCustomerId = sub.stripe_customer_id;
       } else {
@@ -253,15 +235,13 @@ Deno.serve(async (req) => {
       externalContactId = contactRow.id;
       recipientEmail = contactRow.email.toLowerCase();
       recipientCountryIso = isoCountryForStripe(contactRow.country);
-      const expectedExternalCurrency = expectedCurrencyForCountry(contactRow.country);
-      if (expectedExternalCurrency && currency !== expectedExternalCurrency) {
-        return badRequest(
-          expectedExternalCurrency === 'AUD'
-            ? 'Australian recipients must be invoiced in AUD (10% GST applies).'
-            : 'Overseas recipients must be invoiced in USD (no GST).',
-          'currency_country_mismatch',
-        );
-      }
+      const extMismatch = validateCurrencyForCountry({
+        currency,
+        country: contactRow.country,
+        recipientLabel: 'recipient',
+        verb: 'invoiced',
+      });
+      if (extMismatch) return badRequest(extMismatch.error, extMismatch.code);
       if (contactRow.stripe_customer_id) {
         stripeCustomerId = contactRow.stripe_customer_id;
       } else {

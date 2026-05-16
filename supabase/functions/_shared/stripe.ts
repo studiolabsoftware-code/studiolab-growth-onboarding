@@ -49,6 +49,20 @@ export function stripeEncode(obj: Record<string, unknown>, prefix = ''): string 
 
 export type StripeResult<T> = { ok: boolean; status: number; body: T; error?: string };
 
+// Retry policy for transient Stripe failures. 429 (rate limit) and 5xx
+// (server error) are the documented retryable cases. We retry up to 2
+// extra times with exponential backoff + jitter. Idempotency-Key (when
+// provided by the caller) makes the retry safe on POSTs — Stripe replays
+// the original response on a repeat with the same key.
+const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+const MAX_RETRIES = 2;
+
+function jitteredBackoffMs(attempt: number): number {
+  const base = 250 * Math.pow(2, attempt);      // 250 / 500 / 1000ms
+  const jitter = Math.floor(Math.random() * 150);
+  return base + jitter;
+}
+
 export async function stripeRequest<T = unknown>(
   method: 'GET' | 'POST' | 'DELETE',
   path: string,
@@ -66,16 +80,47 @@ export async function stripeRequest<T = unknown>(
   const init: RequestInit = { method, headers };
   if (body && method !== 'GET') init.body = stripeEncode(body);
 
-  const resp = await fetch(`https://api.stripe.com/v1/${path}`, init);
-  let parsed: unknown = {};
-  try { parsed = await resp.json(); } catch (_) { parsed = {}; }
-  const obj = parsed as { error?: { message?: string } };
-  return {
-    ok: resp.ok,
-    status: resp.status,
-    body: parsed as T,
-    error: !resp.ok ? (obj?.error?.message || `Stripe responded ${resp.status}`) : undefined,
-  };
+  let lastStatus = 0;
+  let lastBody: unknown = {};
+  let lastError: string | undefined;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let resp: Response;
+    try {
+      resp = await fetch(`https://api.stripe.com/v1/${path}`, init);
+    } catch (err) {
+      // Transient network error. Treat like a 503 — retry until we exhaust
+      // the budget, then surface the original error.
+      lastError = (err as Error)?.message || String(err);
+      lastStatus = 0;
+      if (attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, jitteredBackoffMs(attempt)));
+        continue;
+      }
+      return { ok: false, status: 0, body: {} as T, error: lastError };
+    }
+
+    let parsed: unknown = {};
+    try { parsed = await resp.json(); } catch (_) { parsed = {}; }
+    lastStatus = resp.status;
+    lastBody = parsed;
+    const obj = parsed as { error?: { message?: string } };
+    lastError = !resp.ok ? (obj?.error?.message || `Stripe responded ${resp.status}`) : undefined;
+
+    if (resp.ok || !RETRY_STATUSES.has(resp.status) || attempt === MAX_RETRIES) {
+      return {
+        ok: resp.ok,
+        status: resp.status,
+        body: parsed as T,
+        error: lastError,
+      };
+    }
+
+    // Retryable. Sleep + try again.
+    await new Promise((r) => setTimeout(r, jitteredBackoffMs(attempt)));
+  }
+
+  // Unreachable in practice — the loop returns once `attempt === MAX_RETRIES`.
+  return { ok: false, status: lastStatus, body: lastBody as T, error: lastError };
 }
 
 // Verify a Stripe-Signature header against the raw request body. Header
@@ -145,15 +190,22 @@ function constantTimeEqualHex(a: string, b: string): boolean {
 // AU GST is collected via a manual Stripe Tax Rate object, not via
 // automatic_tax. Manual rates work in any Stripe environment (sandbox or
 // live) without requiring the account to have business address + tax
-// registration set up first — which we cannot reliably guarantee in a
-// sandbox. The rate is created on first use and cached for the function's
-// lifetime; Stripe deduplicates on the idempotency key. Returns null if we
-// cannot create/find one — the caller should fall back to embedding GST in
-// the unit_amount so AU recipients always pay the GST-inclusive total.
+// registration set up first, which we cannot reliably guarantee in a
+// sandbox. Returns null if we cannot create/find one; the caller should
+// fall back to embedding GST in the unit_amount so AU recipients always
+// pay the GST-inclusive total.
 //
-// Used by create-checkout-session, create-quote, and (eventually)
-// create-custom-invoice. Shared here so all three converge on the same rate
-// id within a function instance.
+// Cache scope: the cached id lives in module state, which means it is
+// scoped to a single Deno isolate. Supabase Edge Functions spin up
+// multiple isolates (one per warm instance), so different invocations
+// can hit different cached values until Stripe returns the same rate
+// from the list endpoint. That's fine because Stripe deduplicates on
+// the idempotency key (`studiolab-au-gst-rate-v1`) and a list lookup
+// will converge on the existing rate after the first create. If we ever
+// need a single shared rate id across instances, persist it on
+// payment_settings instead of this module variable.
+//
+// Used by create-checkout-session, create-quote, and create-custom-invoice.
 let cachedAuGstRateId: string | null = null;
 export async function getAuGstTaxRateId(secretKey: string): Promise<string | null> {
   if (cachedAuGstRateId) return cachedAuGstRateId;

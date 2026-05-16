@@ -1293,8 +1293,19 @@ async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Pr
   const order: Record<string, number> = {
     draft: 0, sent: 1, viewed: 1, accepted: 3, declined: 2, expired: 2, cancelled: 2, revised: 2,
   };
-  if (nextStatus && (order[nextStatus] ?? 0) >= (order[current.status as string] ?? 0)) {
-    updateRow.status = nextStatus;
+  const currentStatus = current.status as string;
+  const shouldAdvance = !!nextStatus && (order[nextStatus] ?? 0) > (order[currentStatus] ?? 0);
+  if (shouldAdvance) {
+    updateRow.status = nextStatus as string;
+  } else if (nextStatus && nextStatus === currentStatus) {
+    // Same status as already recorded (e.g. create-quote stamped 'sent' and
+    // quote.finalized arrives saying 'sent' again). Skip the redundant
+    // write to keep the activity feed quieter and avoid touching
+    // updated_at for no real change.
+    for (const k of Object.keys(updateRow)) {
+      if (k === 'stripe_quote_id' || k === 'number' || k === 'hosted_url') continue;
+      if (updateRow[k] === undefined) delete updateRow[k];
+    }
   }
 
   // Clean undefined keys (we used `undefined` as a marker for "don't write").
@@ -1302,10 +1313,52 @@ async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Pr
     if (updateRow[k] === undefined) delete updateRow[k];
   }
 
-  const { error } = await sb.from('quotes').update(updateRow).eq('id', current.id);
+  // Conditional update: only write if the row's status is still what we
+  // read above. This closes the read-modify-write race where two webhook
+  // events for the same quote land within milliseconds (e.g. quote.accepted
+  // and quote.canceled). Without the .eq('status', currentStatus) filter,
+  // the later writer can downgrade a terminal status without re-evaluating
+  // the guard. PostgreSQL serialises the WHERE-matched updates, so the
+  // first writer wins and the second's update affects 0 rows. We re-read
+  // and try again so the second event can re-evaluate against the new
+  // canonical state.
+  const { data: applied, error } = await sb.from('quotes')
+    .update(updateRow)
+    .eq('id', current.id)
+    .eq('status', currentStatus)
+    .select('id');
   if (error) {
     console.error('quotes update failed:', error, { quote_id: quote.id, event: eventType });
     return;
+  }
+  if (!applied || applied.length === 0) {
+    // Lost the race. Re-read and re-evaluate so we don't silently drop the
+    // event — it might still need to advance the freshly-written status
+    // (e.g. quote.accepted arrived after quote.viewed bumped the row to
+    // 'viewed'). One retry is sufficient: if it loses again we abort and
+    // log, because that means a third event is also in flight and the
+    // ordering is genuinely ambiguous.
+    const { data: refreshed } = await sb.from('quotes')
+      .select('id, status')
+      .eq('id', current.id)
+      .maybeSingle();
+    if (!refreshed) return;
+    const refreshedStatus = refreshed.status as string;
+    const stillShouldAdvance = !!nextStatus
+      && (order[nextStatus] ?? 0) > (order[refreshedStatus] ?? 0);
+    if (!stillShouldAdvance) {
+      // The other writer's value already supersedes ours. Done.
+      return;
+    }
+    updateRow.status = nextStatus as string;
+    const { error: retryErr } = await sb.from('quotes')
+      .update(updateRow)
+      .eq('id', current.id)
+      .eq('status', refreshedStatus);
+    if (retryErr) {
+      console.error('quotes update retry failed:', retryErr, { quote_id: quote.id, event: eventType });
+      return;
+    }
   }
 
   // Phase 6.5 — quote.accepted spawns a project (status='briefing') for

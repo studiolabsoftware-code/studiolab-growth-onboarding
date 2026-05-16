@@ -28,6 +28,10 @@ import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { getCallerProfile } from '../_shared/caller.ts';
 import { getAuGstTaxRateId, getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
+import {
+  isoCountryForStripe,
+  validateCurrencyForCountry,
+} from '../_shared/recipient.ts';
 
 type LineItem = {
   description: string;
@@ -57,25 +61,6 @@ interface RequestBody {
   cover_note?: string;          // studio-facing memo shown on the quote
   description?: string;         // internal admin note
   parent_quote_id?: string;     // set when this quote replaces a prior one (revision)
-}
-
-function isoCountryForStripe(stored: string | null | undefined): string | null {
-  if (!stored) return null;
-  const c = stored.trim().toUpperCase();
-  if (c === 'UK') return 'GB';
-  if (/^[A-Z]{2}$/.test(c)) return c;
-  return null;
-}
-
-// Server-side mirror of the admin modal's currency lock. AU recipients must
-// pay AUD with GST; everyone else USD without GST. Returns null if country
-// is unknown (no enforcement — admin's modal default still applies).
-function expectedCurrencyForCountry(country: string | null | undefined): 'AUD' | 'USD' | null {
-  if (!country) return null;
-  const c = country.trim().toUpperCase();
-  if (c === 'AU' || c === 'AUS' || c === 'AUSTRALIA') return 'AUD';
-  if (/^[A-Z]{2,3}$/.test(c) || c.length > 3) return 'USD';
-  return null;
 }
 
 function badRequest(msg: string, code?: string) {
@@ -133,18 +118,15 @@ Deno.serve(async (req) => {
       recipientEmail = (sub.contact_email || '').toLowerCase();
       recipientCountryIso = isoCountryForStripe(sub.country);
       // Server-side currency/country validation. The admin modal locks the
-      // currency selector but a DOM edit can bypass that — we re-enforce
-      // here because GST handling is tax-correctness load-bearing: AU
-      // recipients must be billed AUD with GST, everyone else USD without.
-      const expectedCurrency = expectedCurrencyForCountry(sub.country);
-      if (expectedCurrency && currency !== expectedCurrency) {
-        return badRequest(
-          expectedCurrency === 'AUD'
-            ? 'Australian studios must be quoted in AUD (10% GST applies).'
-            : 'Overseas studios must be quoted in USD (no GST).',
-          'currency_country_mismatch',
-        );
-      }
+      // currency selector but a DOM edit can bypass that, so we re-enforce
+      // here because GST handling is tax-correctness load-bearing.
+      const mismatch = validateCurrencyForCountry({
+        currency,
+        country: sub.country,
+        recipientLabel: 'studio',
+        verb: 'quoted',
+      });
+      if (mismatch) return badRequest(mismatch.error, mismatch.code);
       if (sub.stripe_customer_id) {
         stripeCustomerId = sub.stripe_customer_id;
       } else {
@@ -213,18 +195,16 @@ Deno.serve(async (req) => {
       externalContactId = contactRow.id;
       recipientEmail = contactRow.email.toLowerCase();
       recipientCountryIso = isoCountryForStripe(contactRow.country);
-      // External recipient currency/country check. Only enforce when we
-      // actually know the country — admins occasionally invoice a new
-      // external contact without specifying country and that's allowed.
-      const expectedExternalCurrency = expectedCurrencyForCountry(contactRow.country);
-      if (expectedExternalCurrency && currency !== expectedExternalCurrency) {
-        return badRequest(
-          expectedExternalCurrency === 'AUD'
-            ? 'Australian recipients must be quoted in AUD (10% GST applies).'
-            : 'Overseas recipients must be quoted in USD (no GST).',
-          'currency_country_mismatch',
-        );
-      }
+      // External recipient currency/country check. Only enforced when we
+      // know the country (admins occasionally invoice a new external
+      // contact without specifying country, and that's allowed).
+      const extMismatch = validateCurrencyForCountry({
+        currency,
+        country: contactRow.country,
+        recipientLabel: 'recipient',
+        verb: 'quoted',
+      });
+      if (extMismatch) return badRequest(extMismatch.error, extMismatch.code);
       if (contactRow.stripe_customer_id) {
         stripeCustomerId = contactRow.stripe_customer_id;
       } else {
