@@ -542,7 +542,50 @@
   }
 
   // Shared row renderer used by both the per-studio panel and the global
-  // Invoices list screen. Action mix is gated on status.
+  // Invoices list screen. One primary inline action per status; everything
+  // else lives in a kebab (⋮) menu that flips above or below the button
+  // depending on viewport space. Keeps the row scannable when there are 5+
+  // possible actions per status.
+  function rowActionConfig(r, showRecipient) {
+    const isDraft = r.status === 'draft';
+    const isOpen = r.status === 'open' || r.status === 'past_due';
+    const isPaid = r.status === 'paid' || r.status === 'partially_refunded';
+
+    const primary = []; // 0–1 inline button (the most common action for this status)
+    const menu = [];    // everything else, inside the kebab
+
+    if (isDraft) {
+      primary.push({ label: 'Edit draft', act: 'edit-draft' });
+      menu.push({ label: 'Finalize and send', act: 'finalize-draft' });
+      menu.push({ divider: true });
+      menu.push({ label: 'Delete draft', act: 'delete-draft', destructive: true });
+    } else if (r.hosted_url) {
+      primary.push({ label: 'Open', href: r.hosted_url, external: true });
+    }
+
+    if (!isDraft && r.pdf_url) {
+      menu.push({ label: 'Download PDF', href: r.pdf_url, external: true });
+    }
+    if (isOpen) {
+      if (menu.length) menu.push({ divider: true });
+      menu.push({ label: 'Resend email', act: 'resend' });
+      menu.push({ label: 'Mark as paid', act: 'mark-paid' });
+      menu.push({ label: 'Revise (void + recreate)', act: 'revise' });
+      menu.push({ divider: true });
+      menu.push({ label: 'Void invoice', act: 'void', destructive: true });
+    } else if (isPaid && !r.marked_paid_manually) {
+      if (menu.length) menu.push({ divider: true });
+      menu.push({ label: 'Issue refund', act: 'refund', destructive: true });
+    }
+
+    if (showRecipient && r._isStudio) {
+      if (menu.length) menu.push({ divider: true });
+      menu.push({ label: 'View studio', studioOpenId: r.submission_id });
+    }
+
+    return { primary, menu };
+  }
+
   function renderInvoiceRow(r, opts) {
     const showRecipient = !!(opts && opts.showRecipient);
     const recipientCell = showRecipient
@@ -571,27 +614,19 @@
       : '';
 
     const isDraft = r.status === 'draft';
-    const isOpen = r.status === 'open' || r.status === 'past_due';
-    const isPaid = r.status === 'paid' || r.status === 'partially_refunded';
+    const { primary, menu } = rowActionConfig(r, showRecipient);
 
-    const acts = [];
-    if (r.hosted_url) acts.push(`<a class="btn-link" href="${ESC(r.hosted_url)}" target="_blank" rel="noopener">Open</a>`);
-    if (r.pdf_url) acts.push(`<a class="btn-link" href="${ESC(r.pdf_url)}" target="_blank" rel="noopener">PDF</a>`);
-    if (isDraft) {
-      acts.push(`<a class="btn-link" href="#" data-inv-act="edit-draft" data-inv-id="${ESC(r.id)}">Edit draft</a>`);
-      acts.push(`<a class="btn-link" href="#" data-inv-act="finalize-draft" data-inv-id="${ESC(r.id)}">Finalize and send</a>`);
-      acts.push(`<a class="btn-link" style="color:#B91C1C;" href="#" data-inv-act="delete-draft" data-inv-id="${ESC(r.id)}">Delete draft</a>`);
-    } else if (isOpen) {
-      acts.push(`<a class="btn-link" href="#" data-inv-act="resend" data-inv-id="${ESC(r.id)}">Resend</a>`);
-      acts.push(`<a class="btn-link" href="#" data-inv-act="mark-paid" data-inv-id="${ESC(r.id)}">Mark paid</a>`);
-      acts.push(`<a class="btn-link" href="#" data-inv-act="revise" data-inv-id="${ESC(r.id)}">Revise</a>`);
-      acts.push(`<a class="btn-link" style="color:#B91C1C;" href="#" data-inv-act="void" data-inv-id="${ESC(r.id)}">Void</a>`);
-    } else if (isPaid && !r.marked_paid_manually) {
-      acts.push(`<a class="btn-link" style="color:#B91C1C;" href="#" data-inv-act="refund" data-inv-id="${ESC(r.id)}">Refund</a>`);
-    }
-    if (showRecipient && r._isStudio) {
-      acts.push(`<a class="btn-link" href="#" data-inv-open-studio="${ESC(r.submission_id)}">View studio</a>`);
-    }
+    const primaryHtml = primary.map((p) => {
+      if (p.href) {
+        return `<a class="btn-link" href="${ESC(p.href)}" target="_blank" rel="noopener">${ESC(p.label)}</a>`;
+      }
+      return `<a class="btn-link" href="#" data-inv-act="${ESC(p.act)}" data-inv-id="${ESC(r.id)}">${ESC(p.label)}</a>`;
+    }).join('');
+
+    const kebabHtml = menu.length
+      ? `<button type="button" class="inv-kebab" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" data-inv-kebab="${ESC(r.id)}">⋮</button>`
+      : '';
+
     return `
       <tr>
         <td>${ESC(r.number || (isDraft ? '(draft)' : '—'))}</td>
@@ -599,8 +634,101 @@
         <td><span class="bdg ${STATUS_CLASS[r.status] || ''}">${ESC(STATUS_LABEL[r.status] || r.status)}</span></td>
         <td>${moneyFmt(r.total_cents, r.currency)}</td>
         <td style="font-size:12px;">${sentLine}${resendLine}${paidLine}${voidLine}${refundedLine}</td>
-        <td style="display:flex;gap:8px;flex-wrap:wrap;">${acts.join('')}</td>
+        <td><div class="inv-actions">${primaryHtml}${kebabHtml}</div></td>
       </tr>`;
+  }
+
+  // Kebab popover: positioned fixed against the trigger button's bounding
+  // box. Flips above when there isn't room below. One menu open at a time —
+  // re-clicking the same kebab closes it; clicking outside dismisses.
+  let activeMenu = null;
+
+  function closeKebabMenu() {
+    if (!activeMenu) return;
+    const { el, anchor, dismiss } = activeMenu;
+    document.removeEventListener('click', dismiss, true);
+    document.removeEventListener('keydown', dismiss, true);
+    window.removeEventListener('resize', dismiss, true);
+    window.removeEventListener('scroll', dismiss, true);
+    if (anchor) anchor.setAttribute('aria-expanded', 'false');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    activeMenu = null;
+  }
+
+  function openKebabMenu(anchor, items, onAction) {
+    // Toggle: re-clicking the same anchor closes the open menu.
+    if (activeMenu && activeMenu.anchor === anchor) {
+      closeKebabMenu();
+      return;
+    }
+    closeKebabMenu();
+
+    const el = document.createElement('div');
+    el.className = 'inv-menu';
+    el.setAttribute('role', 'menu');
+    el.innerHTML = items.map((it, i) => {
+      if (it.divider) return '<hr class="inv-menu-div">';
+      const klass = 'inv-menu-item' + (it.destructive ? ' destructive' : '');
+      if (it.href) {
+        return `<a class="${klass}" role="menuitem" href="${ESC(it.href)}"${it.external ? ' target="_blank" rel="noopener"' : ''}>${ESC(it.label)}</a>`;
+      }
+      return `<button type="button" class="${klass}" role="menuitem" data-i="${i}">${ESC(it.label)}</button>`;
+    }).join('');
+    document.body.appendChild(el);
+
+    // Position. Place against the kebab's right edge, flip up if too close
+    // to the viewport bottom.
+    const rect = anchor.getBoundingClientRect();
+    const menuRect = el.getBoundingClientRect();
+    const margin = 8;
+    let left = rect.right - menuRect.width;
+    if (left < margin) left = margin;
+    if (left + menuRect.width > window.innerWidth - margin) {
+      left = window.innerWidth - menuRect.width - margin;
+    }
+    let top = rect.bottom + 4;
+    if (top + menuRect.height + margin > window.innerHeight) {
+      const flipped = rect.top - menuRect.height - 4;
+      if (flipped >= margin) top = flipped;
+    }
+    el.style.top = top + 'px';
+    el.style.left = left + 'px';
+    anchor.setAttribute('aria-expanded', 'true');
+
+    el.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-i]');
+      if (!btn) return;
+      const idx = parseInt(btn.getAttribute('data-i'), 10);
+      const item = items[idx];
+      closeKebabMenu();
+      if (item && typeof onAction === 'function') onAction(item);
+    });
+    // External-link items inside the menu — close the menu on click but
+    // let the anchor's default navigation fire.
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('a.inv-menu-item')) {
+        // Allow the link to follow, then tear down on the next tick.
+        setTimeout(closeKebabMenu, 0);
+      }
+    });
+
+    function dismiss(e) {
+      if (e.type === 'keydown' && e.key === 'Escape') {
+        e.preventDefault();
+        closeKebabMenu();
+        return;
+      }
+      if (e.type === 'click' && (el.contains(e.target) || anchor.contains(e.target))) return;
+      closeKebabMenu();
+    }
+    setTimeout(() => {
+      document.addEventListener('click', dismiss, true);
+      document.addEventListener('keydown', dismiss, true);
+      window.addEventListener('resize', dismiss, true);
+      window.addEventListener('scroll', dismiss, true);
+    }, 0);
+
+    activeMenu = { el, anchor, dismiss };
   }
 
   function bindInvoiceRowActions(hostEl, onReload, rows) {
@@ -608,6 +736,18 @@
     if (hostEl._invActionsBound) return;
     hostEl._invActionsBound = true;
     hostEl.addEventListener('click', async (e) => {
+      // Kebab opens the menu.
+      const kebab = e.target.closest('[data-inv-kebab]');
+      if (kebab) {
+        e.preventDefault();
+        const id = kebab.getAttribute('data-inv-kebab');
+        const row = (hostEl._invRows || []).find((r) => r.id === id);
+        if (!row) return;
+        const { menu } = rowActionConfig(row, !!hostEl._showRecipient);
+        openKebabMenu(kebab, menu, (item) => dispatchRowItem(item, row, onReload, hostEl));
+        return;
+      }
+      // Direct inline action (primary).
       const target = e.target.closest('[data-inv-act]');
       if (!target) return;
       e.preventDefault();
@@ -615,15 +755,27 @@
       const id = target.getAttribute('data-inv-id');
       const row = (hostEl._invRows || []).find((r) => r.id === id);
       if (!row) return;
-      if (act === 'resend')         return doResendInvoice(row, onReload);
-      if (act === 'revise')         return doReviseInvoice(row, onReload, hostEl._submission || null);
-      if (act === 'edit-draft')     return doEditDraft(row, onReload, hostEl._submission || null);
-      if (act === 'finalize-draft') return doFinalizeDraftAction(row, onReload);
-      if (act === 'delete-draft')   return doDeleteDraftAction(row, onReload);
-      if (act === 'mark-paid')      return doMarkPaid(row, onReload);
-      if (act === 'refund')         return doRefund(row, onReload);
-      if (act === 'void')           return doVoidAction(row, onReload);
+      dispatchRowItem({ act }, row, onReload, hostEl);
     });
+  }
+
+  function dispatchRowItem(item, row, onReload, hostEl) {
+    if (item.studioOpenId) {
+      if (window.AdminDetail && window.AdminDetail.open) {
+        window.AdminDetail.open(item.studioOpenId, { tab: 'invoices' });
+      }
+      return;
+    }
+    const act = item.act;
+    const submission = hostEl && hostEl._submission || null;
+    if (act === 'resend')         return doResendInvoice(row, onReload);
+    if (act === 'revise')         return doReviseInvoice(row, onReload, submission);
+    if (act === 'edit-draft')     return doEditDraft(row, onReload, submission);
+    if (act === 'finalize-draft') return doFinalizeDraftAction(row, onReload);
+    if (act === 'delete-draft')   return doDeleteDraftAction(row, onReload);
+    if (act === 'mark-paid')      return doMarkPaid(row, onReload);
+    if (act === 'refund')         return doRefund(row, onReload);
+    if (act === 'void')           return doVoidAction(row, onReload);
   }
 
   // ── manage-invoice helpers ──────────────────────────────────────────────
@@ -1172,20 +1324,8 @@
           ${filtered.map((r) => renderInvoiceRow(r, { showRecipient: true })).join('')}
         </tbody>
       </table>`;
+    host._showRecipient = true;
     bindInvoiceRowActions(host, async () => { await loadListRows(); renderList(); }, filtered);
-    if (!host._invListBound) {
-      host._invListBound = true;
-      host.addEventListener('click', (e) => {
-        const studioLink = e.target.closest('[data-inv-open-studio]');
-        if (studioLink) {
-          e.preventDefault();
-          const id = studioLink.getAttribute('data-inv-open-studio');
-          if (id && window.AdminDetail && window.AdminDetail.open) {
-            window.AdminDetail.open(id, { tab: 'invoices' });
-          }
-        }
-      });
-    }
   }
 
   // Public surface
