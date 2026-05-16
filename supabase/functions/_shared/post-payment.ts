@@ -161,3 +161,73 @@ async function maybeSpawnProject(sb: Sb, ctx: PostPaymentContext): Promise<void>
     console.log(`[post-payment] spawned project ${result.project_id}`);
   }
 }
+
+// Phase 6.5 — quote.accepted → spawn project (status='briefing') for
+// external recipients only. Studios opt in per their invoice flag at the
+// downstream invoice.paid event instead. Idempotent: if the quote already
+// has project_id set, returns ok with the existing id.
+export async function spawnProjectFromQuote(
+  sb: Sb,
+  quoteId: string,
+): Promise<{ ok: true; project_id: string; was_existing: boolean } | { ok: false; reason: string }> {
+  const { data: quote } = await sb.from('quotes')
+    .select('id, project_id, submission_id, external_contact_id, currency, description, number, status, total_cents')
+    .eq('id', quoteId)
+    .maybeSingle();
+  if (!quote) return { ok: false, reason: 'Quote not found.' };
+  if (quote.project_id) return { ok: true, project_id: quote.project_id, was_existing: true };
+  if (!quote.external_contact_id) {
+    return { ok: false, reason: 'Quote-spawn restricted to external recipients (studios spawn via invoice opt-in).' };
+  }
+
+  const { data: ec } = await sb.from('external_contacts')
+    .select('name, email')
+    .eq('id', quote.external_contact_id)
+    .maybeSingle();
+  const recipientName = ec?.name || ec?.email || 'External recipient';
+  const fallbackName = `${recipientName} — ${(quote.description || `Quote ${quote.number || ''}`).trim().slice(0, 80)}`.slice(0, 120);
+
+  const desc = (quote.description || '').toLowerCase();
+  let projectType = 'service';
+  if (desc.includes('website')) projectType = 'website_build';
+  else if (desc.includes('consult')) projectType = 'consulting';
+
+  const token = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 90).toISOString();
+
+  const { data: project, error: projErr } = await sb.from('projects')
+    .insert({
+      name: fallbackName,
+      project_type: projectType,
+      status: 'briefing',
+      external_contact_id: quote.external_contact_id,
+      currency: quote.currency,
+      token,
+      token_expires_at: expiresAt,
+    })
+    .select('id')
+    .single();
+  if (projErr || !project) {
+    console.warn('[post-payment] quote-spawn project insert failed:', projErr);
+    return { ok: false, reason: projErr?.message || 'Project insert failed.' };
+  }
+
+  await sb.from('quotes').update({ project_id: project.id }).eq('id', quote.id);
+
+  try {
+    await sb.from('activity_log').insert({
+      project_id: project.id,
+      action: 'project_created',
+      actor: 'system',
+      details: {
+        project_id: project.id,
+        project_name: fallbackName,
+        spawned_from_quote_id: quote.id,
+        quote_number: quote.number,
+        trigger: 'quote_accepted',
+      },
+    });
+  } catch (_) {}
+
+  return { ok: true, project_id: project.id, was_existing: false };
+}

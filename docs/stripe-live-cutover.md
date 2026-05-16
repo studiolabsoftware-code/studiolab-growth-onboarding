@@ -126,3 +126,55 @@ If any of those checks fail, revert `stripe_mode` to **test** in admin and check
 If anything looks wrong after the cutover, flip `stripe_mode` back to **test** in admin. The webhook keeps both signing secrets, so test-mode events continue to be accepted; live-mode events keep landing too but stop being acted on by create-checkout-session.
 
 Do not delete the live webhook endpoint or the live secret unless you are abandoning the cutover entirely. Stripe will retry failed deliveries for up to three days and removing the endpoint mid-flight can leave orphan payments without bookkeeping.
+
+---
+
+## Phase 6 — PM expansion live-mode checklist
+
+Phase 6.1–6.5 added drafts, manual mark-paid, refunds, projects, deliverables, and the client-facing project page. Most of it shipped behind the same `payment_settings.stripe_mode` flag, so the original cutover above remains the headline switch. A few extra checks before flipping to live:
+
+### Stripe Tax (AU GST)
+
+Non-negotiable for AU revenue. Before flipping `stripe_mode = 'live'`:
+
+1. **Live mode → Settings → Business** — confirm the registered office address is set (street, suburb, state, postcode, AU).
+2. **Live mode → Tax** — confirm "Stripe Tax is active" with an **AU GST registration** matching your ABN and registration start date.
+3. Issue a $1.00 test invoice to a real AU studio in live mode and confirm the PDF shows the GST line at 10%. Refund immediately.
+
+`create-custom-invoice` skips `automatic_tax` in test mode (Stripe sandbox throws "must have a valid head office address" even when the dashboard reports complete). When `stripe_mode = 'live'`, automatic_tax + tax_id_collection both turn on — so if the live account isn't properly registered, the first live invoice ships with $0 GST. Verify before the first real send.
+
+### Webhook events the live endpoint must receive
+
+The Phase 6 webhook handler reacts to these in addition to the Phase 5 set:
+
+- `invoice.payment_failed` — surfaces a `payment_failed` activity row so the admin team can see declines without checking Stripe.
+- `quote.accepted` — spawns a project (status='briefing') for external recipients.
+- `quote.canceled` — handled with the existing reason discriminator.
+
+If you added these via "Select events" in the dashboard, confirm all four `invoice.*` and all four `quote.*` events are still ticked on the **live** endpoint. Default-event lists differ between test and live setup wizards.
+
+### `PUBLIC_APP_ORIGIN` for client emails
+
+The deliverable-submitted-for-review email includes a client magic-link URL pointing at `project.html`. Set the env var in Supabase (Live edge functions):
+
+- `PUBLIC_APP_ORIGIN` = `https://app.studiolabgrowth.com`
+
+Default is `https://app.studiolabgrowth.com` if the var is missing, so this is belt-and-braces.
+
+### Smoke test the project + deliverable loop
+
+End-to-end checks once live mode is on:
+
+1. Issue a small external invoice ($1 + GST) with collection_method=send_invoice. Recipient gets the Stripe hosted invoice email.
+2. Pay the invoice with a real card. Confirm:
+   - Invoice row flips to **Paid** in admin.
+   - A project auto-spawns (Projects nav → new row).
+   - `invoice_paid` activity event shows on the project's Activity feed.
+3. Open the new project, add a deliverable, click **Submit for review**. Confirm the recipient receives the "Ready for your review" email with the project URL.
+4. Open the project URL in a private browser window (no admin session). Confirm the Deliverables tab loads the card with **Approve** and **Request revisions** buttons.
+5. Click **Request revisions**, leave a note, send. Confirm:
+   - Deliverable flips to **Revisions in progress** on the client page.
+   - All admins get the "Revisions requested" email with the note embedded.
+6. Refund the original invoice via Stripe (or the admin **Refund** kebab action). Confirm the invoice flips to **Refunded** and `invoice_refunded` lands on the activity feed.
+
+If any step fails, flip `stripe_mode` back to **test** before triaging — the rollback is one toggle.

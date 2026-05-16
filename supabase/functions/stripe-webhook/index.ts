@@ -17,7 +17,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { getStripeKey, stripeRequest, verifyStripeSignature, type StripeMode } from '../_shared/stripe.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
-import { onInvoicePaid } from '../_shared/post-payment.ts';
+import { onInvoicePaid, spawnProjectFromQuote } from '../_shared/post-payment.ts';
 import {
   paymentReceiptImmediate,
   paymentReceiptHold,
@@ -1012,7 +1012,7 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
   // invoice side.
   if (ledger && classification.source === 'studiolab-growth-quote' && invoice.quote) {
     const { data: quoteRow } = await sb.from('quotes')
-      .select('id, submission_id, external_contact_id, resulting_invoice_id')
+      .select('id, submission_id, external_contact_id, resulting_invoice_id, project_id')
       .eq('stripe_quote_id', invoice.quote)
       .maybeSingle();
     if (quoteRow) {
@@ -1038,6 +1038,13 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
       }
       if (quoteRow.external_contact_id) {
         invoicePatch.external_contact_id = quoteRow.external_contact_id;
+      }
+      // Phase 6.5 — if the quote already spawned a project (quote.accepted
+      // for external recipients), link the resulting invoice to the same
+      // project. Prevents invoice.paid from re-spawning when the invoice
+      // is paid later.
+      if (quoteRow.project_id) {
+        invoicePatch.project_id = quoteRow.project_id;
       }
       await sb.from('invoices').update(invoicePatch).eq('id', ledger.id);
     }
@@ -1100,6 +1107,19 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
         currency: (invoice.currency || '').toUpperCase(),
       });
     }
+  } else if (eventType === 'invoice.payment_failed') {
+    // Surface the failure on the admin invoice list. Stripe's own dashboard
+    // is the source of truth for *why* the charge declined; we mirror the
+    // event so our timeline isn't missing a beat. The invoices row already
+    // updated to status='past_due' (or unchanged) via the status mapper above.
+    await logActivityForInvoice(sb, submissionId, 'payment_failed', {
+      invoice_id: invoice.id,
+      number: invoice.number,
+      total_cents: invoice.total,
+      currency: invoice.currency,
+      source: classification.source,
+    });
+    console.warn(`stripe-webhook: invoice.payment_failed for ${invoice.id} (${invoice.number || 'unnumbered'}); admin should review.`);
   } else if (eventType === 'invoice.voided') {
     await logActivityForInvoice(sb, submissionId, 'invoice_voided', {
       invoice_id: invoice.id,
@@ -1223,6 +1243,20 @@ async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Pr
   if (error) {
     console.error('quotes update failed:', error, { quote_id: quote.id, event: eventType });
     return;
+  }
+
+  // Phase 6.5 — quote.accepted spawns a project (status='briefing') for
+  // external recipients only. Idempotent inside spawnProjectFromQuote so
+  // event redelivery is safe.
+  if (eventType === 'quote.accepted' && current.id) {
+    try {
+      const spawnRes = await spawnProjectFromQuote(sb, current.id);
+      if (spawnRes.ok && !spawnRes.was_existing) {
+        console.log(`stripe-webhook: spawned project ${spawnRes.project_id} from quote ${quote.id}`);
+      }
+    } catch (e) {
+      console.warn('quote.accepted project spawn failed:', e);
+    }
   }
 
   // Activity log mapping. submission_id is null for external recipients.
