@@ -438,9 +438,9 @@
             <div class="proj-card-body">
               ${p.token
                 ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                    <input type="text" id="projClientUrl" readonly value="${ESC(window.location.origin + '/project/?p=' + encodeURIComponent(p.id) + '&t=' + encodeURIComponent(p.token))}" style="flex:1;min-width:280px;padding:8px 10px;border:1px solid var(--g2);border-radius:8px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--g1);">
+                    <input type="text" id="projClientUrl" readonly value="${ESC(window.location.origin + '/project.html?p=' + encodeURIComponent(p.id) + '&t=' + encodeURIComponent(p.token))}" style="flex:1;min-width:280px;padding:8px 10px;border:1px solid var(--g2);border-radius:8px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--g1);">
                     <button type="button" class="btn btn-g" id="projCopyUrl">Copy link</button>
-                    <a class="btn btn-g" href="${ESC(window.location.origin + '/project/?p=' + encodeURIComponent(p.id) + '&t=' + encodeURIComponent(p.token))}" target="_blank" rel="noopener">Preview</a>
+                    <a class="btn btn-g" href="${ESC(window.location.origin + '/project.html?p=' + encodeURIComponent(p.id) + '&t=' + encodeURIComponent(p.token))}" target="_blank" rel="noopener">Preview</a>
                   </div>
                   <div style="color:var(--g6);font-size:12px;margin-top:8px;">Anyone with this link can view the project. ${p.token_expires_at ? `Link expires ${shortDate(p.token_expires_at)}.` : ''}</div>`
                 : `<div class="adm-empty" style="padding:16px 0;">No client link yet — this project was created without a magic-link token.</div>`}

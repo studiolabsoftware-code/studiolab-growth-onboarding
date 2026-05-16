@@ -25,13 +25,18 @@
 //     needs internal approval before paying.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
-import { adminClient, sha256Hex } from '../_shared/supabase.ts';
+import { adminClient, sha256Hex, randomToken } from '../_shared/supabase.ts';
 import { getCallerProfile } from '../_shared/caller.ts';
 import { getAuGstTaxRateId, getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 import {
   isoCountryForStripe,
   validateCurrencyForCountry,
 } from '../_shared/recipient.ts';
+import { quoteClientUrl } from '../_shared/quotes.ts';
+import { quoteReadyForReview } from '../_shared/email-templates.ts';
+import { createGatedSender } from '../_shared/email-gated.ts';
+
+const TOKEN_TTL_DAYS = 90;
 
 type LineItem = {
   description: string;
@@ -158,6 +163,10 @@ Deno.serve(async (req) => {
     let externalContactId: string | null = null;
     let recipientEmail = '';
     let recipientCountryIso: string | null = null;
+    // Recipient display name for the email greeting. Studio: full name or
+    // studio name. External: name field if set, otherwise their email's
+    // local part as a fallback so we never address them as "Hi ".
+    let recipientName = '';
 
     if (recipient.type === 'studio') {
       const { data: sub } = await sb.from('submissions')
@@ -168,6 +177,10 @@ Deno.serve(async (req) => {
       submissionId = sub.id;
       recipientEmail = (sub.contact_email || '').toLowerCase();
       recipientCountryIso = isoCountryForStripe(sub.country);
+      recipientName = [sub.first_name, sub.last_name].filter(Boolean).join(' ').trim()
+        || sub.studio_name
+        || (sub.contact_email || '').split('@')[0]
+        || 'there';
       // Server-side currency/country validation. The admin modal locks the
       // currency selector but a DOM edit can bypass that, so we re-enforce
       // here because GST handling is tax-correctness load-bearing.
@@ -246,6 +259,9 @@ Deno.serve(async (req) => {
       externalContactId = contactRow.id;
       recipientEmail = contactRow.email.toLowerCase();
       recipientCountryIso = isoCountryForStripe(contactRow.country);
+      recipientName = (contactRow.name || '').trim()
+        || contactRow.email.split('@')[0]
+        || 'there';
       // External recipient currency/country check. Only enforced when we
       // know the country (admins occasionally invoice a new external
       // contact without specifying country, and that's allowed).
@@ -470,9 +486,10 @@ Deno.serve(async (req) => {
     }
     const q = finalised.body;
 
-    // Stripe builds the hosted URL and PDF after finalize. The Quote object
-    // doesn't always return them in the finalize payload, so we fetch the
-    // quote PDF endpoint metadata via a follow-up GET.
+    // Refetch the canonical quote so we have the final number + status.
+    // The Quote object has no public hosted_url; recipient access is via
+    // OUR quote portal (quote.html), authenticated by a URL token we mint
+    // below.
     const refetch = await stripeRequest<{ id: string; number: string | null; status: string; expires_at: number | null }>(
       'GET',
       `quotes/${encodeURIComponent(quoteId)}`,
@@ -481,37 +498,13 @@ Deno.serve(async (req) => {
     );
     const qFull = refetch.ok ? refetch.body : q;
 
-    // Trigger Stripe's quote email so the recipient gets it immediately
-    // rather than waiting for whatever Stripe's internal advance schedule
-    // would do. Stripe handles the email + the recipient's view-and-accept
-    // surface — there is no public hosted_url or PDF URL on the Quote
-    // object (the /v1/quotes/{id}/pdf endpoint requires API auth, so we
-    // do not expose it as a customer-facing link).
-    //
-    // CHECK THE RESPONSE: previously fire-and-forget. If Stripe rejects
-    // (e.g. customer has no email), our ledger would say status='sent'
-    // with no email actually delivered. Roll back the Stripe quote and
-    // surface to admin so they can fix the recipient and retry.
-    const sendResp = await stripeRequest(
-      'POST',
-      `quotes/${encodeURIComponent(quoteId)}/send`,
-      null,
-      secretKey,
-    );
-    if (!sendResp.ok) {
-      console.error('quotes/send failed, rolling back:', sendResp.error);
-      await stripeRequest(
-        'POST',
-        `quotes/${encodeURIComponent(quoteId)}/cancel`,
-        null,
-        secretKey,
-      );
-      return jsonResponse({
-        ok: false,
-        error: 'Could not send the quote email. Check that the recipient has an email address in Stripe and try again.',
-        code: 'send_failed',
-      }, 502);
-    }
+    // Mint a 64-char hex token + 90-day TTL for the client portal. Stored
+    // alongside the ledger row; emailed to the recipient as ?t= in the
+    // quote.html URL. portal-quote verifies it in constant time. Stripe
+    // removed POST /v1/quotes/{id}/send so the legacy email-the-recipient
+    // flow no longer exists; we email them ourselves instead.
+    const portalToken = randomToken(32);
+    const tokenExpiresAtIso = new Date(Date.now() + TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
     const hostedUrl: string | null = null;
     const pdfUrl: string | null = null;
@@ -548,6 +541,8 @@ Deno.serve(async (req) => {
         pdf_url: pdfUrl,
         description,
         cover_note: coverNote,
+        token: portalToken,
+        token_expires_at: tokenExpiresAtIso,
         created_by: caller.id,
       }, { onConflict: 'stripe_quote_id' })
       .select('id')
@@ -622,6 +617,42 @@ Deno.serve(async (req) => {
           },
         });
       } catch (e) { console.error('activity_log insert failed:', e); }
+    }
+
+    // ---- Email the recipient with a link to our quote portal. Stripe
+    // removed POST /v1/quotes/{id}/send so we email them ourselves. The
+    // token + URL are pre-computed above; the gated sender respects the
+    // test/live mode rules (STRIPE_TEST_EMAIL_RECIPIENT redirect or
+    // owner-only filter — see _shared/email-gated.ts).
+    try {
+      if (recipientEmail) {
+        const origin = Deno.env.get('PUBLIC_APP_ORIGIN') || 'https://app.studiolabgrowth.com';
+        const acceptUrl = quoteClientUrl({ origin, quoteId: ledgerRow.id, token: portalToken });
+        const amountDisplay = `${currency} $${(totalCents / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency === 'AUD' ? ' incl. GST' : ''}`;
+        const tpl = quoteReadyForReview({
+          recipientName: recipientName || 'there',
+          quoteNumber: qFull.number || '(pending)',
+          amountDisplay,
+          expiresAtIso,
+          coverNote,
+          acceptUrl,
+        });
+        const isLive = mode === 'live';
+        const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+        const send = createGatedSender({ isLive, testRecipient });
+        await send({
+          to: recipientEmail,
+          subject: tpl.subject,
+          html: tpl.html,
+          replyTo: 'info@studiolabsoftware.com',
+          intent: 'quote ready for review',
+        });
+      }
+    } catch (e) {
+      // Best-effort. The quote is in 'sent' status either way; admin can
+      // re-send manually from the panel if delivery fails (a Resend
+      // surface is on the post-Phase-6 roadmap).
+      console.error('quote ready-for-review email failed:', e);
     }
 
     // ---- Activity log: drafted → sent in one step (we send immediately).

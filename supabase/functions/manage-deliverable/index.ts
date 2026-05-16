@@ -222,7 +222,7 @@ async function notifyClientSubmittedForReview(sb: any, deliverableId: string) {
     : (project.external_contact?.name || 'there');
 
   const origin = (Deno.env.get('PUBLIC_APP_ORIGIN') || 'https://app.studiolabgrowth.com').replace(/\/$/, '');
-  const projectUrl = `${origin}/project/?p=${encodeURIComponent(project.id)}&t=${encodeURIComponent(project.token)}`;
+  const projectUrl = `${origin}/project.html?p=${encodeURIComponent(project.id)}&t=${encodeURIComponent(project.token)}`;
 
   const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
   const isLive = (settings?.stripe_mode || 'test') === 'live';

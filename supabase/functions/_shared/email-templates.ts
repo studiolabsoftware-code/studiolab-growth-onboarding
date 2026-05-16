@@ -546,6 +546,39 @@ export function inboxMessageEmail(opts: {
   return { subject: '', html: layout({ previewText: opts.previewText, body }) };
 }
 
+// Quote ready-for-review — sent by create-quote immediately after the
+// quote is finalised. Replaces the legacy Stripe-sent quote email because
+// Stripe removed POST /v1/quotes/{id}/send. The link points to our own
+// hosted quote page (quote.html), authenticated by a URL token written
+// to quotes.token at issue time.
+export function quoteReadyForReview(opts: {
+  recipientName: string;
+  studioContext?: string | null;     // e.g. "StudioLAB Growth team" — appears in the body
+  quoteNumber: string;
+  amountDisplay: string;             // pre-formatted, e.g. "AUD $7,150.00 incl. GST"
+  expiresAtIso: string;              // ISO date for "valid until X" line
+  coverNote?: string | null;         // admin-set scope note, shown verbatim
+  acceptUrl: string;                 // quote.html?q=…&t=…
+}): { subject: string; html: string } {
+  const subject = `Your quote from StudioLAB: ${opts.quoteNumber}`;
+  const expiresDisplay = (() => {
+    try { return new Date(opts.expiresAtIso).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }); }
+    catch (_) { return opts.expiresAtIso; }
+  })();
+  const noteBlock = opts.coverNote && opts.coverNote.trim()
+    ? `<div style="background:${COL.g1};border:1px solid ${COL.g2};border-radius:10px;padding:14px 16px;margin:0 0 18px;font-size:14px;line-height:1.55;white-space:pre-wrap;">${escape(opts.coverNote.trim())}</div>`
+    : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your quote is ready</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.recipientName)},</p>
+    <p style="margin:0 0 14px;">Quote <strong>${escape(opts.quoteNumber)}</strong> for <strong>${escape(opts.amountDisplay)}</strong> is ready for you to review.</p>
+    ${noteBlock}
+    <p style="margin:0 0 14px;">Open the link below to view the full breakdown, download the PDF, and accept or decline.</p>
+    ${cta('Review and accept your quote', opts.acceptUrl)}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">This quote is valid until ${escape(expiresDisplay)}. Reply to this email if you have any questions.</p>`;
+  return { subject, html: layout({ previewText: `Quote ${opts.quoteNumber} for ${opts.amountDisplay} is ready for review.`, body }) };
+}
+
 // Quote nudge — sent 7 days after the quote was issued if the recipient
 // hasn't accepted or declined. Soft tone; no scarcity. The quote's hosted
 // link comes from the Stripe-sent quote email, so we point the recipient

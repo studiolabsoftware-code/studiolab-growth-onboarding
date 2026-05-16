@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>Your quote — StudioLAB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/form.css">
+<link rel="stylesheet" href="css/portal.css?v=20260513a">
+<style>
+  /* Local layout for the quote portal — mirrors project.html shape so
+     recipients on multiple pages see one StudioLAB look. */
+  :root {
+    --st-ok-fg: #047857;  --st-ok-bg: #D1FAE5;
+    --st-warn-fg: #B45309; --st-warn-bg: #FEF3C7;
+    --st-info-fg: #1E40AF; --st-info-bg: #DBEAFE;
+    --st-crit-fg: #B91C1C; --st-crit-bg: #FEE2E2;
+  }
+  .q-wrap { max-width: 760px; margin: 32px auto 80px; padding: 0 16px; }
+  .q-hero { background: var(--in-d); color: #fff; border-radius: 14px; padding: 28px 30px; margin-bottom: 18px; }
+  .q-hero-kicker { font-size: 11px; letter-spacing: 0.6px; text-transform: uppercase; color: rgba(255,255,255,0.7); font-weight: 600; margin-bottom: 8px; }
+  .q-hero h1 { font-size: 26px; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.4px; }
+  .q-hero-meta { font-size: 14px; color: rgba(255,255,255,0.85); display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .q-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; }
+  .q-pill-sent { background: var(--st-info-bg); color: var(--st-info-fg); }
+  .q-pill-accepted { background: var(--st-ok-bg); color: var(--st-ok-fg); }
+  .q-pill-declined, .q-pill-cancelled { background: var(--st-crit-bg); color: var(--st-crit-fg); }
+  .q-pill-expired, .q-pill-revised { background: var(--g2); color: var(--g6); }
+  .q-card { background: #fff; border: 1px solid var(--g2); border-radius: 14px; padding: 22px 24px; margin-bottom: 18px; box-shadow: 0 4px 22px rgba(19,16,46,.06); }
+  .q-card h2 { font-size: 14px; font-weight: 700; color: var(--g6); margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .q-note { white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: var(--in-d); }
+  .q-lines { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .q-lines th { text-align: left; font-weight: 600; color: var(--g6); padding: 8px 8px 8px 0; border-bottom: 1px solid var(--g2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .q-lines td { padding: 10px 8px 10px 0; border-bottom: 1px solid var(--g1); vertical-align: top; }
+  .q-lines tr:last-child td { border-bottom: 0; }
+  .q-lines .q-amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .q-totals { margin-top: 12px; font-size: 14px; }
+  .q-totals-row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .q-totals-row-mute { color: var(--g6); font-size: 13px; }
+  .q-totals-row-total { font-weight: 700; border-top: 1px solid var(--g2); padding-top: 8px; margin-top: 4px; }
+  .q-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .q-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer; border: 0; font-family: inherit; text-decoration: none; }
+  .q-btn-accept { background: var(--mg); color: #fff; }
+  .q-btn-accept:hover { background: var(--mg-d, var(--mg)); }
+  .q-btn-decline { background: #fff; color: var(--g6); border: 1px solid var(--g2); }
+  .q-btn-decline:hover { color: var(--rd); border-color: var(--rd); }
+  .q-btn-pdf { background: var(--g1); color: var(--in-d); border: 1px solid var(--g2); }
+  .q-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .q-state { text-align: center; padding: 40px 20px; color: var(--g6); }
+  .q-error { background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; font-size: 13px; }
+  .q-success { background: var(--st-ok-bg); border: 1px solid #6EE7B7; color: var(--st-ok-fg); border-radius: 10px; padding: 16px 18px; margin: 0 0 18px; font-size: 14px; line-height: 1.55; }
+  .q-foot { text-align: center; margin-top: 28px; color: var(--g6); font-size: 12px; line-height: 1.6; }
+  .q-decline-form { margin-top: 10px; padding: 14px 16px; background: var(--g1); border-radius: 10px; }
+  .q-decline-form textarea { width: 100%; min-height: 80px; padding: 10px 12px; border: 1px solid var(--g2); border-radius: 8px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; }
+  .q-decline-form .q-acts { margin-top: 10px; }
+</style>
+<link rel="icon" type="image/png" href="/assets/studiolab-icon.png">
+<link rel="apple-touch-icon" href="/assets/studiolab-icon.png">
+</head>
+<body class="portal-body">
+
+<header class="portal-hdr">
+  <div class="portal-hdr-inner">
+    <a class="portal-logo" href="#" aria-label="StudioLAB">
+      <img src="assets/growth-logo-white.svg" alt="StudioLAB">
+    </a>
+    <div class="portal-studio-name" id="qRecipient"></div>
+    <div class="portal-spacer"></div>
+  </div>
+</header>
+
+<section id="qErrorView" class="q-wrap" style="display:none">
+  <div class="q-card">
+    <h1 style="margin:0 0 12px; color: var(--in-d);">This quote link is no longer valid</h1>
+    <p style="margin:0 0 12px;">The link in your email may have expired or already been used. Open the most recent email from us and click the <strong>Review and accept your quote</strong> link again.</p>
+    <p style="color: var(--g6); font-size: 13px; margin:0;">If you cannot find a recent email, reply to <a href="mailto:info@studiolabsoftware.com" style="color: var(--in); font-weight: 600;">info@studiolabsoftware.com</a> and we will send you a fresh link.</p>
+  </div>
+</section>
+
+<main id="qMain" class="q-wrap" style="display:none">
+  <div class="q-hero">
+    <div class="q-hero-kicker">Quote</div>
+    <h1 id="qNumber">—</h1>
+    <div class="q-hero-meta">
+      <span id="qTotalDisplay">—</span>
+      <span aria-hidden="true">·</span>
+      <span id="qStatusPill" class="q-pill q-pill-sent">Open</span>
+    </div>
+  </div>
+
+  <div id="qSuccessBox" class="q-success" style="display:none"></div>
+
+  <div id="qNoteCard" class="q-card" style="display:none">
+    <h2>Cover note</h2>
+    <div class="q-note" id="qNote"></div>
+  </div>
+
+  <div class="q-card">
+    <h2>Breakdown</h2>
+    <table class="q-lines">
+      <thead>
+        <tr><th>Description</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Amount</th></tr>
+      </thead>
+      <tbody id="qLines"></tbody>
+    </table>
+    <div class="q-totals">
+      <div class="q-totals-row q-totals-row-mute"><span>Subtotal</span><span id="qSubtotal">—</span></div>
+      <div class="q-totals-row q-totals-row-mute"><span id="qTaxLabel">Tax</span><span id="qTax">—</span></div>
+      <div class="q-totals-row q-totals-row-total"><span>Total</span><span id="qTotal">—</span></div>
+    </div>
+  </div>
+
+  <div class="q-card" id="qActionsCard">
+    <h2>What happens next</h2>
+    <p id="qActionsCopy" style="margin:0 0 6px; line-height: 1.55;">Click <strong>Accept</strong> to confirm this scope. We will email you the invoice with a Pay link immediately. Click <strong>Decline</strong> if you have changed your mind or want to discuss changes.</p>
+    <p style="margin:0 0 14px; color: var(--g6); font-size: 12px;" id="qExpiryLine"></p>
+    <div class="q-acts">
+      <button type="button" class="q-btn q-btn-accept" id="qAcceptBtn">Accept this quote</button>
+      <button type="button" class="q-btn q-btn-decline" id="qDeclineToggle">Decline</button>
+      <a href="#" class="q-btn q-btn-pdf" id="qPdfLink" target="_blank" rel="noopener">Download PDF</a>
+    </div>
+    <div class="q-decline-form" id="qDeclineForm" style="display:none">
+      <label for="qDeclineReason" style="display:block; font-size:13px; margin-bottom:6px; color: var(--g6);">Tell us why (optional) — helps us send a better next quote.</label>
+      <textarea id="qDeclineReason" placeholder="e.g. Pricing is out of scope right now"></textarea>
+      <div class="q-acts">
+        <button type="button" class="q-btn q-btn-decline" id="qDeclineConfirmBtn">Confirm decline</button>
+        <button type="button" class="q-btn q-btn-pdf" id="qDeclineCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="q-foot">
+    Questions? Reply to your quote email or message <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.
+  </div>
+</main>
+
+<section id="qLoadingView" class="q-wrap">
+  <div class="q-state">Loading your quote…</div>
+</section>
+
+<script>
+(function () {
+  'use strict';
+  const FN = 'https://hiaruvsdamggenhqdvtp.supabase.co/functions/v1/';
+  const ANON = 'sb_publishable_ymvaM_o9GFa-aMjrYd2Uqw_9uw4lT6B';
+
+  const params = new URLSearchParams(window.location.search);
+  const quoteId = (params.get('q') || '').trim();
+  const token = (params.get('t') || '').trim();
+
+  const $ = (id) => document.getElementById(id);
+  const show = (id) => { const e = $(id); if (e) e.style.display = ''; };
+  const hide = (id) => { const e = $(id); if (e) e.style.display = 'none'; };
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function money(cents, ccy) {
+    return (cents / 100).toLocaleString('en-AU', { style: 'currency', currency: ccy || 'AUD' });
+  }
+  function dayFmt(iso) {
+    try { return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }); }
+    catch (_) { return iso; }
+  }
+
+  async function call(action, extra) {
+    const resp = await fetch(FN + 'portal-quote', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': ANON,
+        'Authorization': 'Bearer ' + ANON,
+      },
+      body: JSON.stringify({ action, quote_id: quoteId, token, ...(extra || {}) }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    return { ok: resp.ok, status: resp.status, data };
+  }
+
+  function showError(msg) {
+    hide('qLoadingView');
+    hide('qMain');
+    show('qErrorView');
+    if (msg) {
+      const card = document.querySelector('#qErrorView .q-card');
+      if (card) {
+        const p = document.createElement('p');
+        p.className = 'q-error';
+        p.style.marginTop = '14px';
+        p.textContent = msg;
+        card.appendChild(p);
+      }
+    }
+  }
+
+  function render(q) {
+    hide('qLoadingView');
+    show('qMain');
+
+    $('qRecipient').textContent = q.recipient_label || '';
+    $('qNumber').textContent = q.number || '(pending)';
+    $('qTotalDisplay').textContent = money(q.total_cents, q.currency) + (q.currency === 'AUD' ? ' incl. GST' : '');
+
+    const statusLabel = {
+      draft: 'Draft', sent: 'Open', viewed: 'Open', accepted: 'Accepted',
+      declined: 'Declined', expired: 'Expired', cancelled: 'Withdrawn', revised: 'Replaced',
+    }[q.status] || q.status;
+    const pill = $('qStatusPill');
+    pill.textContent = statusLabel;
+    pill.className = 'q-pill q-pill-' + q.status;
+
+    if (q.cover_note && q.cover_note.trim()) {
+      $('qNote').textContent = q.cover_note;
+      show('qNoteCard');
+    }
+
+    const linesHtml = (q.line_items || []).map((li) => `
+      <tr>
+        <td>${esc(li.description)}</td>
+        <td class="q-amt">${esc(li.quantity)}</td>
+        <td class="q-amt">${money(li.amount_cents, q.currency)}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="3" style="color:var(--g6); padding:14px 0;">No line items returned.</td></tr>`;
+    $('qLines').innerHTML = linesHtml;
+
+    $('qSubtotal').textContent = money(q.subtotal_cents, q.currency);
+    $('qTax').textContent = money(q.tax_cents || 0, q.currency);
+    $('qTaxLabel').textContent = q.currency === 'AUD' ? 'GST (10%)' : 'Tax';
+    $('qTotal').textContent = money(q.total_cents, q.currency);
+
+    if (q.expires_at) {
+      $('qExpiryLine').textContent = 'Valid until ' + dayFmt(q.expires_at) + '.';
+    }
+
+    // Read-only modes for terminal statuses.
+    if (q.terminal_status) {
+      $('qActionsCard').querySelector('.q-acts').style.display = 'none';
+      $('qExpiryLine').style.display = 'none';
+      const msg = q.status === 'accepted'
+        ? 'You accepted this quote on ' + dayFmt(q.accepted_at || q.sent_at) + '. We have emailed you the invoice with a Pay link.'
+        : q.status === 'declined'
+        ? 'This quote was declined on ' + dayFmt(q.declined_at || q.sent_at) + '. Reply to the email if you want to revisit it.'
+        : 'This quote is ' + statusLabel.toLowerCase() + '. Reply to the email if you want a fresh quote.';
+      $('qActionsCopy').textContent = msg;
+    }
+
+    // PDF link goes through get-quote-pdf with the same token. Wire as a
+    // click handler so we can stream and trigger download via JS.
+    $('qPdfLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const resp = await fetch(FN + 'get-quote-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': ANON,
+            'Authorization': 'Bearer ' + ANON,
+          },
+          body: JSON.stringify({ quote_id: q.id, session_token: token }),
+        });
+        if (!resp.ok) {
+          alert('Could not download the PDF right now. Please try again in a moment.');
+          return;
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (q.number || 'quote') + '.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      } catch (err) {
+        alert('Could not download the PDF: ' + (err && err.message || err));
+      }
+    });
+  }
+
+  async function doAccept() {
+    const btn = $('qAcceptBtn');
+    btn.disabled = true;
+    btn.textContent = 'Recording your acceptance…';
+    const r = await call('accept');
+    if (!r.ok) {
+      btn.disabled = false;
+      btn.textContent = 'Accept this quote';
+      const box = $('qSuccessBox');
+      box.className = 'q-error';
+      box.style.display = '';
+      box.textContent = (r.data && r.data.error) || 'Something went wrong. Please try again.';
+      return;
+    }
+    const box = $('qSuccessBox');
+    box.className = 'q-success';
+    box.style.display = '';
+    box.innerHTML = '<strong>Quote accepted.</strong> We are sending you the invoice email now — check your inbox in the next minute or two. The invoice has a Pay link you can use straight away.';
+    location.reload();
+  }
+
+  async function doDecline() {
+    const reason = $('qDeclineReason').value.trim();
+    const btn = $('qDeclineConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = 'Recording…';
+    const r = await call('decline', reason ? { reason } : {});
+    if (!r.ok) {
+      btn.disabled = false;
+      btn.textContent = 'Confirm decline';
+      alert((r.data && r.data.error) || 'Something went wrong. Please try again.');
+      return;
+    }
+    const box = $('qSuccessBox');
+    box.className = 'q-success';
+    box.style.display = '';
+    box.style.background = 'var(--g1)';
+    box.style.color = 'var(--g6)';
+    box.style.borderColor = 'var(--g2)';
+    box.innerHTML = '<strong>Thanks — quote declined.</strong> If you change your mind or want a revised quote, reply to the original email.';
+    location.reload();
+  }
+
+  async function boot() {
+    if (!quoteId || !token) {
+      showError('The link is missing required fields.');
+      return;
+    }
+    try {
+      const r = await call('load');
+      if (!r.ok) {
+        showError((r.data && r.data.error) || 'Could not load this quote.');
+        return;
+      }
+      render(r.data.quote);
+
+      $('qAcceptBtn').addEventListener('click', doAccept);
+      $('qDeclineToggle').addEventListener('click', () => {
+        $('qDeclineForm').style.display = '';
+        $('qDeclineReason').focus();
+      });
+      $('qDeclineCancelBtn').addEventListener('click', () => {
+        $('qDeclineForm').style.display = 'none';
+      });
+      $('qDeclineConfirmBtn').addEventListener('click', doDecline);
+    } catch (err) {
+      console.error('quote portal boot failed', err);
+      showError('Could not load this quote.');
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

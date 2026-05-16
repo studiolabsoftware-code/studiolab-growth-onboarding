@@ -48,8 +48,13 @@ function constantTimeEq(a: string, b: string): boolean {
 }
 
 // Public client-link URL for a project. Used by the admin UI to surface the
-// magic link for sharing, and by future invite-email senders.
+// magic link for sharing, and by deliverable-event emails.
+//
+// IMPORTANT: path is `/project.html` (not `/project/`). GitHub Pages only
+// serves /foo/ when /foo/index.html exists, which it doesn't here — the
+// clean-folder URL was returning 404 for every recipient. Latent bug
+// surfaced during the 2026-05-17 smoke.
 export function projectClientUrl(opts: { origin: string; projectId: string; token: string }): string {
   const base = opts.origin.replace(/\/$/, '');
-  return `${base}/project/?p=${encodeURIComponent(opts.projectId)}&t=${encodeURIComponent(opts.token)}`;
+  return `${base}/project.html?p=${encodeURIComponent(opts.projectId)}&t=${encodeURIComponent(opts.token)}`;
 }
