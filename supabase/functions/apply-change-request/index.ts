@@ -5,8 +5,9 @@
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
-import { sendEmail } from '../_shared/mailgun.ts';
 import { changeCompletedAdmin } from '../_shared/email-templates.ts';
+import { createGatedSender } from '../_shared/email-gated.ts';
+import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
 
 // Allowlist of columns that may be updated via the magic-link flow. Kept in
 // sync with FIELDS in js/update.js.
@@ -88,17 +89,22 @@ Deno.serve(async (req) => {
     } catch (e) { console.error('system message (change_request_completed) failed:', e); }
 
     // Notify admins (best-effort; do not fail the request if email fails).
+    // Mode-aware: live -> all active admins, test -> owner-only.
     try {
       const { data: sub } = await sb.from('submissions').select('studio_name').eq('id', cr.submission_id).single();
-      const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
-      if (admins && admins.length) {
+      const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+      const isLive = (settings?.stripe_mode || 'test') === 'live';
+      const adminTo = await resolveAdminNotificationRecipients(sb, isLive);
+      if (adminTo.length) {
         const appUrl = Deno.env.get('ADMIN_APP_URL') || '';
         const t = changeCompletedAdmin({
           studioName: sub?.studio_name || 'A studio',
           adminUrl: `${appUrl}?id=${cr.submission_id}`,
           fields: Object.keys(patch),
         });
-        await sendEmail({ to: admins.map((a) => a.email), subject: t.subject, html: t.html });
+        const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+        const send = createGatedSender({ isLive, testRecipient });
+        await send({ to: adminTo, subject: t.subject, html: t.html, intent: 'admin change request completed' });
       }
     } catch (e) {
       console.warn('Admin notification email failed:', e);

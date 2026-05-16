@@ -122,7 +122,15 @@ Deno.serve(async (req) => {
     // --------------------------------------------------------------------
     const isInternalNote = msg.sender_role === 'admin' && msg.visibility === 'internal';
     const excludeId = msg.sender_role === 'admin' ? msg.sender_admin_id : null;
-    const recipients = await resolveAdminRecipients(sb, conv.id, conv.submission_id, excludeId);
+    let recipients = await resolveAdminRecipients(sb, conv.id, conv.submission_id, excludeId);
+    // Test-mode filter: collapse the admin fanout to owners only so VAs
+    // aren't pinged for sandbox threads. Live mode keeps the existing
+    // assignment + subscription logic intact.
+    const { data: pmSettings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+    const isLive = (pmSettings?.stripe_mode || 'test') === 'live';
+    if (!isLive) {
+      recipients = recipients.filter((r) => r.role === 'owner');
+    }
     if (recipients.length === 0) {
       return jsonResponse({ ok: true, skipped: 'no subscribed admins' });
     }

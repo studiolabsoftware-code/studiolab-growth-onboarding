@@ -16,6 +16,7 @@ import { adminClient } from '../_shared/supabase.ts';
 import { verifyProjectToken } from '../_shared/projects.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
 import { deliverableApprovedAdmin, deliverableRevisionsRequestedAdmin } from '../_shared/email-templates.ts';
+import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
 
 interface RequestBody {
   action:
@@ -416,8 +417,10 @@ async function notifyAdminsOfDeliverableEvent(
       || 'Client')
     : (project.external_contact?.name || project.external_contact?.email || 'Client');
 
-  const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
-  const to = (admins || []).map((a: { email: string }) => a.email).filter(Boolean);
+  // Mode-aware admin fanout: live -> all active admins, test -> owner-only.
+  const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+  const isLive = (settings?.stripe_mode || 'test') === 'live';
+  const to = await resolveAdminNotificationRecipients(sb, isLive);
   if (to.length === 0) return;
 
   const adminOrigin = (Deno.env.get('ADMIN_APP_URL') || 'https://app.studiolabgrowth.com/admin/').replace(/\/$/, '/');

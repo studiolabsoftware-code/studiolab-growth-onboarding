@@ -26,6 +26,7 @@ import {
   adminInvoicePaymentFailed,
 } from '../_shared/email-templates.ts';
 import { createGatedSender } from '../_shared/email-gated.ts';
+import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
 
 const PLAN_LABEL: Record<string, string> = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
 const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guided' };
@@ -542,10 +543,11 @@ async function sendPaymentReceiptsOnce(
 
   // Admin notification. Pull the full submission row so the email digest
   // contains every field — VAs can copy-paste straight from the email into
-  // GHL without round-tripping to the admin UI.
+  // GHL without round-tripping to the admin UI. Recipient list is
+  // mode-aware: live -> all active admins, test -> owner-only.
   try {
-    const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
-    if (admins && admins.length) {
+    const adminTo = await resolveAdminNotificationRecipients(sb, isLive);
+    if (adminTo.length) {
       const { data: fullRow } = await sb.from('submissions')
         .select('*')
         .eq('id', args.submissionId)
@@ -575,7 +577,7 @@ async function sendPaymentReceiptsOnce(
         submission: fullRow || undefined,
         attachments,
       });
-      await sendGated({ to: admins.map((a) => a.email), subject: t.subject, html: t.html, intent: 'admin notification' });
+      await sendGated({ to: adminTo, subject: t.subject, html: t.html, intent: 'admin notification' });
     }
   } catch (e) { console.error('admin notification failed:', e); }
 
@@ -971,8 +973,12 @@ async function notifyAdminsInvoicePaymentFailed(
 ): Promise<void> {
   if (!ledgerRef) return;
 
-  const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
-  const to = (admins || []).map((a: { email: string }) => a.email).filter(Boolean);
+  // Mode-aware admin fanout. Test mode -> owner-only so VAs aren't pinged
+  // for sandbox failures; live mode -> every active admin. Read settings
+  // once and pass the same isLive down to the gated sender below.
+  const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+  const isLive = (settings?.stripe_mode || 'test') === 'live';
+  const to = await resolveAdminNotificationRecipients(sb, isLive);
   if (to.length === 0) return;
 
   // upsertInvoiceLedger only returns id + external_contact_id; fetch the
@@ -1021,8 +1027,6 @@ async function notifyAdminsInvoicePaymentFailed(
     adminUrl,
   });
 
-  const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
-  const isLive = (settings?.stripe_mode || 'test') === 'live';
   const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
   const send = createGatedSender({ isLive, testRecipient });
 
@@ -1295,10 +1299,14 @@ async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Pr
     if (eventType === 'quote.canceled') {
       try {
         const { adminQuoteCanceledOrphan } = await import('../_shared/email-templates.ts');
-        const { data: admins } = await sb.from('admin_users')
-          .select('email')
-          .eq('is_active', true);
-        if (admins && admins.length) {
+        // Self-contained gated sender: handleQuoteUpdate doesn't have
+        // access to the per-checkout sendGated. Same gating logic — test
+        // mode without STRIPE_TEST_EMAIL_RECIPIENT falls back to the
+        // real recipient, and admin fanout is owner-only in test mode.
+        const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+        const isLive = (settings?.stripe_mode || 'test') === 'live';
+        const adminTo = await resolveAdminNotificationRecipients(sb, isLive);
+        if (adminTo.length) {
           const adminUrl = Deno.env.get('ADMIN_APP_URL') || '';
           const recipientHint = (quote as { customer_email?: string | null }).customer_email
             || (quote.metadata?.email as string | undefined)
@@ -1309,16 +1317,10 @@ async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Pr
             recipientHint,
             adminUrl,
           });
-          // Self-contained gated sender: handleQuoteUpdate doesn't have
-          // access to the per-checkout sendGated. Same gating logic — test
-          // mode without STRIPE_TEST_EMAIL_RECIPIENT falls back to the
-          // real recipient.
-          const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
-          const isLive = (settings?.stripe_mode || 'test') === 'live';
           const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
           const send = createGatedSender({ isLive, testRecipient });
           await send({
-            to: admins.map((a) => a.email),
+            to: adminTo,
             subject: tpl.subject,
             html: tpl.html,
             intent: 'orphan quote cancel',

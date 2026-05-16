@@ -37,6 +37,7 @@ import {
   quoteAutoCancelDigest,
   type AutoCancelDigestRow,
 } from '../_shared/email-templates.ts';
+import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
 
 const NUDGE_AFTER_DAYS = 7;
 const EXPIRY_WARNING_WITHIN_DAYS = 5;
@@ -316,16 +317,14 @@ Deno.serve(async (req) => {
     // backlog burns down).
     if (cancelDigest.length > 0) {
       try {
-        const { data: admins } = await sb.from('admin_users')
-          .select('email')
-          .eq('is_active', true);
-        if (admins && admins.length) {
+        // Mode-aware admin fanout: live -> all active admins, test ->
+        // owner-only (no VA noise from sandbox sweeps).
+        const adminTo = await resolveAdminNotificationRecipients(sb, isLive);
+        if (adminTo.length) {
           const adminUrl = Deno.env.get('ADMIN_APP_URL') || '';
           const tpl = quoteAutoCancelDigest({ rows: cancelDigest, adminUrl });
-          // Digest goes to all active admins. Same gating as the other
-          // emails in this function.
-          await Promise.all(admins.map((a) =>
-            gatedSend(a.email, tpl.subject, tpl.html, 'admin auto-cancel digest')));
+          await Promise.all(adminTo.map((email) =>
+            gatedSend(email, tpl.subject, tpl.html, 'admin auto-cancel digest')));
         }
       } catch (e) {
         console.error('auto-cancel digest send failed:', e);

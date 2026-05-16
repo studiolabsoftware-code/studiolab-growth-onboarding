@@ -8,8 +8,9 @@
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
-import { sendEmail } from '../_shared/mailgun.ts';
 import { submissionConfirmation, adminNewSubmission } from '../_shared/email-templates.ts';
+import { createGatedSender } from '../_shared/email-gated.ts';
+import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
 
 const PLAN_LABEL: Record<string, string> = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
 const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guided' };
@@ -95,19 +96,29 @@ Deno.serve(async (req) => {
       const ref = String(saved.id).replace(/-/g, '').substring(0, 8).toUpperCase();
       const finalRow = { ...row, ...update };
 
+      // Resolve gating once: test mode redirects through the gate's
+      // single test inbox (when STRIPE_TEST_EMAIL_RECIPIENT is set) and
+      // restricts admin fanout to owners (so VAs aren't spammed by smoke
+      // tests). Live mode delivers to the real recipient list.
+      const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+      const isLive = (settings?.stripe_mode || 'test') === 'live';
+      const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+      const sendGated = createGatedSender({ isLive, testRecipient });
+
       try {
         const t = submissionConfirmation({ studioName: finalRow.studio_name || 'there', ref });
-        await sendEmail({
+        await sendGated({
           to: row.contact_email,
           subject: t.subject,
           html: t.html,
           replyTo: 'info@studiolabsoftware.com',
+          intent: 'studio submission confirmation',
         });
       } catch (e) { console.error('confirmation email failed:', e); }
 
       try {
-        const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
-        if (admins && admins.length) {
+        const adminTo = await resolveAdminNotificationRecipients(sb, isLive);
+        if (adminTo.length) {
           const appUrl = Deno.env.get('ADMIN_APP_URL') || '';
           const t = adminNewSubmission({
             studioName: finalRow.studio_name || '(no name)',
@@ -117,7 +128,12 @@ Deno.serve(async (req) => {
             // Full row drives the copy-friendly digest embedded in the email.
             submission: finalRow as Record<string, unknown>,
           });
-          await sendEmail({ to: admins.map((a) => a.email), subject: t.subject, html: t.html });
+          await sendGated({
+            to: adminTo,
+            subject: t.subject,
+            html: t.html,
+            intent: 'admin new submission',
+          });
         }
       } catch (e) { console.error('admin notification failed:', e); }
 

@@ -11,6 +11,7 @@ import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
 import { submissionConfirmation, adminNewSubmission } from '../_shared/email-templates.ts';
+import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
 
 const PLAN_LABEL: Record<string, string> = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
 const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guided' };
@@ -71,12 +72,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Notify all active admins. The full submission row + attachment list
+    // Notify active admins. Live mode: every active admin. Test mode:
+    // owner-only — so smoke tests and sandbox flows don't spam VAs with
+    // non-real submissions. The full submission row + attachment list
     // are passed so the email digest is the VA's "everything in one place"
     // copy-paste surface. Attachment download links route through the admin
     // app URL so admins click → land in the panel → click Download.
-    const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
-    if (admins && admins.length) {
+    const adminTo = await resolveAdminNotificationRecipients(sb, isLive);
+    if (adminTo.length) {
       const { data: attachmentsRaw } = await sb.from('submission_attachments_view')
         .select('id, file_name, mime_type, size_bytes, uploaded_at, expires_at')
         .eq('submission_id', row.id)
@@ -100,7 +103,7 @@ Deno.serve(async (req) => {
         attachments,
       });
       await sendGated({
-        to: admins.map((a) => a.email), subject: t.subject, html: t.html,
+        to: adminTo, subject: t.subject, html: t.html,
         intent: 'admin new submission',
       });
     }
