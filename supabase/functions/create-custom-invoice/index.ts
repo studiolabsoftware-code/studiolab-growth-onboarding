@@ -52,6 +52,11 @@ interface RequestBody {
   due_in_days?: number;        // for send_invoice mode; default 14
   description?: string;        // internal note shown on the invoice
   memo?: string;               // recipient-facing memo on the invoice
+  // When true, create the Stripe invoice as a draft (line items attached,
+  // not finalized, not sent). The admin UI uses this to park an invoice for
+  // edit-and-send-later. Drafts are surfaced in the admin invoice list and
+  // finalised via manage-invoice action='finalize-draft'.
+  save_as_draft?: boolean;
 }
 
 function isoCountryForStripe(stored: string | null | undefined): string | null {
@@ -93,6 +98,7 @@ Deno.serve(async (req) => {
     const dueInDays = body.due_in_days ?? 14;
     const description = (body.description || '').trim() || null;
     const memo = (body.memo || '').trim() || null;
+    const saveAsDraft = body.save_as_draft === true;
 
     if (!recipient) return badRequest('Recipient is required.');
     if (currency !== 'AUD' && currency !== 'USD') return badRequest('Currency must be AUD or USD.');
@@ -334,8 +340,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ---- Finalise. After this the invoice has a number, hosted URL, PDF.
-    const finalised = await stripeRequest<{
+    // ---- Finalise (or, when save_as_draft, just fetch the draft totals).
+    // Drafts skip /finalize and /send entirely. The line items are already
+    // attached above, so Stripe holds the draft and we mirror it into the
+    // ledger with status='draft'. The admin UI surfaces the draft and uses
+    // manage-invoice action='finalize-draft' (Phase 6.1) to issue it later.
+    type StripeInvoiceShape = {
       id: string;
       number: string | null;
       status: string;
@@ -348,37 +358,67 @@ Deno.serve(async (req) => {
       amount_remaining: number;
       due_date: number | null;
       status_transitions?: { finalized_at?: number | null };
-    }>('POST', `invoices/${encodeURIComponent(invoiceId)}/finalize`, {
-      auto_advance: collectionMethod === 'send_invoice',
-    }, secretKey, `${idempotencyBase}-finalize`);
-    if (!finalised.ok) {
-      return jsonResponse({ ok: false, error: finalised.error || 'Stripe invoice finalize failed.' }, 502);
-    }
-    const inv = finalised.body;
+    };
 
-    // ---- send_invoice: explicitly send the email now. (auto_advance also
-    // schedules it, but calling /send guarantees the email is dispatched
-    // immediately rather than on Stripe's internal advance schedule.)
-    // Capture whether the send succeeded so we can stamp email_sent_at on
-    // the ledger row below — gives the admin UI a clean "this went out at
-    // <time>" signal instead of inferring from finalized_at.
+    let inv: StripeInvoiceShape;
     let emailSentAtIso: string | null = null;
-    if (collectionMethod === 'send_invoice') {
-      const sendRes = await stripeRequest('POST', `invoices/${encodeURIComponent(invoiceId)}/send`, {}, secretKey);
-      if (sendRes.ok) {
-        emailSentAtIso = new Date().toISOString();
-      } else {
-        console.warn('Stripe /send returned non-ok:', sendRes.error);
+
+    if (saveAsDraft) {
+      // Fetch the draft so the ledger row carries the real Stripe-computed
+      // subtotal/tax/total — keeps the admin UI honest if our local maths
+      // ever drift from Stripe's. Drafts have status='draft', no number, no
+      // hosted_invoice_url, no invoice_pdf.
+      const draftRead = await stripeRequest<StripeInvoiceShape>(
+        'GET',
+        `invoices/${encodeURIComponent(invoiceId)}`,
+        undefined,
+        secretKey,
+      );
+      if (!draftRead.ok || !draftRead.body) {
+        return jsonResponse({ ok: false, error: draftRead.error || 'Stripe draft read failed.' }, 502);
+      }
+      inv = draftRead.body;
+    } else {
+      const finalised = await stripeRequest<StripeInvoiceShape>(
+        'POST',
+        `invoices/${encodeURIComponent(invoiceId)}/finalize`,
+        { auto_advance: collectionMethod === 'send_invoice' },
+        secretKey,
+        `${idempotencyBase}-finalize`,
+      );
+      if (!finalised.ok) {
+        return jsonResponse({ ok: false, error: finalised.error || 'Stripe invoice finalize failed.' }, 502);
+      }
+      inv = finalised.body;
+
+      // send_invoice: explicitly send the email now. (auto_advance also
+      // schedules it, but calling /send guarantees the email is dispatched
+      // immediately rather than on Stripe's internal advance schedule.)
+      // Capture whether the send succeeded so we can stamp email_sent_at on
+      // the ledger row below — gives the admin UI a clean "this went out at
+      // <time>" signal instead of inferring from finalized_at.
+      if (collectionMethod === 'send_invoice') {
+        const sendRes = await stripeRequest('POST', `invoices/${encodeURIComponent(invoiceId)}/send`, {}, secretKey);
+        if (sendRes.ok) {
+          emailSentAtIso = new Date().toISOString();
+        } else {
+          console.warn('Stripe /send returned non-ok:', sendRes.error);
+        }
       }
     }
 
     // ---- Write the ledger row immediately. The webhook will also write/
     // update on invoice.finalized, but inserting here makes the new invoice
     // appear in admin UI without waiting for webhook latency.
-    const finalizedAtIso = inv.status_transitions?.finalized_at
-      ? new Date(inv.status_transitions.finalized_at * 1000).toISOString()
-      : new Date().toISOString();
+    const issuedAtIso = saveAsDraft
+      ? null
+      : (inv.status_transitions?.finalized_at
+        ? new Date(inv.status_transitions.finalized_at * 1000).toISOString()
+        : new Date().toISOString());
     const dueAtIso = inv.due_date ? new Date(inv.due_date * 1000).toISOString() : null;
+    const ledgerStatus = saveAsDraft
+      ? 'draft'
+      : (inv.status === 'open' ? 'open' : (inv.status === 'paid' ? 'paid' : 'draft'));
 
     const { data: ledgerRow, error: ledgerErr } = await sb.from('invoices')
       .upsert({
@@ -389,14 +429,14 @@ Deno.serve(async (req) => {
         number: inv.number,
         kind: 'custom_charge',
         source: 'studiolab-growth-custom',
-        status: inv.status === 'open' ? 'open' : (inv.status === 'paid' ? 'paid' : 'draft'),
+        status: ledgerStatus,
         currency,
         subtotal_cents: inv.subtotal ?? 0,
         tax_cents: inv.tax ?? 0,
         total_cents: inv.total ?? 0,
         amount_paid_cents: inv.amount_paid ?? 0,
         amount_remaining_cents: inv.amount_remaining ?? 0,
-        issued_at: finalizedAtIso,
+        issued_at: issuedAtIso,
         due_at: dueAtIso,
         hosted_url: inv.hosted_invoice_url,
         pdf_url: inv.invoice_pdf,
@@ -415,7 +455,7 @@ Deno.serve(async (req) => {
     try {
       await sb.from('activity_log').insert({
         submission_id: submissionId,
-        action: 'custom_invoice_sent',
+        action: saveAsDraft ? 'invoice_drafted' : 'custom_invoice_sent',
         actor: caller.email,
         details: {
           invoice_id: inv.id,
@@ -424,13 +464,16 @@ Deno.serve(async (req) => {
           currency,
           recipient_type: submissionId ? 'studio' : 'external',
           external_contact_id: externalContactId,
+          ...(saveAsDraft ? { save_as_draft: true } : {}),
         },
       });
     } catch (e) { console.error('activity_log insert failed:', e); }
 
-    if (externalContactId) {
+    if (externalContactId && !saveAsDraft) {
       // Best-effort totals bump. Refunds and the eventual paid event will
-      // adjust further via the webhook.
+      // adjust further via the webhook. Skipped for drafts — they haven't
+      // been issued yet, so they don't count against the contact's totals.
+      // The finalize-draft action in manage-invoice bumps these instead.
       try {
         const { data: contact } = await sb.from('external_contacts')
           .select('invoice_count, total_invoiced_cents')

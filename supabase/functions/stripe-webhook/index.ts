@@ -17,6 +17,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { getStripeKey, stripeRequest, verifyStripeSignature, type StripeMode } from '../_shared/stripe.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
+import { onInvoicePaid } from '../_shared/post-payment.ts';
 import {
   paymentReceiptImmediate,
   paymentReceiptHold,
@@ -1087,6 +1088,18 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
       currency: invoice.currency,
       source: classification.source,
     });
+    // Single-dispatch post-payment workflow. Phase 6.1 stub; Phase 6.2 will
+    // spawn projects + send the payment-received email from inside the
+    // dispatcher. Manual mark-paid in manage-invoice calls the same hook.
+    if (ledger?.id) {
+      await onInvoicePaid(sb, {
+        invoiceId: ledger.id,
+        trigger: 'webhook',
+        stripeInvoiceId: invoice.id,
+        amountPaidCents: invoice.amount_paid ?? 0,
+        currency: (invoice.currency || '').toUpperCase(),
+      });
+    }
   } else if (eventType === 'invoice.voided') {
     await logActivityForInvoice(sb, submissionId, 'invoice_voided', {
       invoice_id: invoice.id,

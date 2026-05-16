@@ -1,8 +1,10 @@
-/* StudioLAB Growth admin: one-off custom invoice creator.
+/* StudioLAB Growth admin: one-off invoice creator + lifecycle actions.
    Opens a modal with two recipient modes (studio / external), one or more
    line items, currency, collection method, and posts to the
    create-custom-invoice edge function. Also renders the per-studio
-   Invoices panel on the detail page. */
+   Invoices panel on the detail page, the global Invoices screen, and the
+   row-level actions (Resend, Revise, Mark paid, Refund, Edit draft,
+   Finalize draft, Delete draft, Void). */
 
 (function () {
   'use strict';
@@ -26,6 +28,7 @@
   const STATUS_LABEL = {
     draft: 'Draft',
     open: 'Open',
+    past_due: 'Past due',
     paid: 'Paid',
     voided: 'Voided',
     uncollectible: 'Uncollectible',
@@ -36,6 +39,7 @@
   const STATUS_CLASS = {
     draft: 'bdg-st-submitted',
     open: 'bdg-st-in_review',
+    past_due: 'bdg-st-changes_requested',
     paid: 'bdg-st-complete',
     voided: 'bdg-st-changes_requested',
     uncollectible: 'bdg-st-changes_requested',
@@ -43,8 +47,15 @@
     partially_refunded: 'bdg-st-changes_requested',
   };
 
+  const PAYMENT_METHOD_LABEL = {
+    cheque: 'Cheque',
+    bank_transfer: 'Bank transfer / EFT',
+    cash: 'Cash',
+    other: 'Other',
+  };
+
   // ── State (per-open) ───────────────────────────────────────────────────────
-  let currentContext = null; // { mode: 'studio'|'external', submission?: {...} }
+  let currentContext = null; // { mode, submission?, revision? }
   let detachHygiene = null;
 
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -59,12 +70,31 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   }
 
+  function todayIsoDate() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function shortDate(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function authHeaders() {
+    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': jwt ? `Bearer ${jwt}` : '',
+      'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
+    };
+  }
+  function apiBase() { return (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) || ''; }
+
   // Strict country-to-currency mapping. AU recipients are always invoiced in
-  // AUD with GST; everyone else is invoiced in USD without GST. This is
-  // load-bearing for tax handling — invoicing an AU recipient in USD would
-  // skip the GST line and invoicing an overseas recipient in AUD would add
-  // GST that shouldn't apply. We enforce this in the UI by locking the
-  // currency selector once a country is known.
+  // AUD with GST; everyone else is invoiced in USD without GST.
   function currencyForCountry(c) {
     if (!c) return null;
     const u = c.trim().toUpperCase();
@@ -93,7 +123,6 @@
       console.error('invoiceModal markup missing from admin/index.html');
       return;
     }
-    // Default state
     const isStudio = ctx && ctx.mode === 'studio' && ctx.submission;
     $('#invRecipientStudio').checked = isStudio;
     $('#invRecipientExternal').checked = !isStudio;
@@ -114,20 +143,13 @@
       $('#invCurrency').value = 'AUD';
       lockCurrency(null);
     }
-    // Reset external fields
     $('#invExtEmail').value = '';
     $('#invExtName').value = '';
     $('#invExtCountry').value = '';
-    // Reset other fields
     $('#invCollection').value = 'send_invoice';
     $('#invDueDays').value = '14';
     $('#invDescription').value = '';
     $('#invMemo').value = '';
-    // Reset line items. If we're opening as a revision of an existing
-    // invoice, rehydrate every line item from the Stripe snapshot so the
-    // admin sees exactly what's on the original. The original is NOT
-    // voided yet — that happens later, on submit, only if the admin
-    // actually sends. Cancelling leaves the original untouched.
     $('#invItems').innerHTML = '';
     const rev = ctx && ctx.revision;
     if (rev && Array.isArray(rev.lines) && rev.lines.length) {
@@ -142,8 +164,12 @@
       if (rev.due_days) $('#invDueDays').value = String(rev.due_days);
       if (rev.collection_method) $('#invCollection').value = rev.collection_method;
       if (rev.currency && $('#invCurrency')) $('#invCurrency').value = rev.currency;
+      if (rev.external && !isStudio) {
+        if (rev.external.email) $('#invExtEmail').value = rev.external.email;
+        if (rev.external.name) $('#invExtName').value = rev.external.name;
+        if (rev.external.country) $('#invExtCountry').value = rev.external.country;
+      }
     } else if (rev) {
-      // Legacy single-line fallback (kept so older callers don't break).
       addLineItemRow({
         description: rev.description || '',
         quantity: rev.quantity || 1,
@@ -159,11 +185,26 @@
     $('#invSuccess').hidden = true;
     $('#invForm').hidden = false;
     $('#invSendBtn').disabled = false;
-    // Reframe the CTA when revising so the admin knows the original will
-    // be voided as part of this action.
-    $('#invSendBtn').textContent = rev && rev.pendingVoidId
-      ? 'Void original and re-issue'
-      : 'Create and send';
+    const draftBtn = $('#invDraftBtn');
+    if (draftBtn) draftBtn.disabled = false;
+    // Reframe the CTAs based on whether this is a fresh invoice, a draft
+    // edit, or a revision of an issued invoice.
+    if (rev && rev.pendingVoidId) {
+      $('#invSendBtn').textContent = 'Void original and re-issue';
+      if (draftBtn) draftBtn.hidden = true;
+    } else if (rev && rev.pendingDeleteDraftId) {
+      $('#invSendBtn').textContent = 'Update and send';
+      if (draftBtn) {
+        draftBtn.hidden = false;
+        draftBtn.textContent = 'Save draft';
+      }
+    } else {
+      $('#invSendBtn').textContent = 'Create and send';
+      if (draftBtn) {
+        draftBtn.hidden = false;
+        draftBtn.textContent = 'Save as draft';
+      }
+    }
 
     modal.hidden = false;
     document.body.classList.add('adm-modal-open');
@@ -198,10 +239,8 @@
     const isStudio = $('#invRecipientStudio').checked;
     $('#invStudioBlock').hidden = !isStudio;
     $('#invExternalBlock').hidden = isStudio;
-    // The dueDays row only matters for send_invoice
     const send = $('#invCollection').value === 'send_invoice';
     $('#invDueDaysRow').hidden = !send;
-    // Re-evaluate the currency lock when toggling recipient mode.
     if (isStudio && currentContext?.submission) {
       const c = currencyForCountry(currentContext.submission.country) || 'AUD';
       lockCurrency(c,
@@ -227,9 +266,6 @@
   }
 
   // ── Catalog picker (upgrade SKUs) ────────────────────────────────────────
-  // Opens the shared AdminCatalogPicker. The picked row is converted into a
-  // new line item — manual rows added via "+ Add line" are unaffected and
-  // the admin can still edit any picked row's fields before sending.
   function openCatalogPicker() {
     if (!window.AdminCatalogPicker || typeof window.AdminCatalogPicker.open !== 'function') {
       console.warn('AdminCatalogPicker not loaded yet');
@@ -239,8 +275,6 @@
     window.AdminCatalogPicker.open({
       currency,
       onPick(row) {
-        // Append a pre-filled line. Amount is in major units (dollars) to
-        // match the existing line-item input format; quantity defaults to 1.
         const amount = ((row.amount_cents || 0) / 100).toFixed(2);
         const includesNote = Array.isArray(row.includes) && row.includes.length
           ? ' — ' + row.includes.join('; ')
@@ -268,7 +302,7 @@
     row.querySelectorAll('input').forEach((i) => i.addEventListener('input', updateTotalsUI));
     row.querySelector('[data-act="remove"]').addEventListener('click', () => {
       const all = $$('#invItems .inv-row');
-      if (all.length <= 1) return; // Always keep at least one row
+      if (all.length <= 1) return;
       row.remove();
       updateTotalsUI();
     });
@@ -288,8 +322,6 @@
     const items = collectLineItems();
     const currency = $('#invCurrency').value;
     const subtotalCents = items.reduce((s, li) => s + (li.amount_cents * li.quantity), 0);
-    // GST preview shown only for AUD; Stripe Tax computes the actual value
-    // based on the customer's address.country at finalize time.
     const isAud = currency === 'AUD';
     const taxCents = isAud ? Math.round(subtotalCents * 0.10) : 0;
     const totalCents = subtotalCents + taxCents;
@@ -301,7 +333,7 @@
   }
 
   // ── Validation ─────────────────────────────────────────────────────────────
-  function validateAndBuildPayload() {
+  function validateAndBuildPayload(opts) {
     const isStudio = $('#invRecipientStudio').checked;
     const errors = [];
 
@@ -317,9 +349,6 @@
       const name = $('#invExtName').value.trim();
       const country = $('#invExtCountry').value.trim().toUpperCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('Enter a valid recipient email.');
-      // Block side-door routing: typing Australia into an external invoice
-      // is fine (we treat as AU), but a typed-out spelling shouldn't go
-      // through as AU code. UI guides them to use the ISO code dropdown.
       recipient = {
         type: 'external',
         email,
@@ -353,61 +382,74 @@
         due_in_days: dueInDays,
         description: $('#invDescription').value.trim() || undefined,
         memo: $('#invMemo').value.trim() || undefined,
+        ...(opts && opts.saveAsDraft ? { save_as_draft: true } : {}),
       } : null,
     };
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────────
-  async function submit() {
+  async function submit(opts) {
+    const saveAsDraft = !!(opts && opts.saveAsDraft);
     $('#invErr').classList.remove('vis');
-    const { ok, errors, payload } = validateAndBuildPayload();
+    const { ok, errors, payload } = validateAndBuildPayload({ saveAsDraft });
     if (!ok) {
       $('#invErr').textContent = errors.join(' ');
       $('#invErr').classList.add('vis');
       return;
     }
-    const btn = $('#invSendBtn');
-    const orig = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Creating…';
+    const sendBtn = $('#invSendBtn');
+    const draftBtn = $('#invDraftBtn');
+    const activeBtn = saveAsDraft ? (draftBtn || sendBtn) : sendBtn;
+    const origLabel = activeBtn.textContent;
+    sendBtn.disabled = true;
+    if (draftBtn) draftBtn.disabled = true;
+    activeBtn.textContent = saveAsDraft ? 'Saving draft…' : 'Creating…';
 
     try {
-      const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
-      const apiBase = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url);
-      const anonKey = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '';
-      const authHeaders = {
-        'Content-Type': 'application/json',
-        'Authorization': jwt ? `Bearer ${jwt}` : '',
-        'apikey': anonKey,
-      };
+      const rev = currentContext && currentContext.revision;
 
-      // Revision flow: void the original FIRST. If void fails (e.g. the
-      // original got paid between opening Revise and clicking Send) we
-      // abort here, leave the original alone, and surface the error. The
-      // admin can cancel out and try again, or pay attention to the new
-      // state of the original.
-      if (currentContext && currentContext.revision && currentContext.revision.pendingVoidId) {
-        btn.textContent = 'Voiding original…';
-        const vResp = await fetch(apiBase + '/functions/v1/manage-invoice', {
+      if (rev && rev.pendingVoidId) {
+        activeBtn.textContent = 'Voiding original…';
+        const vResp = await fetch(apiBase() + '/functions/v1/manage-invoice', {
           method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({ action: 'void', invoice_id: currentContext.revision.pendingVoidId }),
+          headers: authHeaders(),
+          body: JSON.stringify({ action: 'void', invoice_id: rev.pendingVoidId }),
         });
         const vData = await vResp.json().catch(() => ({}));
         if (!vResp.ok || !vData.ok) {
           $('#invErr').textContent = 'Could not void the original (' + (vData.error || vResp.status) + '). The original invoice has not been changed.';
           $('#invErr').classList.add('vis');
-          btn.disabled = false;
-          btn.textContent = orig;
+          sendBtn.disabled = false;
+          if (draftBtn) draftBtn.disabled = false;
+          activeBtn.textContent = origLabel;
           return;
         }
-        btn.textContent = 'Creating revised invoice…';
+        activeBtn.textContent = 'Creating revised invoice…';
+      } else if (rev && rev.pendingDeleteDraftId) {
+        // Draft-edit flow: delete the old draft, create a new one in its
+        // place. Stripe drafts can't be edited line-by-line cheaply once
+        // items are attached, so we recreate.
+        activeBtn.textContent = 'Replacing draft…';
+        const dResp = await fetch(apiBase() + '/functions/v1/manage-invoice', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ action: 'delete-draft', invoice_id: rev.pendingDeleteDraftId }),
+        });
+        const dData = await dResp.json().catch(() => ({}));
+        if (!dResp.ok || !dData.ok) {
+          $('#invErr').textContent = 'Could not replace the old draft (' + (dData.error || dResp.status) + ').';
+          $('#invErr').classList.add('vis');
+          sendBtn.disabled = false;
+          if (draftBtn) draftBtn.disabled = false;
+          activeBtn.textContent = origLabel;
+          return;
+        }
       }
 
-      const url = apiBase + '/functions/v1/create-custom-invoice';
+      const url = apiBase() + '/functions/v1/create-custom-invoice';
       const resp = await fetch(url, {
         method: 'POST',
-        headers: authHeaders,
+        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
       const data = await resp.json().catch(() => ({}));
@@ -415,14 +457,16 @@
         const reason = data.error || `Failed (${resp.status})`;
         $('#invErr').textContent = reason;
         $('#invErr').classList.add('vis');
-        btn.disabled = false;
-        btn.textContent = orig;
+        sendBtn.disabled = false;
+        if (draftBtn) draftBtn.disabled = false;
+        activeBtn.textContent = origLabel;
         return;
       }
-      // Success — show the result panel with the hosted URL
       $('#invForm').hidden = true;
       const inv = data.invoice;
-      $('#invSuccessNumber').textContent = inv.number || '(pending number)';
+      $('#invSuccessNumber').textContent = saveAsDraft
+        ? 'Draft saved'
+        : (inv.number || '(pending number)');
       $('#invSuccessAmount').textContent = moneyFmt(inv.total_cents, inv.currency);
       const link = $('#invSuccessLink');
       if (inv.hosted_url) {
@@ -439,22 +483,24 @@
         pdfLink.hidden = true;
       }
       $('#invSuccess').hidden = false;
-      // If this was for a studio, refresh the panel underneath
       if (payload.recipient.type === 'studio') {
         refreshStudioInvoicesPanel(payload.recipient.submission_id);
+      }
+      if (document.getElementById('invListBody')) {
+        await loadListRows();
+        renderList();
       }
     } catch (err) {
       console.error('create-custom-invoice failed:', err);
       $('#invErr').textContent = String(err && err.message || err);
       $('#invErr').classList.add('vis');
-      btn.disabled = false;
-      btn.textContent = orig;
+      sendBtn.disabled = false;
+      if (draftBtn) draftBtn.disabled = false;
+      activeBtn.textContent = origLabel;
     }
   }
 
   // ── Per-studio Invoices panel ──────────────────────────────────────────────
-  // Renders into #studioInvoicesHost on the detail page (the detail.js template
-  // adds the section host element; we hydrate it).
   async function renderStudioInvoicesPanel(submissionId, hostEl) {
     if (!hostEl) return;
     hostEl.innerHTML = '<div class="adm-empty" style="padding:16px 0;">Loading invoices…</div>';
@@ -464,7 +510,7 @@
       return;
     }
     const { data, error } = await sb.from('invoices')
-      .select('id, number, kind, status, currency, total_cents, amount_paid_cents, amount_refunded_cents, issued_at, paid_at, hosted_url, pdf_url, description, stripe_invoice_id, email_sent_at, last_resent_at, resend_count, voided_at')
+      .select('id, number, kind, status, currency, total_cents, amount_paid_cents, amount_refunded_cents, issued_at, paid_at, hosted_url, pdf_url, description, stripe_invoice_id, email_sent_at, last_resent_at, resend_count, voided_at, marked_paid_manually, manual_payment_method, manual_payment_date, manual_payment_reference, submission_id, external_contact_id, collection_method')
       .eq('submission_id', submissionId)
       .order('created_at', { ascending: false });
     if (error) {
@@ -496,8 +542,7 @@
   }
 
   // Shared row renderer used by both the per-studio panel and the global
-  // Invoices list screen. Surfaces the new send-history columns plus
-  // Resend / Revise actions on open invoices.
+  // Invoices list screen. Action mix is gated on status.
   function renderInvoiceRow(r, opts) {
     const showRecipient = !!(opts && opts.showRecipient);
     const recipientCell = showRecipient
@@ -507,43 +552,57 @@
         </td>`
       : '';
     const sentAt = r.email_sent_at || r.issued_at;
-    const sentLine = sentAt
-      ? `Sent ${new Date(sentAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
-      : '<span class="adm-empty">Not sent</span>';
+    const sentLine = r.status === 'draft'
+      ? '<span class="adm-empty">Draft — not sent</span>'
+      : (sentAt
+        ? `Sent ${shortDate(sentAt)}`
+        : '<span class="adm-empty">Not sent</span>');
     const resendLine = r.last_resent_at
-      ? `<div class="inv-list-sub">Resent ${new Date(r.last_resent_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}${r.resend_count > 1 ? ` (×${r.resend_count})` : ''}</div>`
+      ? `<div class="inv-list-sub">Resent ${shortDate(r.last_resent_at)}${r.resend_count > 1 ? ` (×${r.resend_count})` : ''}</div>`
       : '';
     const paidLine = r.paid_at
-      ? `<div class="inv-list-sub">Paid ${new Date(r.paid_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>`
+      ? `<div class="inv-list-sub">${r.marked_paid_manually ? 'Marked paid' : 'Paid'} ${shortDate(r.paid_at)}${r.marked_paid_manually && r.manual_payment_method ? ' · ' + ESC(PAYMENT_METHOD_LABEL[r.manual_payment_method] || r.manual_payment_method) : ''}</div>`
       : '';
     const voidLine = r.voided_at
-      ? `<div class="inv-list-sub" style="color:#B91C1C;">Voided ${new Date(r.voided_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>`
+      ? `<div class="inv-list-sub" style="color:#B91C1C;">Voided ${shortDate(r.voided_at)}</div>`
       : '';
+    const refundedLine = (r.amount_refunded_cents || 0) > 0
+      ? `<div class="inv-list-sub" style="color:#B91C1C;">Refunded ${moneyFmt(r.amount_refunded_cents, r.currency)}${r.status === 'partially_refunded' ? ' (partial)' : ''}</div>`
+      : '';
+
+    const isDraft = r.status === 'draft';
     const isOpen = r.status === 'open' || r.status === 'past_due';
-    const isPaid = r.status === 'paid';
+    const isPaid = r.status === 'paid' || r.status === 'partially_refunded';
+
     const acts = [];
     if (r.hosted_url) acts.push(`<a class="btn-link" href="${ESC(r.hosted_url)}" target="_blank" rel="noopener">Open</a>`);
     if (r.pdf_url) acts.push(`<a class="btn-link" href="${ESC(r.pdf_url)}" target="_blank" rel="noopener">PDF</a>`);
-    if (isOpen) {
+    if (isDraft) {
+      acts.push(`<a class="btn-link" href="#" data-inv-act="edit-draft" data-inv-id="${ESC(r.id)}">Edit draft</a>`);
+      acts.push(`<a class="btn-link" href="#" data-inv-act="finalize-draft" data-inv-id="${ESC(r.id)}">Finalize and send</a>`);
+      acts.push(`<a class="btn-link" style="color:#B91C1C;" href="#" data-inv-act="delete-draft" data-inv-id="${ESC(r.id)}">Delete draft</a>`);
+    } else if (isOpen) {
       acts.push(`<a class="btn-link" href="#" data-inv-act="resend" data-inv-id="${ESC(r.id)}">Resend</a>`);
-      acts.push(`<a class="btn-link" style="color:#B91C1C;" href="#" data-inv-act="revise" data-inv-id="${ESC(r.id)}">Revise</a>`);
+      acts.push(`<a class="btn-link" href="#" data-inv-act="mark-paid" data-inv-id="${ESC(r.id)}">Mark paid</a>`);
+      acts.push(`<a class="btn-link" href="#" data-inv-act="revise" data-inv-id="${ESC(r.id)}">Revise</a>`);
+      acts.push(`<a class="btn-link" style="color:#B91C1C;" href="#" data-inv-act="void" data-inv-id="${ESC(r.id)}">Void</a>`);
+    } else if (isPaid && !r.marked_paid_manually) {
+      acts.push(`<a class="btn-link" style="color:#B91C1C;" href="#" data-inv-act="refund" data-inv-id="${ESC(r.id)}">Refund</a>`);
     }
     if (showRecipient && r._isStudio) {
       acts.push(`<a class="btn-link" href="#" data-inv-open-studio="${ESC(r.submission_id)}">View studio</a>`);
     }
     return `
       <tr>
-        <td>${ESC(r.number || '(draft)')}</td>
+        <td>${ESC(r.number || (isDraft ? '(draft)' : '—'))}</td>
         ${recipientCell}
         <td><span class="bdg ${STATUS_CLASS[r.status] || ''}">${ESC(STATUS_LABEL[r.status] || r.status)}</span></td>
         <td>${moneyFmt(r.total_cents, r.currency)}</td>
-        <td style="font-size:12px;">${sentLine}${resendLine}${paidLine}${voidLine}</td>
+        <td style="font-size:12px;">${sentLine}${resendLine}${paidLine}${voidLine}${refundedLine}</td>
         <td style="display:flex;gap:8px;flex-wrap:wrap;">${acts.join('')}</td>
       </tr>`;
   }
 
-  // Delegated click handler. Binds once per host element. The rows array is
-  // re-bound on each render so revise has the current snapshot to prefill.
   function bindInvoiceRowActions(hostEl, onReload, rows) {
     hostEl._invRows = rows;
     if (hostEl._invActionsBound) return;
@@ -556,88 +615,100 @@
       const id = target.getAttribute('data-inv-id');
       const row = (hostEl._invRows || []).find((r) => r.id === id);
       if (!row) return;
-      if (act === 'resend') return doResendInvoice(row, onReload);
-      if (act === 'revise') return doReviseInvoice(row, onReload, hostEl._submission || null);
+      if (act === 'resend')         return doResendInvoice(row, onReload);
+      if (act === 'revise')         return doReviseInvoice(row, onReload, hostEl._submission || null);
+      if (act === 'edit-draft')     return doEditDraft(row, onReload, hostEl._submission || null);
+      if (act === 'finalize-draft') return doFinalizeDraftAction(row, onReload);
+      if (act === 'delete-draft')   return doDeleteDraftAction(row, onReload);
+      if (act === 'mark-paid')      return doMarkPaid(row, onReload);
+      if (act === 'refund')         return doRefund(row, onReload);
+      if (act === 'void')           return doVoidAction(row, onReload);
     });
   }
 
+  // ── manage-invoice helpers ──────────────────────────────────────────────
+  async function callManage(body) {
+    const resp = await fetch(apiBase() + '/functions/v1/manage-invoice', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json().catch(() => ({}));
+    return { resp, data };
+  }
+
+  async function showAlert(opts) {
+    if (window.AdminModal && window.AdminModal.alert) {
+      return window.AdminModal.alert(opts);
+    }
+    const msg = typeof opts === 'string' ? opts : (opts.message || opts.title || 'Action failed');
+    alert(msg.replace(/<[^>]+>/g, ''));
+    return Promise.resolve();
+  }
+  async function showConfirm(opts) {
+    if (window.AdminModal && window.AdminModal.confirm) {
+      return window.AdminModal.confirm(opts);
+    }
+    return confirm(typeof opts === 'string' ? opts : (opts.message || opts.title || 'Confirm?'));
+  }
+
   async function doResendInvoice(row, onReload) {
-    const ok = window.AdminModal
-      ? await window.AdminModal.confirm({
-          title: 'Resend invoice email?',
-          message: `<p>Send the hosted-invoice email to the recipient again for <strong>${ESC(row.number || 'this invoice')}</strong>.</p><p style="color:var(--g6);font-size:12px;">In Stripe test mode the email goes only to your Stripe account email, not the recipient.</p>`,
-          confirmLabel: 'Resend',
-        })
-      : confirm('Resend invoice email?');
+    const ok = await showConfirm({
+      title: 'Resend invoice email?',
+      message: `<p>Send the hosted-invoice email to the recipient again for <strong>${ESC(row.number || 'this invoice')}</strong>.</p><p style="color:var(--g6);font-size:12px;">In Stripe test mode the email goes only to your Stripe account email, not the recipient.</p>`,
+      confirmLabel: 'Resend',
+    });
     if (!ok) return;
-    const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/manage-invoice';
-    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
     try {
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': jwt ? `Bearer ${jwt}` : '',
-          'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
-        },
-        body: JSON.stringify({ action: 'resend', invoice_id: row.id }),
-      });
-      const data = await resp.json().catch(() => ({}));
+      const { resp, data } = await callManage({ action: 'resend', invoice_id: row.id });
       if (!resp.ok || !data.ok) {
-        await (window.AdminModal ? window.AdminModal.alert({ title: 'Resend failed', message: ESC(data.error || `Status ${resp.status}.`) }) : Promise.resolve());
+        await showAlert({ title: 'Resend failed', message: ESC(data.error || `Status ${resp.status}.`) });
         return;
       }
       if (typeof onReload === 'function') await onReload();
     } catch (err) {
       console.error('resend failed:', err);
-      await (window.AdminModal ? window.AdminModal.alert('Could not resend the invoice. Please try again.') : Promise.resolve());
+      await showAlert('Could not resend the invoice. Please try again.');
     }
   }
 
-  // Revise: open the create-invoice modal pre-filled with the original
-  // line items. The Stripe void only happens later, inside submit(), iff
-  // the admin actually clicks Send. Cancelling the modal leaves the
-  // original invoice untouched.
-  async function doReviseInvoice(row, onReload, submission) {
-    const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/manage-invoice';
-    const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
-    let snapshot;
+  async function doVoidAction(row, onReload) {
+    const ok = await showConfirm({
+      title: 'Void this invoice?',
+      message: `<p>Voiding <strong>${ESC(row.number || 'this invoice')}</strong> is permanent on Stripe — the recipient can no longer pay it. Use Revise if you want to issue a replacement.</p>`,
+      confirmLabel: 'Void invoice',
+      destructive: true,
+    });
+    if (!ok) return;
     try {
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': jwt ? `Bearer ${jwt}` : '',
-          'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
-        },
-        body: JSON.stringify({ action: 'get-snapshot', invoice_id: row.id }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data.ok || !data.snapshot) {
-        await (window.AdminModal ? window.AdminModal.alert({ title: 'Could not load invoice', message: ESC(data.error || `Status ${resp.status}.`) }) : Promise.resolve());
+      const { resp, data } = await callManage({ action: 'void', invoice_id: row.id });
+      if (!resp.ok || !data.ok) {
+        await showAlert({ title: 'Void failed', message: ESC(data.error || `Status ${resp.status}.`) });
         return;
       }
-      snapshot = data.snapshot;
+      if (typeof onReload === 'function') await onReload();
     } catch (err) {
-      console.error('get-snapshot failed:', err);
-      await (window.AdminModal ? window.AdminModal.alert('Could not load the invoice for revision.') : Promise.resolve());
-      return;
+      console.error('void failed:', err);
+      await showAlert('Could not void the invoice.');
     }
-    // Build the revision context that the modal + submit flow consume.
-    // pendingVoidId is what tells submit() to void the original FIRST and
-    // only then issue the replacement.
+  }
+
+  // Revise: open the modal pre-filled. Original is voided only on Send.
+  async function doReviseInvoice(row, onReload, submission) {
+    const snap = await loadSnapshot(row.id);
+    if (!snap) return;
     const revision = {
       pendingVoidId: row.id,
       pendingVoidNumber: row.number,
-      lines: snapshot.lines || [],
-      description: snapshot.description || row.description || '',
-      currency: snapshot.currency || row.currency || 'AUD',
-      collection_method: snapshot.collection_method,
-      due_days: snapshot.due_days,
+      lines: snap.lines || [],
+      description: snap.description || row.description || '',
+      currency: snap.currency || row.currency || 'AUD',
+      collection_method: snap.collection_method,
+      due_days: snap.due_days,
       external: !submission ? {
-        name: snapshot.customer_name,
-        email: snapshot.customer_email,
-        country: snapshot.customer_country,
+        name: snap.customer_name,
+        email: snap.customer_email,
+        country: snap.customer_country,
       } : null,
     };
     if (submission) {
@@ -645,9 +716,316 @@
     } else {
       open({ mode: 'external', revision });
     }
-    // onReload deferred — nothing changed yet. submit() will trigger a
-    // refresh after a successful void+create round trip.
     void onReload;
+  }
+
+  // Edit draft: same as Revise but for un-issued drafts. Old draft is
+  // deleted (not voided) on Send.
+  async function doEditDraft(row, onReload, submission) {
+    if (row.status !== 'draft') {
+      await showAlert({ title: 'Not a draft', message: 'This invoice has already been issued — use Revise instead.' });
+      return;
+    }
+    const snap = await loadSnapshot(row.id);
+    if (!snap) return;
+    const revision = {
+      pendingDeleteDraftId: row.id,
+      lines: snap.lines || [],
+      description: snap.description || row.description || '',
+      currency: snap.currency || row.currency || 'AUD',
+      collection_method: snap.collection_method,
+      due_days: snap.due_days,
+      external: !submission ? {
+        name: snap.customer_name,
+        email: snap.customer_email,
+        country: snap.customer_country,
+      } : null,
+    };
+    if (submission) {
+      open({ mode: 'studio', submission, revision });
+    } else {
+      open({ mode: 'external', revision });
+    }
+    void onReload;
+  }
+
+  async function loadSnapshot(invoiceId) {
+    try {
+      const { resp, data } = await callManage({ action: 'get-snapshot', invoice_id: invoiceId });
+      if (!resp.ok || !data.ok || !data.snapshot) {
+        await showAlert({ title: 'Could not load invoice', message: ESC(data.error || `Status ${resp.status}.`) });
+        return null;
+      }
+      return data.snapshot;
+    } catch (err) {
+      console.error('get-snapshot failed:', err);
+      await showAlert('Could not load the invoice.');
+      return null;
+    }
+  }
+
+  async function doFinalizeDraftAction(row, onReload) {
+    const ok = await showConfirm({
+      title: 'Finalize and send this draft?',
+      message: `<p>This will issue the draft as a real invoice and email it to the recipient.</p><p style="color:var(--g6);font-size:12px;">In Stripe test mode the email goes only to your Stripe account email, not the recipient.</p>`,
+      confirmLabel: 'Finalize and send',
+    });
+    if (!ok) return;
+    try {
+      const { resp, data } = await callManage({ action: 'finalize-draft', invoice_id: row.id });
+      if (!resp.ok || !data.ok) {
+        await showAlert({ title: 'Finalize failed', message: ESC(data.error || `Status ${resp.status}.`) });
+        return;
+      }
+      if (typeof onReload === 'function') await onReload();
+    } catch (err) {
+      console.error('finalize-draft failed:', err);
+      await showAlert('Could not finalize the draft.');
+    }
+  }
+
+  async function doDeleteDraftAction(row, onReload) {
+    const ok = await showConfirm({
+      title: 'Delete this draft?',
+      message: `<p>This permanently removes the draft on Stripe and from your records.</p>`,
+      confirmLabel: 'Delete draft',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      const { resp, data } = await callManage({ action: 'delete-draft', invoice_id: row.id });
+      if (!resp.ok || !data.ok) {
+        await showAlert({ title: 'Delete failed', message: ESC(data.error || `Status ${resp.status}.`) });
+        return;
+      }
+      if (typeof onReload === 'function') await onReload();
+    } catch (err) {
+      console.error('delete-draft failed:', err);
+      await showAlert('Could not delete the draft.');
+    }
+  }
+
+  // ── Mark paid / Refund: small inline form dialog ────────────────────────
+  function openFormDialog({ title, intro, fields, confirmLabel, destructive }) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'adm-modal';
+      overlay.style.zIndex = '12000';
+      overlay.hidden = false;
+      overlay.innerHTML = `
+        <div class="adm-modal-backdrop"></div>
+        <div class="adm-modal-panel" style="max-width:480px;">
+          <div class="adm-modal-hdr">
+            <h3 class="adm-modal-title">${ESC(title)}</h3>
+          </div>
+          <div class="adm-modal-body">
+            ${intro ? `<p style="margin-top:0;">${intro}</p>` : ''}
+            <form data-form>
+              ${fields.map((f) => renderField(f)).join('')}
+              <div class="form-err" data-err style="display:none;color:#B91C1C;font-size:13px;margin-top:8px;"></div>
+            </form>
+          </div>
+          <div class="adm-modal-ftr">
+            <button type="button" class="btn btn-g" data-act="cancel">Cancel</button>
+            <button type="button" class="btn ${destructive ? 'btn-danger' : 'btn-p'}" data-act="ok">${ESC(confirmLabel)}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      document.body.classList.add('adm-modal-open');
+
+      function teardown(result) {
+        overlay.remove();
+        document.body.classList.remove('adm-modal-open');
+        resolve(result);
+      }
+
+      overlay.querySelector('[data-act="cancel"]').addEventListener('click', () => teardown(null));
+      overlay.querySelector('.adm-modal-backdrop').addEventListener('click', () => teardown(null));
+      overlay.querySelector('[data-act="ok"]').addEventListener('click', () => {
+        const form = overlay.querySelector('[data-form]');
+        const values = {};
+        for (const f of fields) {
+          const el = form.querySelector(`[name="${f.name}"]`);
+          if (!el) continue;
+          if (f.type === 'select' || f.type === 'date' || f.type === 'text' || f.type === 'number') {
+            values[f.name] = el.value;
+          } else if (f.type === 'radio') {
+            const checked = form.querySelector(`[name="${f.name}"]:checked`);
+            values[f.name] = checked ? checked.value : '';
+          }
+        }
+        const errs = [];
+        for (const f of fields) {
+          if (f.required && !values[f.name]) errs.push(`${f.label} is required.`);
+          if (f.validate) {
+            const e = f.validate(values[f.name], values);
+            if (e) errs.push(e);
+          }
+        }
+        const errEl = overlay.querySelector('[data-err]');
+        if (errs.length) {
+          errEl.textContent = errs.join(' ');
+          errEl.style.display = '';
+          return;
+        }
+        teardown(values);
+      });
+
+      setTimeout(() => {
+        const first = overlay.querySelector('input, select');
+        if (first) first.focus();
+      }, 50);
+    });
+  }
+
+  function renderField(f) {
+    const id = `flddlg_${f.name}`;
+    const labelHtml = f.label ? `<label for="${id}" style="display:block;font-size:13px;font-weight:600;margin:10px 0 4px;">${ESC(f.label)}</label>` : '';
+    if (f.type === 'select') {
+      const opts = (f.options || []).map((o) => `<option value="${ESC(o.value)}"${o.value === (f.value || '') ? ' selected' : ''}>${ESC(o.label)}</option>`).join('');
+      return labelHtml + `<select id="${id}" name="${f.name}" style="width:100%;">${opts}</select>`;
+    }
+    if (f.type === 'radio') {
+      return labelHtml + (f.options || []).map((o, i) => `
+        <label style="display:flex;align-items:center;gap:8px;margin:4px 0;font-weight:400;">
+          <input type="radio" name="${f.name}" value="${ESC(o.value)}"${(o.value === (f.value || '') || (i === 0 && !f.value)) ? ' checked' : ''}>
+          <span>${ESC(o.label)}</span>
+        </label>`).join('');
+    }
+    const type = f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text');
+    const extra = (f.step ? ` step="${f.step}"` : '') + (f.min != null ? ` min="${f.min}"` : '') + (f.max != null ? ` max="${f.max}"` : '');
+    return labelHtml + `<input type="${type}" id="${id}" name="${f.name}" value="${ESC(f.value || '')}" placeholder="${ESC(f.placeholder || '')}" style="width:100%;"${extra}>${f.hint ? `<div style="font-size:12px;color:var(--g6);margin-top:4px;">${ESC(f.hint)}</div>` : ''}`;
+  }
+
+  async function doMarkPaid(row, onReload) {
+    if (row.status !== 'open' && row.status !== 'past_due') {
+      await showAlert({ title: 'Cannot mark paid', message: `Only open invoices can be marked paid (current status: ${row.status}).` });
+      return;
+    }
+    const values = await openFormDialog({
+      title: 'Mark invoice as paid',
+      intro: `<strong>${ESC(row.number || 'Invoice')}</strong> · ${moneyFmt(row.total_cents, row.currency)}<br><span style="color:var(--g6);font-size:12px;">Use this when the recipient paid outside Stripe (cheque, bank transfer, cash). Stripe will close the hosted invoice so they can't pay again.</span>`,
+      fields: [
+        {
+          name: 'payment_method',
+          label: 'Payment method',
+          type: 'select',
+          required: true,
+          value: 'bank_transfer',
+          options: [
+            { value: 'bank_transfer', label: 'Bank transfer / EFT' },
+            { value: 'cheque', label: 'Cheque' },
+            { value: 'cash', label: 'Cash' },
+            { value: 'other', label: 'Other' },
+          ],
+        },
+        {
+          name: 'payment_date',
+          label: 'Payment date',
+          type: 'date',
+          required: true,
+          value: todayIsoDate(),
+        },
+        {
+          name: 'payment_reference',
+          label: 'Reference (optional)',
+          type: 'text',
+          placeholder: 'Cheque number, EFT reference, …',
+        },
+      ],
+      confirmLabel: 'Mark paid',
+    });
+    if (!values) return;
+    try {
+      const { resp, data } = await callManage({
+        action: 'mark-paid',
+        invoice_id: row.id,
+        payment_method: values.payment_method,
+        payment_date: values.payment_date,
+        payment_reference: values.payment_reference,
+      });
+      if (!resp.ok || !data.ok) {
+        await showAlert({ title: 'Could not mark paid', message: ESC(data.error || `Status ${resp.status}.`) });
+        return;
+      }
+      if (typeof onReload === 'function') await onReload();
+    } catch (err) {
+      console.error('mark-paid failed:', err);
+      await showAlert('Could not mark the invoice as paid.');
+    }
+  }
+
+  async function doRefund(row, onReload) {
+    if (row.status !== 'paid' && row.status !== 'partially_refunded') {
+      await showAlert({ title: 'Cannot refund', message: `Only paid invoices can be refunded (current status: ${row.status}).` });
+      return;
+    }
+    if (row.marked_paid_manually) {
+      await showAlert({ title: 'Cannot refund', message: 'This invoice was paid out-of-band — there is no Stripe charge to refund. Handle the refund through your bank.' });
+      return;
+    }
+    const total = row.total_cents || 0;
+    const already = row.amount_refunded_cents || 0;
+    const cap = total - already;
+    const values = await openFormDialog({
+      title: 'Issue a refund',
+      intro: `<strong>${ESC(row.number || 'Invoice')}</strong> · paid ${moneyFmt(total, row.currency)}${already ? ` · already refunded ${moneyFmt(already, row.currency)}` : ''}<br><span style="color:var(--g6);font-size:12px;">Refunds go through Stripe and are sent to the original payment method.</span>`,
+      fields: [
+        {
+          name: 'refund_mode',
+          label: 'Refund amount',
+          type: 'radio',
+          required: true,
+          value: 'full',
+          options: [
+            { value: 'full', label: `Full refund (${moneyFmt(cap, row.currency)})` },
+            { value: 'partial', label: 'Partial refund' },
+          ],
+        },
+        {
+          name: 'partial_amount',
+          label: 'Amount to refund',
+          type: 'number',
+          step: '0.01',
+          min: '0.01',
+          placeholder: ((cap / 100).toFixed(2)),
+          hint: `Maximum: ${moneyFmt(cap, row.currency)}`,
+          validate(v, all) {
+            if (all.refund_mode !== 'partial') return null;
+            const cents = Math.round(parseFloat(v || '0') * 100);
+            if (!Number.isInteger(cents) || cents <= 0) return 'Enter a positive partial amount.';
+            if (cents > cap) return 'Partial amount exceeds the refundable balance.';
+            return null;
+          },
+        },
+        {
+          name: 'reason',
+          label: 'Internal reason (optional)',
+          type: 'text',
+          placeholder: 'Why this refund is being issued',
+        },
+      ],
+      confirmLabel: 'Refund',
+      destructive: true,
+    });
+    if (!values) return;
+    const body = { action: 'refund', invoice_id: row.id, reason: values.reason || undefined };
+    if (values.refund_mode === 'full') {
+      body.refund_full = true;
+    } else {
+      body.refund_amount_cents = Math.round(parseFloat(values.partial_amount || '0') * 100);
+    }
+    try {
+      const { resp, data } = await callManage(body);
+      if (!resp.ok || !data.ok) {
+        await showAlert({ title: 'Refund failed', message: ESC(data.error || `Status ${resp.status}.`) });
+        return;
+      }
+      if (typeof onReload === 'function') await onReload();
+    } catch (err) {
+      console.error('refund failed:', err);
+      await showAlert('Could not issue the refund.');
+    }
   }
 
   function refreshStudioInvoicesPanel(submissionId) {
@@ -663,7 +1041,8 @@
       if (e.target.matches('[data-act="close-invoice"]')) close();
       if (e.target.matches('[data-act="add-line"]')) addLineItemRow();
       if (e.target.matches('[data-act="pick-from-catalog"]')) openCatalogPicker();
-      if (e.target.matches('[data-act="send"]')) submit();
+      if (e.target.matches('[data-act="send"]')) submit({ saveAsDraft: false });
+      if (e.target.matches('[data-act="save-draft"]')) submit({ saveAsDraft: true });
     });
     modal.addEventListener('change', (e) => {
       if (e.target.name === 'invRecipient') updateModeUI();
@@ -674,11 +1053,7 @@
   }
 
   // ── Global Invoices screen ────────────────────────────────────────────────
-  // Top-level admin nav entry that lists every invoice across all studios
-  // and external contacts. The per-studio panel (renderStudioInvoicesPanel)
-  // stays — this is the standalone surface for issuing one-off invoices
-  // and reviewing the full ledger without going through a studio profile.
-  const LIST_STATUS_FILTERS = ['all', 'draft', 'open', 'paid', 'void'];
+  const LIST_STATUS_FILTERS = ['all', 'draft', 'open', 'paid', 'voided'];
   const listState = { status: 'all', search: '', rows: [] };
 
   async function openListScreen() {
@@ -701,7 +1076,7 @@
       <div class="inbox-hdr">
         <div>
           <h2 class="users-title">Invoices</h2>
-          <p class="users-desc">Every invoice across studios and external contacts. Open one to view it on Stripe, or create a new one for someone who isn't a studio yet.</p>
+          <p class="users-desc">Every invoice across studios and external contacts. Drafts live here too — finish or finalise them at your own pace.</p>
         </div>
         <button type="button" class="btn btn-p" id="invListNew">+ New invoice</button>
       </div>
@@ -740,15 +1115,14 @@
   async function loadListRows() {
     const sb = window.initSupabase && window.initSupabase();
     if (!sb) { listState.rows = []; return; }
-    // PostgREST FK sugar pulls the recipient label without a second round
-    // trip. Studio invoices have submission_id set; external invoices have
-    // external_contact_id set. We tolerate either being null.
     const { data, error } = await sb.from('invoices')
       .select(`
         id, number, kind, status, currency, total_cents,
         amount_paid_cents, amount_refunded_cents, issued_at, paid_at,
         hosted_url, pdf_url, description, submission_id, external_contact_id,
         stripe_invoice_id, email_sent_at, last_resent_at, resend_count, voided_at,
+        marked_paid_manually, manual_payment_method, manual_payment_date, manual_payment_reference,
+        collection_method,
         submission:submissions(id, studio_name, contact_email),
         external_contact:external_contacts(id, name, email)
       `)
