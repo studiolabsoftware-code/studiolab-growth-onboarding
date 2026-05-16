@@ -218,10 +218,57 @@
       .subscribe();
   }
 
+  // Deep-link router. Runs once at boot. Handles every link shape the
+  // outbound emails use so admins click through to the right screen
+  // instead of landing on the dashboard with the URL fragment ignored.
+  //
+  // Supported shapes (anything else is ignored, falls through to dashboard):
+  //   ?id=<submission_id>          (legacy) -> open submission detail
+  //   ?submission=<submission_id>  -> open submission detail
+  //   ?project=<project_id>        -> open project detail
+  //   ?invoice=<invoice_id>        -> open Invoices screen + select row
+  //   ?quote=<quote_id>            -> open Quotes screen + select row
+  //   #project=<project_id>        -> same as ?project=
+  //   #invoice=<invoice_id>        -> same as ?invoice=
+  //   #quote=<quote_id>            -> same as ?quote=
+  //   #submission=<submission_id>  -> same as ?submission=
+  //
+  // Hash parses are needed because email clients sometimes strip the
+  // querystring on link previews while preserving the fragment.
   function maybeOpenFromUrl() {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    if (id && window.AdminDetail) window.AdminDetail.open(id);
+    const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    const pick = (k) => params.get(k) || hashParams.get(k);
+
+    const submissionId = pick('id') || pick('submission');
+    const projectId = pick('project');
+    const invoiceId = pick('invoice');
+    const quoteId = pick('quote');
+
+    // Priority: project > invoice > quote > submission. The deliverable
+    // emails are the most common case of users wanting to land on a
+    // specific entity, and a project link should win if the URL carries
+    // both (shouldn't happen, but defensive).
+    if (projectId && window.AdminProjects?.openDetail) {
+      window.AdminProjects.openDetail(projectId);
+      return;
+    }
+    if (invoiceId && window.AdminInvoice?.openListScreen) {
+      // The invoice list screen accepts an optional focus_invoice_id to
+      // scroll-to + highlight. Falls back to just opening the list when
+      // that argument isn't supported.
+      try { window.AdminInvoice.openListScreen({ focusInvoiceId: invoiceId }); }
+      catch (_) { window.AdminInvoice.openListScreen(); }
+      return;
+    }
+    if (quoteId && window.AdminQuote?.openListScreen) {
+      try { window.AdminQuote.openListScreen({ focusQuoteId: quoteId }); }
+      catch (_) { window.AdminQuote.openListScreen(); }
+      return;
+    }
+    if (submissionId && window.AdminDetail?.open) {
+      window.AdminDetail.open(submissionId);
+    }
   }
 
   function matchesFilters(r) {

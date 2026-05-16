@@ -424,7 +424,9 @@ async function notifyAdminsOfDeliverableEvent(
   if (to.length === 0) return;
 
   const adminOrigin = (Deno.env.get('ADMIN_APP_URL') || 'https://app.studiolabgrowth.com/admin/').replace(/\/$/, '/');
-  const adminUrl = `${adminOrigin}#projects/${encodeURIComponent(projectId)}`;
+  // Hash-param shape parsed by admin/js/dashboard.js maybeOpenFromUrl —
+  // opens the project detail via AdminProjects.openDetail on admin boot.
+  const adminUrl = `${adminOrigin}#project=${encodeURIComponent(projectId)}`;
 
   // Comments piggy-back on the revisions template — same shape (recipient +
   // deliverable + body block). Subject line is rewritten so admins can tell

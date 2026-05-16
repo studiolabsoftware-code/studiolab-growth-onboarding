@@ -1028,7 +1028,9 @@ async function notifyAdminsInvoicePaymentFailed(
   // payment_intent.last_payment_error.message. Both are out of scope for
   // the v1 email; the link to the hosted invoice gives admins the full
   // context with one click. Pass null and surface that in the template.
-  const adminUrl = `${Deno.env.get('ADMIN_APP_URL') || 'https://app.studiolabgrowth.com/admin/'}#invoices/${encodeURIComponent(ledger.id)}`;
+  // Hash-param shape parsed by admin/js/dashboard.js maybeOpenFromUrl —
+  // opens the Invoices list and (best-effort) focuses the row on admin boot.
+  const adminUrl = `${Deno.env.get('ADMIN_APP_URL') || 'https://app.studiolabgrowth.com/admin/'}#invoice=${encodeURIComponent(ledger.id)}`;
 
   const t = adminInvoicePaymentFailed({
     recipientLabel,
