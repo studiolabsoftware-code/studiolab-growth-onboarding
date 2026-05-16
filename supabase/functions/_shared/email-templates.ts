@@ -670,6 +670,46 @@ export function deliverableApprovedAdmin(opts: {
   return { subject, html: layout({ previewText: `${opts.recipientName} approved ${opts.deliverableTitle}.`, body }) };
 }
 
+// ---------------------------------------------------------------------------
+// Admin notification — Stripe reported invoice.payment_failed. Stripe will
+// retry on its own schedule and the recipient gets Stripe's own dunning
+// email, but we surface the event to admins so a VA can decide whether to
+// follow up (e.g. confirm card details, reissue a quote, etc.).
+// ---------------------------------------------------------------------------
+export function adminInvoicePaymentFailed(opts: {
+  recipientLabel: string;        // studio name or external contact name
+  invoiceNumber: string | null;
+  amountCents: number | null;
+  currency: string;
+  reason?: string | null;        // optional decline reason from Stripe
+  hostedInvoiceUrl?: string | null;
+  adminUrl: string;
+}): { subject: string; html: string } {
+  const amountDisplay = (opts.amountCents != null)
+    ? `${opts.currency.toUpperCase()} $${(opts.amountCents / 100).toFixed(2)}`
+    : '—';
+  const invoiceLabel = opts.invoiceNumber || '(unnumbered)';
+  const subject = `Payment failed: ${invoiceLabel} — ${opts.recipientLabel}`;
+  const reasonBlock = opts.reason
+    ? `<p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Stripe reported</p>
+       <div style="margin:0 0 18px;padding:14px 16px;background:${COL.g1};border-left:3px solid ${COL.in};border-radius:6px;white-space:pre-wrap;font-size:14px;">${escape(opts.reason)}</div>`
+    : '';
+  const stripeLink = opts.hostedInvoiceUrl
+    ? `<p style="margin:0 0 14px;font-size:13px;"><a href="${escape(opts.hostedInvoiceUrl)}" style="color:${COL.in};">Open hosted invoice on Stripe →</a></p>`
+    : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Payment failed</h1>
+    <p style="margin:0 0 14px;">Stripe reported a failed payment attempt on an invoice for <strong>${escape(opts.recipientLabel)}</strong>.</p>
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Invoice</p>
+    <p style="margin:0 0 14px;font-weight:600;font-size:16px;color:${COL.in_d};">${escape(invoiceLabel)} · ${escape(amountDisplay)}</p>
+    ${reasonBlock}
+    <p style="margin:0 0 14px;">Stripe will retry automatically and emails the recipient its own dunning notice. Open the invoice if you want to chase the customer, edit the invoice, or void and reissue.</p>
+    ${cta('Open invoice in admin', opts.adminUrl)}
+    ${stripeLink}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">No action required from the recipient — this is a heads-up so the team can follow up if needed.</p>`;
+  return { subject, html: layout({ previewText: `Stripe reported payment_failed on ${invoiceLabel} for ${opts.recipientLabel}.`, body }) };
+}
+
 function escape(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
 }

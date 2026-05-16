@@ -23,7 +23,9 @@ import {
   paymentReceiptHold,
   paymentReceiptSaveCard,
   adminPaymentLanded,
+  adminInvoicePaymentFailed,
 } from '../_shared/email-templates.ts';
+import { createGatedSender } from '../_shared/email-gated.ts';
 
 const PLAN_LABEL: Record<string, string> = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
 const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guided' };
@@ -512,27 +514,11 @@ async function sendPaymentReceiptsOnce(
   const isLive = args.stripeMode === 'live';
   const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
 
-  async function sendGated(g: { to: string | string[]; subject: string; html: string; replyTo?: string; intent: string }) {
-    if (isLive) {
-      await sendEmail({ to: g.to, subject: g.subject, html: g.html, replyTo: g.replyTo });
-      return;
-    }
-    // Test mode. Opt-in redirect is for situations where you want to
-    // funnel all test emails to a single inbox (e.g. shared QA mailbox).
-    // Default behaviour is now "send to the real recipient" — paired with
-    // Gmail aliases (foo+bar@gmail.com) for studio test addresses, the
-    // realistic flow exercises Mailgun + email routing properly.
-    if (testRecipient) {
-      await sendEmail({
-        to: testRecipient,
-        subject: `[TEST · ${g.intent}] ${g.subject}`,
-        html: g.html,
-        replyTo: g.replyTo,
-      });
-    } else {
-      await sendEmail({ to: g.to, subject: g.subject, html: g.html, replyTo: g.replyTo });
-    }
-  }
+  // Shared gating logic — see `_shared/email-gated.ts` for the rule.
+  // Pre-resolved isLive + testRecipient because handlePaymentLanded fires
+  // multiple emails per event (studio receipt + admin notification + inbox
+  // system message), so we don't want one DB lookup per send.
+  const sendGated = createGatedSender({ isLive, testRecipient });
 
   // Studio receipt — mode-specific template
   try {
@@ -975,6 +961,74 @@ async function logActivityForInvoice(
   } catch (e) { console.error('activity_log insert failed:', e); }
 }
 
+// Heads-up email to admins when Stripe reports invoice.payment_failed.
+// Best-effort: errors here are caught at the call site so the webhook
+// always returns 200. Reuses the test-mode email gating pattern.
+async function notifyAdminsInvoicePaymentFailed(
+  sb: Sb,
+  ledgerRef: { id: string; external_contact_id: string | null } | null,
+  invoice: InvoiceObj,
+): Promise<void> {
+  if (!ledgerRef) return;
+
+  const { data: admins } = await sb.from('admin_users').select('email').eq('is_active', true);
+  const to = (admins || []).map((a: { email: string }) => a.email).filter(Boolean);
+  if (to.length === 0) return;
+
+  // upsertInvoiceLedger only returns id + external_contact_id; fetch the
+  // wider field set we need for the email here. One query per failed
+  // payment is fine — these are rare events.
+  const { data: ledger } = await sb.from('invoices')
+    .select('id, number, total_cents, currency, submission_id, external_contact_id, hosted_url')
+    .eq('id', ledgerRef.id)
+    .maybeSingle();
+  if (!ledger) return;
+
+  // Resolve a friendly recipient label from whichever side the invoice
+  // belongs to. Falls back to '(unknown recipient)' rather than failing.
+  let recipientLabel = '(unknown recipient)';
+  if (ledger.submission_id) {
+    const { data: sub } = await sb.from('submissions')
+      .select('studio_name, first_name, last_name, contact_email')
+      .eq('id', ledger.submission_id)
+      .maybeSingle();
+    recipientLabel = sub?.studio_name
+      || [sub?.first_name, sub?.last_name].filter(Boolean).join(' ')
+      || sub?.contact_email
+      || recipientLabel;
+  } else if (ledger.external_contact_id) {
+    const { data: ec } = await sb.from('external_contacts')
+      .select('name, email')
+      .eq('id', ledger.external_contact_id)
+      .maybeSingle();
+    recipientLabel = ec?.name || ec?.email || recipientLabel;
+  }
+
+  // Stripe doesn't put the decline reason on the invoice object directly —
+  // it lives on the latest_charge.outcome.seller_message or the failed
+  // payment_intent.last_payment_error.message. Both are out of scope for
+  // the v1 email; the link to the hosted invoice gives admins the full
+  // context with one click. Pass null and surface that in the template.
+  const adminUrl = `${Deno.env.get('ADMIN_APP_URL') || 'https://app.studiolabgrowth.com/admin/'}#invoices/${encodeURIComponent(ledger.id)}`;
+
+  const t = adminInvoicePaymentFailed({
+    recipientLabel,
+    invoiceNumber: ledger.number,
+    amountCents: ledger.total_cents ?? invoice.total ?? null,
+    currency: ledger.currency || (invoice.currency || 'USD').toUpperCase(),
+    reason: null,
+    hostedInvoiceUrl: ledger.hosted_url || invoice.hosted_invoice_url || null,
+    adminUrl,
+  });
+
+  const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+  const isLive = (settings?.stripe_mode || 'test') === 'live';
+  const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+  const send = createGatedSender({ isLive, testRecipient });
+
+  await send({ to, subject: t.subject, html: t.html, intent: 'admin invoice.payment_failed' });
+}
+
 async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: string, eventId: string, eventPayload: unknown): Promise<void> {
   const classification = await classifyInvoice(sb, invoice);
   if (!classification.ours) {
@@ -1120,6 +1174,15 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
       source: classification.source,
     });
     console.warn(`stripe-webhook: invoice.payment_failed for ${invoice.id} (${invoice.number || 'unnumbered'}); admin should review.`);
+
+    // Heads-up email to admins. Best-effort — a failed send here must not
+    // tank the webhook. Stripe will retry the charge on its own schedule
+    // and emails the recipient its own dunning notice.
+    try {
+      await notifyAdminsInvoicePaymentFailed(sb, ledger, invoice);
+    } catch (e) {
+      console.error('admin invoice.payment_failed email failed:', e);
+    }
   } else if (eventType === 'invoice.voided') {
     await logActivityForInvoice(sb, submissionId, 'invoice_voided', {
       invoice_id: invoice.id,
