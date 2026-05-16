@@ -330,7 +330,7 @@
     const sb = window.initSupabase && window.initSupabase();
     if (!sb) { screen.innerHTML = '<div class="adm-empty">Supabase unavailable.</div>'; return; }
 
-    const [{ data: project, error: projErr }, { data: invoices }, { data: activity }] = await Promise.all([
+    const [{ data: project, error: projErr }, { data: invoices }, { data: activity }, { data: deliverables }] = await Promise.all([
       sb.from('projects')
         .select(`
           id, name, project_type, status, currency, due_at, notes, created_at, completed_at, cancelled_at,
@@ -348,12 +348,17 @@
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
         .limit(50),
+      sb.from('deliverables')
+        .select('id, title, description, status, visibility, due_date, order_index, submitted_at, approved_at, delivered_at, cancelled_at, revisions_notes, created_at')
+        .eq('project_id', projectId)
+        .order('order_index', { ascending: true })
+        .order('created_at', { ascending: true }),
     ]);
     if (projErr || !project) {
       screen.innerHTML = `<div class="adm-empty">Project not found.</div>`;
       return;
     }
-    renderDetail(screen, project, invoices || [], activity || []);
+    renderDetail(screen, project, invoices || [], activity || [], deliverables || []);
   }
 
   function ensureDetailScreen() {
@@ -366,7 +371,26 @@
     return screen;
   }
 
-  function renderDetail(screen, p, invoices, activity) {
+  const DELIV_STATUS_LABEL = {
+    pending: 'Not started',
+    in_progress: 'In progress',
+    submitted_for_review: 'Awaiting client',
+    revisions_requested: 'Revisions requested',
+    approved: 'Approved',
+    delivered: 'Delivered',
+    cancelled: 'Cancelled',
+  };
+  const DELIV_STATUS_CLASS = {
+    pending: 'bdg-st-submitted',
+    in_progress: 'bdg-st-in_review',
+    submitted_for_review: 'bdg-st-in_review',
+    revisions_requested: 'bdg-st-changes_requested',
+    approved: 'bdg-st-complete',
+    delivered: 'bdg-st-complete',
+    cancelled: 'bdg-st-changes_requested',
+  };
+
+  function renderDetail(screen, p, invoices, activity, deliverables) {
     const isStudio = !!p.submission_id;
     const recipientName = isStudio
       ? (p.submission?.studio_name || p.submission?.contact_email || 'Unknown studio')
@@ -424,9 +448,12 @@
           </section>
 
           <section class="proj-card proj-card-wide">
-            <div class="proj-card-hdr"><h3>Deliverables</h3></div>
+            <div class="proj-card-hdr" style="display:flex;justify-content:space-between;align-items:center;">
+              <h3>Deliverables</h3>
+              <button type="button" class="btn-link" id="deliverNew">+ Add deliverable</button>
+            </div>
             <div class="proj-card-body">
-              <div class="adm-empty" style="padding:24px 0;">Coming in Phase 6.3 — per-project deliverables with submit-for-review, client approve, and revisions.</div>
+              <div id="deliverList">${renderDeliverablesList(deliverables)}</div>
             </div>
           </section>
 
@@ -513,6 +540,8 @@
       openDetail(p.id);
     });
 
+    wireDeliverables(screen, p);
+
     screen.querySelector('#projStatus').addEventListener('change', async (e) => {
       const next = e.target.value;
       if (next === p.status) return;
@@ -534,6 +563,171 @@
       } catch (_) {}
       openDetail(p.id);
     });
+  }
+
+  // ── Deliverables (admin side) ──────────────────────────────────────────
+  function renderDeliverablesList(deliverables) {
+    if (!deliverables || deliverables.length === 0) {
+      return '<div class="adm-empty" style="padding:16px 0;">No deliverables yet. Click <strong>+ Add deliverable</strong> to set up the first piece of work.</div>';
+    }
+    return `<table class="inv-table"><thead><tr>
+        <th>Title</th><th>Visibility</th><th>Status</th><th>Due</th><th>Actions</th>
+      </tr></thead><tbody>
+      ${deliverables.map((d) => {
+        const isTerminal = d.status === 'delivered' || d.status === 'cancelled';
+        const acts = [];
+        acts.push(`<button type="button" class="btn-link" data-deliver-act="edit" data-deliver-id="${ESC(d.id)}">Edit</button>`);
+        if (d.status === 'in_progress' || d.status === 'pending' || d.status === 'revisions_requested') {
+          acts.push(`<button type="button" class="btn-link" data-deliver-act="submit-for-review" data-deliver-id="${ESC(d.id)}">Submit for review</button>`);
+        }
+        if (d.status === 'submitted_for_review' || d.status === 'in_progress' || d.status === 'revisions_requested') {
+          acts.push(`<button type="button" class="btn-link" data-deliver-act="mark-approved" data-deliver-id="${ESC(d.id)}">Approve</button>`);
+        }
+        if (d.status === 'approved') {
+          acts.push(`<button type="button" class="btn-link" data-deliver-act="mark-delivered" data-deliver-id="${ESC(d.id)}">Mark delivered</button>`);
+        }
+        if (!isTerminal) {
+          acts.push(`<button type="button" class="btn-link" style="color:#B91C1C;" data-deliver-act="cancel" data-deliver-id="${ESC(d.id)}">Cancel</button>`);
+        }
+        const sub = [];
+        if (d.description) sub.push(ESC(d.description.slice(0, 140)) + (d.description.length > 140 ? '…' : ''));
+        if (d.revisions_notes) sub.push(`<span style="color:#B91C1C;">Client asked: ${ESC(d.revisions_notes.slice(0, 200))}${d.revisions_notes.length > 200 ? '…' : ''}</span>`);
+        return `<tr data-deliver-row="${ESC(d.id)}">
+          <td>
+            <div style="font-weight:500;">${ESC(d.title)}</div>
+            ${sub.length ? `<div class="inv-list-sub">${sub.join(' · ')}</div>` : ''}
+          </td>
+          <td>${d.visibility === 'internal' ? '<span class="inv-list-tag">Internal</span>' : 'Client'}</td>
+          <td><span class="bdg ${DELIV_STATUS_CLASS[d.status] || ''}">${ESC(DELIV_STATUS_LABEL[d.status] || d.status)}</span></td>
+          <td>${d.due_date ? ESC(shortDate(d.due_date)) : '<span class="adm-empty">—</span>'}</td>
+          <td style="display:flex;gap:8px;flex-wrap:wrap;">${acts.join('')}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table>`;
+  }
+
+  function wireDeliverables(screen, project) {
+    const addBtn = screen.querySelector('#deliverNew');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => openDeliverableEditor(project, null));
+    }
+    const host = screen.querySelector('#deliverList');
+    if (!host) return;
+    host.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-deliver-act]');
+      if (!btn) return;
+      const act = btn.getAttribute('data-deliver-act');
+      const id = btn.getAttribute('data-deliver-id');
+      if (act === 'edit') {
+        const row = (project._deliverables || []).find((d) => d.id === id) || null;
+        // Fall back to fetching the row if we don't have it cached.
+        if (row) {
+          openDeliverableEditor(project, row);
+        } else {
+          const sb = window.initSupabase && window.initSupabase();
+          if (!sb) return;
+          const { data } = await sb.from('deliverables').select('*').eq('id', id).maybeSingle();
+          if (data) openDeliverableEditor(project, data);
+        }
+        return;
+      }
+      const confirmLabel = {
+        'submit-for-review': 'Submit for review',
+        'mark-approved': 'Approve',
+        'mark-delivered': 'Mark delivered',
+        'cancel': 'Cancel deliverable',
+      }[act];
+      if (confirmLabel) {
+        const ok = await (window.AdminModal?.confirm
+          ? window.AdminModal.confirm({ title: `${confirmLabel}?`, message: `<p>This will move the deliverable forward.</p>`, confirmLabel, destructive: act === 'cancel' })
+          : confirm(`${confirmLabel}?`));
+        if (!ok) return;
+      }
+      try {
+        const resp = await fetch(apiBase() + '/functions/v1/manage-deliverable', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ action: act, id }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          alert(data.error || `Failed (${resp.status})`);
+          return;
+        }
+        openDetail(project.id);
+      } catch (err) {
+        console.error('deliverable action failed:', err);
+        alert('Action failed. Try again.');
+      }
+    });
+  }
+
+  async function openDeliverableEditor(project, existing) {
+    const isEdit = !!existing;
+    const overlay = document.createElement('div');
+    overlay.className = 'adm-modal';
+    overlay.style.zIndex = '12000';
+    overlay.hidden = false;
+    overlay.innerHTML = `
+      <div class="adm-modal-backdrop"></div>
+      <div class="adm-modal-card" style="max-width:560px;">
+        <div class="adm-modal-hdr"><h3 class="adm-modal-title">${isEdit ? 'Edit deliverable' : 'New deliverable'}</h3></div>
+        <div class="adm-modal-body">
+          <label style="display:block;font-size:13px;font-weight:600;margin:10px 0 4px;">Title</label>
+          <input type="text" id="del_title" style="width:100%;" placeholder="e.g. Knowledge base — first draft" value="${ESC(existing?.title || '')}">
+
+          <label style="display:block;font-size:13px;font-weight:600;margin:10px 0 4px;">Description <span style="color:var(--g6);font-weight:400;">(visible to client when this is client-visible)</span></label>
+          <textarea id="del_desc" rows="4" style="width:100%;font-family:inherit;">${ESC(existing?.description || '')}</textarea>
+
+          <label style="display:block;font-size:13px;font-weight:600;margin:10px 0 4px;">Due date <span style="color:var(--g6);font-weight:400;">(optional)</span></label>
+          <input type="date" id="del_due" style="width:100%;" value="${ESC(existing?.due_date || '')}">
+
+          <label style="display:block;font-size:13px;font-weight:600;margin:10px 0 4px;">Visibility</label>
+          <div style="display:flex;gap:14px;">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;"><input type="radio" name="del_vis" value="client"${(!existing || existing.visibility === 'client') ? ' checked' : ''}>Client (shown on their project page)</label>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;"><input type="radio" name="del_vis" value="internal"${existing?.visibility === 'internal' ? ' checked' : ''}>Internal (team only)</label>
+          </div>
+          <div style="display:none;color:#B91C1C;font-size:13px;margin-top:8px;" id="del_err"></div>
+        </div>
+        <div class="adm-modal-ftr">
+          <button type="button" class="btn btn-g" data-act="cancel">Cancel</button>
+          <button type="button" class="btn btn-p" data-act="save">${isEdit ? 'Save' : 'Create'}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    document.body.classList.add('adm-modal-open');
+    function teardown() {
+      overlay.remove();
+      document.body.classList.remove('adm-modal-open');
+    }
+    overlay.querySelector('[data-act="cancel"]').addEventListener('click', teardown);
+    overlay.querySelector('.adm-modal-backdrop').addEventListener('click', teardown);
+    overlay.querySelector('[data-act="save"]').addEventListener('click', async () => {
+      const title = overlay.querySelector('#del_title').value.trim();
+      const description = overlay.querySelector('#del_desc').value.trim();
+      const due = overlay.querySelector('#del_due').value || null;
+      const vis = overlay.querySelector('input[name="del_vis"]:checked').value;
+      const errEl = overlay.querySelector('#del_err');
+      function err(m) { errEl.textContent = m; errEl.style.display = ''; }
+      if (!title) return err('Title is required.');
+      try {
+        const body = isEdit
+          ? { action: 'update', id: existing.id, title, description, due_date: due, visibility: vis }
+          : { action: 'create', project_id: project.id, title, description, due_date: due, visibility: vis };
+        const resp = await fetch(apiBase() + '/functions/v1/manage-deliverable', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) return err(data.error || `Failed (${resp.status})`);
+        teardown();
+        openDetail(project.id);
+      } catch (e) {
+        err(String(e && e.message || e));
+      }
+    });
+    setTimeout(() => overlay.querySelector('#del_title').focus(), 50);
   }
 
   window.AdminProjects = {

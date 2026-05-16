@@ -32,6 +32,19 @@
     invoice_refunded: 'Invoice refunded',
     invoice_partially_refunded: 'Partial refund processed',
     external_contact_paid: 'Payment received',
+    deliverable_submitted_for_review: 'Deliverable ready for your review',
+    deliverable_revisions_requested: 'Revisions requested',
+    deliverable_approved: 'Deliverable approved',
+    deliverable_delivered: 'Deliverable delivered',
+  };
+
+  const DELIV_STATUS_LABEL = {
+    pending: 'Coming up',
+    in_progress: 'In progress',
+    submitted_for_review: 'Ready for your review',
+    revisions_requested: 'Revisions in progress',
+    approved: 'Approved',
+    delivered: 'Delivered',
   };
 
   const state = {
@@ -40,6 +53,7 @@
     project: null,
     invoices: [],
     activity: [],
+    deliverables: [],
     billedCents: 0,
     activeTab: 'overview',
   };
@@ -107,6 +121,7 @@
       state.project = data.project || null;
       state.invoices = data.invoices || [];
       state.activity = data.activity || [];
+      state.deliverables = data.deliverables || [];
       state.billedCents = data.billed_cents || 0;
       render();
     } catch (err) {
@@ -141,6 +156,144 @@
 
     renderOverview();
     renderInvoices();
+    renderDeliverables();
+  }
+
+  function renderDeliverables() {
+    const host = $('projDeliverablesHost');
+    if (!host) return;
+    if (state.deliverables.length === 0) {
+      host.innerHTML = `<div class="portal-card">
+        <h2 class="proj-card-title">Deliverables</h2>
+        <p class="proj-card-body portal-muted">No deliverables yet. We'll post each piece of work here as it's ready for your review.</p>
+      </div>`;
+      return;
+    }
+    const cards = state.deliverables.map((d) => {
+      const due = d.due_date ? `<div class="proj-deliv-due">Due ${ESC(longDate(d.due_date))}</div>` : '';
+      const desc = d.description ? `<p class="proj-deliv-desc">${ESC(d.description)}</p>` : '';
+      let actionsHtml = '';
+      let statusBlock = '';
+      if (d.status === 'submitted_for_review') {
+        actionsHtml = `<div class="proj-deliv-actions">
+          <button type="button" class="btn btn-p" data-deliv-act="approve" data-deliv-id="${ESC(d.id)}">Approve</button>
+          <button type="button" class="btn btn-g" data-deliv-act="revisions" data-deliv-id="${ESC(d.id)}">Request revisions</button>
+        </div>`;
+        statusBlock = `<span class="proj-status-pill ps-review">Ready for your review</span>`;
+      } else if (d.status === 'approved') {
+        statusBlock = `<span class="proj-status-pill ps-complete">Approved${d.approved_at ? ' · ' + shortDate(d.approved_at) : ''}</span>`;
+      } else if (d.status === 'delivered') {
+        statusBlock = `<span class="proj-status-pill ps-complete">Delivered${d.delivered_at ? ' · ' + shortDate(d.delivered_at) : ''}</span>`;
+      } else if (d.status === 'revisions_requested') {
+        statusBlock = `<span class="proj-status-pill ps-on_hold">Revisions in progress</span>`;
+        if (d.revisions_notes) {
+          statusBlock += `<p class="proj-deliv-notes">Your notes: <em>${ESC(d.revisions_notes)}</em></p>`;
+        }
+      } else if (d.status === 'in_progress') {
+        statusBlock = `<span class="proj-status-pill ps-in_progress">In progress</span>`;
+      } else if (d.status === 'pending') {
+        statusBlock = `<span class="proj-status-pill ps-briefing">Coming up</span>`;
+      } else {
+        statusBlock = `<span class="proj-status-pill">${ESC(DELIV_STATUS_LABEL[d.status] || d.status)}</span>`;
+      }
+      return `<div class="proj-deliv-card" data-deliv-id="${ESC(d.id)}">
+        <div class="proj-deliv-hdr">
+          <div class="proj-deliv-title">${ESC(d.title)}</div>
+          <div class="proj-deliv-status">${statusBlock}</div>
+        </div>
+        ${due}
+        ${desc}
+        ${actionsHtml}
+      </div>`;
+    }).join('');
+    host.innerHTML = `<div class="proj-deliv-stack">${cards}</div>`;
+
+    host.addEventListener('click', onDeliverableClick, { once: false });
+  }
+
+  let _delivClickBound = false;
+  function onDeliverableClick(e) {
+    const btn = e.target.closest('[data-deliv-act]');
+    if (!btn) return;
+    e.preventDefault();
+    const act = btn.getAttribute('data-deliv-act');
+    const id = btn.getAttribute('data-deliv-id');
+    if (act === 'approve') approveDeliverable(id);
+    if (act === 'revisions') openRevisionsDialog(id);
+  }
+
+  async function approveDeliverable(id) {
+    if (!confirm('Approve this deliverable?')) return;
+    try {
+      const resp = await fetch(FN_BASE + 'portal-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'approve-deliverable',
+          project_id: state.projectId,
+          token: state.token,
+          deliverable_id: id,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        alert(data.error || 'Could not approve. Try again.');
+        return;
+      }
+      await load();
+    } catch (err) {
+      console.error('approve failed:', err);
+      alert('Could not approve. Try again.');
+    }
+  }
+
+  function openRevisionsDialog(id) {
+    const deliv = state.deliverables.find((d) => d.id === id);
+    if (!deliv) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'proj-dialog';
+    overlay.innerHTML = `
+      <div class="proj-dialog-backdrop"></div>
+      <div class="proj-dialog-card">
+        <h3 class="proj-dialog-title">Request revisions</h3>
+        <p class="proj-dialog-sub">Tell us what needs changing on <strong>${ESC(deliv.title)}</strong>. We'll get on it and resubmit when it's ready.</p>
+        <textarea id="revNotes" rows="6" placeholder="Describe the changes you'd like…"></textarea>
+        <div class="proj-dialog-err" id="revErr"></div>
+        <div class="proj-dialog-ftr">
+          <button type="button" class="btn btn-g" data-act="cancel">Cancel</button>
+          <button type="button" class="btn btn-p" data-act="send">Send to team</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    function teardown() { overlay.remove(); }
+    overlay.querySelector('[data-act="cancel"]').addEventListener('click', teardown);
+    overlay.querySelector('.proj-dialog-backdrop').addEventListener('click', teardown);
+    overlay.querySelector('[data-act="send"]').addEventListener('click', async () => {
+      const notes = overlay.querySelector('#revNotes').value.trim();
+      const errEl = overlay.querySelector('#revErr');
+      if (!notes) { errEl.textContent = 'Tell us what needs changing.'; return; }
+      try {
+        const resp = await fetch(FN_BASE + 'portal-project', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'request-revisions',
+            project_id: state.projectId,
+            token: state.token,
+            deliverable_id: id,
+            notes,
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) { errEl.textContent = data.error || 'Could not send. Try again.'; return; }
+        teardown();
+        await load();
+      } catch (err) {
+        console.error('revisions failed:', err);
+        errEl.textContent = 'Could not send. Try again.';
+      }
+    });
+    setTimeout(() => overlay.querySelector('#revNotes').focus(), 50);
   }
 
   function renderOverview() {
