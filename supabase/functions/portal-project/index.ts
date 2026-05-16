@@ -448,8 +448,7 @@ async function notifyAdminsOfDeliverableEvent(
     ? `${recipientName} commented on “${deliverableTitle}”`
     : t.subject;
 
-  const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
-  const isLive = (settings?.stripe_mode || 'test') === 'live';
+  // isLive already resolved above where we filtered the recipient list.
   const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
 
   if (isLive) {

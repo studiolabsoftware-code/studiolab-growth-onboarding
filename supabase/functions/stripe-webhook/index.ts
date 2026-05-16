@@ -806,12 +806,25 @@ async function classifyInvoice(
     if (sub) return { ours: true, source: 'studiolab-growth-setup' };
   }
 
-  // 4. If the invoice was already linked to a submission in a prior event,
+  // 4. Quote-derived invoices. Stripe removed invoice_settings.metadata
+  // from the Quotes API, so the resulting invoice no longer inherits our
+  // source tag. The Invoice object still carries `invoice.quote` pointing
+  // back to the quote id, which our quotes ledger keys off — if we have
+  // a ledger row for that quote, the invoice is ours.
+  if (invoice.quote) {
+    const { data: q } = await sb.from('quotes')
+      .select('id')
+      .eq('stripe_quote_id', invoice.quote)
+      .maybeSingle();
+    if (q) return { ours: true, source: 'studiolab-growth-quote' };
+  }
+
+  // 5. If the invoice was already linked to a submission in a prior event,
   // reuse that classification.
   const prior = await submissionByInvoiceId(sb, invoice.id);
   if (prior) return { ours: true, source: 'studiolab-growth-setup' };
 
-  // 5. Customer-based match. invoice.customer maps to a submission's
+  // 6. Customer-based match. invoice.customer maps to a submission's
   // stripe_customer_id and the invoice has no subscription (branch 1
   // already filtered subscriptions), so this is one of our one-shot
   // invoices arriving before its PI got stored on the submission row.
@@ -826,7 +839,7 @@ async function classifyInvoice(
     if (byCustomer) return { ours: true, source: 'studiolab-growth-setup' };
   }
 
-  // 6. Last resort: nothing links the invoice to us. Skip.
+  // 7. Last resort: nothing links the invoice to us. Skip.
   return { ours: false, reason: 'no_link_to_studiolab_growth' };
 }
 

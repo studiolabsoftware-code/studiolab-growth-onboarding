@@ -400,14 +400,13 @@ Deno.serve(async (req) => {
     const daysUntilDue = acceptanceMode === 'pay_on_accept' ? 0 : 14;
 
     // ---- Create the Quote (draft).
-    const invoiceMeta: Record<string, unknown> = {
-      // Stamp source on the resulting invoice's metadata so classifyInvoice
-      // in the webhook lands on the studiolab-growth-quote branch and writes
-      // it to our ledger with kind='quote_invoice'.
-      source: 'studiolab-growth-quote',
-    };
-    if (submissionId) invoiceMeta.submission_id = submissionId;
-    if (externalContactId) invoiceMeta.external_contact_id = externalContactId;
+    // Stripe removed `invoice_settings.metadata` from the Quotes API (the
+    // POST returns `parameter_unknown` for it). The resulting invoice no
+    // longer inherits stamped metadata from the quote, so classifyInvoice
+    // falls back to its `invoice.quote -> quotes ledger` lookup branch to
+    // route quote-derived invoices into the right webhook path. Source +
+    // submission_id + external_contact_id still go on the QUOTE metadata
+    // below, which is preserved and visible on the quote object itself.
 
     const quoteMeta: Record<string, unknown> = {
       source: 'studiolab-growth-quote',
@@ -429,7 +428,6 @@ Deno.serve(async (req) => {
       invoice_settings: {
         days_until_due: daysUntilDue,
         issuer: { type: 'self' },
-        metadata: invoiceMeta,
       },
       metadata: quoteMeta,
       line_items: lineItemsArr,
