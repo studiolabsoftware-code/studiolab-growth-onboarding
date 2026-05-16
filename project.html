@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>StudioLAB Growth: Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/form.css">
+<link rel="stylesheet" href="css/portal.css?v=20260513a">
+<link rel="stylesheet" href="css/project.css?v=20260516a">
+<link rel="icon" type="image/png" href="/assets/studiolab-icon.png">
+<link rel="apple-touch-icon" href="/assets/studiolab-icon.png">
+<link rel="shortcut icon" href="/assets/studiolab-icon.png">
+</head>
+<body class="portal-body">
+
+<header class="portal-hdr">
+  <div class="portal-hdr-inner">
+    <a class="portal-logo" href="#" aria-label="StudioLAB Growth">
+      <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
+    </a>
+    <div class="portal-studio-name" id="projRecipientName"></div>
+    <div class="portal-spacer"></div>
+    <button type="button" class="btn-link" id="projRefresh" title="Refresh">↻</button>
+  </div>
+</header>
+
+<!-- Invalid / expired link -->
+<section id="projErrorView" class="portal-error" style="display:none">
+  <div class="portal-card">
+    <h1>This link is no longer valid</h1>
+    <p>The project link in your email may have expired or been revoked. Open the most recent email from us and click the <strong>"Open project"</strong> link again — it will always show your current project.</p>
+    <p class="portal-muted">If you cannot find a recent email, reply to <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a> and we will send you a fresh link.</p>
+  </div>
+</section>
+
+<!-- Main view -->
+<main id="projMain" class="portal-main" style="display:none">
+
+  <section class="proj-hero">
+    <div class="proj-hero-inner">
+      <div class="proj-hero-text">
+        <div class="proj-hero-kicker" id="projType">Service</div>
+        <h1 class="proj-hero-title" id="projName">Project</h1>
+        <div class="proj-hero-meta" id="projHeroMeta"></div>
+      </div>
+      <div class="proj-hero-status">
+        <span class="proj-status-pill" id="projStatusPill">In progress</span>
+      </div>
+    </div>
+  </section>
+
+  <nav class="portal-tabs" role="tablist" aria-label="Project sections">
+    <button type="button" class="portal-tab active" data-tab="overview" role="tab" aria-selected="true">📋 Overview</button>
+    <button type="button" class="portal-tab" data-tab="deliverables" role="tab" aria-selected="false">📦 Deliverables</button>
+    <button type="button" class="portal-tab" data-tab="invoices" role="tab" aria-selected="false">💳 Invoices</button>
+  </nav>
+
+  <section id="projTabOverview" class="portal-tab-panel" role="tabpanel">
+    <div class="proj-grid">
+      <div class="portal-card">
+        <h2 class="proj-card-title">What's happening</h2>
+        <p class="proj-card-body" id="projOverviewSummary">
+          Loading…
+        </p>
+      </div>
+      <div class="portal-card">
+        <h2 class="proj-card-title">Billing</h2>
+        <div class="proj-billing-total" id="projBilledTotal">—</div>
+        <div class="proj-billing-sub" id="projBilledSub">No invoices yet</div>
+      </div>
+      <div class="portal-card proj-card-wide">
+        <h2 class="proj-card-title">Recent activity</h2>
+        <ul class="proj-activity-list" id="projActivityList">
+          <li class="portal-loading">Loading…</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="projTabDeliverables" class="portal-tab-panel" role="tabpanel" style="display:none">
+    <div class="portal-card">
+      <h2 class="proj-card-title">Deliverables</h2>
+      <p class="proj-card-body">
+        Each piece of work we deliver shows up here. When something is ready for you to look at, you'll be able to <strong>approve</strong> it or <strong>request revisions</strong> right from this page.
+      </p>
+      <p class="proj-card-body portal-muted">
+        We're shipping this view shortly. In the meantime, watch for an email when your first deliverable is ready.
+      </p>
+    </div>
+  </section>
+
+  <section id="projTabInvoices" class="portal-tab-panel" role="tabpanel" style="display:none">
+    <div class="portal-card">
+      <h2 class="proj-card-title">Invoices</h2>
+      <p class="proj-card-body portal-muted">Every invoice linked to this project.</p>
+      <div id="projInvoicesList"></div>
+    </div>
+  </section>
+
+</main>
+
+<script src="js/project.js?v=20260516a"></script>
+</body>
+</html>

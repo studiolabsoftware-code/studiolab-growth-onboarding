@@ -1,0 +1,147 @@
+/* Client-facing project page. Sits on top of portal.css so the header,
+   tabs, body background, and card chrome match the studio inbox view. */
+
+.proj-hero {
+  background: linear-gradient(135deg, #2D2459 0%, #13102E 100%);
+  color: #fff;
+  border-radius: 18px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 16px 48px rgba(19, 16, 46, 0.18);
+}
+.proj-hero-inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.proj-hero-text { min-width: 0; flex: 1; }
+.proj-hero-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+}
+.proj-hero-title {
+  font-size: 30px;
+  line-height: 1.15;
+  margin: 0;
+  font-weight: 700;
+}
+.proj-hero-meta {
+  margin-top: 10px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.78);
+}
+.proj-hero-status { flex-shrink: 0; }
+
+.proj-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.proj-card-wide { grid-column: 1 / -1; }
+
+.proj-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #6b6890;
+  margin: 0 0 12px;
+}
+.proj-card-body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #2A2548;
+}
+
+.proj-billing-total {
+  font-size: 32px;
+  font-weight: 700;
+  color: #13102E;
+  line-height: 1;
+}
+.proj-billing-sub {
+  margin-top: 4px;
+  color: #6b6890;
+  font-size: 13px;
+}
+
+.proj-activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.proj-activity-list li {
+  display: flex;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid #ECEAF5;
+  font-size: 14px;
+  align-items: baseline;
+}
+.proj-activity-list li:last-child { border-bottom: 0; }
+.proj-activity-when {
+  color: #6b6890;
+  min-width: 110px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.proj-activity-what { color: #2A2548; }
+
+/* Status pill */
+.proj-status-pill {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  background: #ECEAF5;
+  color: #2A2548;
+  white-space: nowrap;
+}
+.proj-status-pill.ps-briefing { background: #EEF2FF; color: #3730A3; }
+.proj-status-pill.ps-in_progress { background: #DBEAFE; color: #1E40AF; }
+.proj-status-pill.ps-review { background: #FEF3C7; color: #92400E; }
+.proj-status-pill.ps-complete { background: #DCFCE7; color: #15803D; }
+.proj-status-pill.ps-on_hold { background: #FFE4E6; color: #9F1239; }
+.proj-status-pill.ps-cancelled { background: #FEE2E2; color: #991B1B; }
+
+/* Invoices table */
+.proj-inv-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+.proj-inv-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #6b6890;
+  padding: 10px 14px 10px 0;
+  border-bottom: 1px solid #ECEAF5;
+}
+.proj-inv-table td {
+  padding: 14px 14px 14px 0;
+  border-bottom: 1px solid #ECEAF5;
+  font-size: 14px;
+  color: #2A2548;
+  vertical-align: middle;
+}
+.proj-inv-table tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 600px) {
+  .proj-hero { padding: 22px 20px; border-radius: 14px; }
+  .proj-hero-title { font-size: 24px; }
+  .proj-hero-inner { flex-direction: column; align-items: stretch; }
+  .proj-hero-status { align-self: flex-start; }
+}

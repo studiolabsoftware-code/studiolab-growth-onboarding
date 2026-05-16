@@ -334,7 +334,7 @@
       sb.from('projects')
         .select(`
           id, name, project_type, status, currency, due_at, notes, created_at, completed_at, cancelled_at,
-          submission_id, external_contact_id, owner_admin_id,
+          submission_id, external_contact_id, owner_admin_id, token, token_expires_at,
           submission:submissions(id, studio_name, contact_email),
           external_contact:external_contacts(id, name, email)
         `)
@@ -410,6 +410,20 @@
           </section>
 
           <section class="proj-card proj-card-wide">
+            <div class="proj-card-hdr"><h3>Share with client</h3></div>
+            <div class="proj-card-body">
+              ${p.token
+                ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input type="text" id="projClientUrl" readonly value="${ESC(window.location.origin + '/project/?p=' + encodeURIComponent(p.id) + '&t=' + encodeURIComponent(p.token))}" style="flex:1;min-width:280px;padding:8px 10px;border:1px solid var(--g2);border-radius:8px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--g1);">
+                    <button type="button" class="btn btn-g" id="projCopyUrl">Copy link</button>
+                    <a class="btn btn-g" href="${ESC(window.location.origin + '/project/?p=' + encodeURIComponent(p.id) + '&t=' + encodeURIComponent(p.token))}" target="_blank" rel="noopener">Preview</a>
+                  </div>
+                  <div style="color:var(--g6);font-size:12px;margin-top:8px;">Anyone with this link can view the project. ${p.token_expires_at ? `Link expires ${shortDate(p.token_expires_at)}.` : ''}</div>`
+                : `<div class="adm-empty" style="padding:16px 0;">No client link yet — this project was created without a magic-link token.</div>`}
+            </div>
+          </section>
+
+          <section class="proj-card proj-card-wide">
             <div class="proj-card-hdr"><h3>Deliverables</h3></div>
             <div class="proj-card-body">
               <div class="adm-empty" style="padding:24px 0;">Coming in Phase 6.3 — per-project deliverables with submit-for-review, client approve, and revisions.</div>
@@ -457,6 +471,23 @@
           </section>` : ''}
         </div>
       </div>`;
+
+    const copyBtn = screen.querySelector('#projCopyUrl');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        const input = screen.querySelector('#projClientUrl');
+        if (!input) return;
+        try {
+          await navigator.clipboard.writeText(input.value);
+          const orig = copyBtn.textContent;
+          copyBtn.textContent = 'Copied ✓';
+          setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+        } catch (_) {
+          input.select();
+          document.execCommand('copy');
+        }
+      });
+    }
 
     screen.querySelector('#projBack').addEventListener('click', () => {
       if (window.AdminAuth && window.AdminAuth.showSection) window.AdminAuth.showSection('projects');
