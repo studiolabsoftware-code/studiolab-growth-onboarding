@@ -27,11 +27,23 @@ Deno.serve(async (req) => {
 
     const sb = adminClient();
     const { data: row } = await sb.from('submission_attachments')
-      .select('id, submission_id, storage_path, file_name, uploaded_by_role')
+      .select('id, submission_id, storage_path, file_name, uploaded_by_role, deliverable_id')
       .eq('id', attachmentId)
       .maybeSingle();
     if (!row) {
       return jsonResponse({ ok: true, skipped: 'already_gone' });
+    }
+
+    // For deliverable-scoped files, resolve the parent project so we can
+    // record the deletion on the project timeline. Studio session_token
+    // auth does not apply to deliverable files (those are admin-managed).
+    let deliverableProjectId: string | null = null;
+    if (row.deliverable_id) {
+      const { data: deliv } = await sb.from('deliverables')
+        .select('project_id')
+        .eq('id', row.deliverable_id)
+        .maybeSingle();
+      deliverableProjectId = deliv?.project_id || null;
     }
 
     // ---- Auth
@@ -85,13 +97,16 @@ Deno.serve(async (req) => {
     }
 
     try {
+      const isDeliverableScope = !!row.deliverable_id;
       await sb.from('activity_log').insert({
         submission_id: row.submission_id,
-        action: 'attachment_deleted',
+        project_id: isDeliverableScope ? deliverableProjectId : null,
+        action: isDeliverableScope ? 'deliverable_file_removed' : 'attachment_deleted',
         actor,
         details: {
           attachment_id: row.id,
           file_name: row.file_name,
+          deliverable_id: row.deliverable_id || null,
           storage_orphan: !!storageErr,
         },
       });

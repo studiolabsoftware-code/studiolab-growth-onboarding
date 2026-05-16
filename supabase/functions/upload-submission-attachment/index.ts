@@ -1,5 +1,5 @@
 // Uploads a single file to the submission-attachments bucket and records
-// the metadata row. Three auth paths:
+// the metadata row. Four auth paths:
 //
 //   1. Studio session_token (FORM context) — passed in form data as
 //      `session_token`. Matched against submissions.session_token_hash;
@@ -13,19 +13,31 @@
 //      studio portal composer where the studio is authenticated by the
 //      magic-link token rather than a submission session.
 //
-//   3. Admin Authorization JWT — verified via getCallerProfile.
-//      submission_id comes from the form body; admin can upload against
-//      any submission. uploaded_by_role='admin'.
+//   3. Admin Authorization JWT (submission scope) — verified via
+//      getCallerProfile. submission_id comes from the form body; admin can
+//      upload against any submission. uploaded_by_role='admin'.
 //
-// Storage path: `{submission_id}/{uuid}-{sanitised-filename}` inside the
-// `submission-attachments` bucket. Bucket is private; downloads always
-// go through get-attachment-download-url which returns short-lived
-// signed URLs.
+//   4. Admin Authorization JWT (deliverable scope) — admin uploads a file
+//      against a specific deliverable on a project. deliverable_id is
+//      required; submission_id is derived from projects.submission_id (or
+//      null for external-contact projects). uploaded_by_role='admin'.
+//      Storage path uses the deliverable's parent project id when there's
+//      no submission.
+//
+// Storage path:
+//   * submission scope:  `{submission_id}/{uuid}-{sanitised-filename}`
+//   * deliverable scope (studio): `{submission_id}/{uuid}-{name}` (so it
+//     still falls under the submission-status retention trigger)
+//   * deliverable scope (external): `projects/{project_id}/{uuid}-{name}`
+//
+// Bucket is private; downloads always go through get-attachment-download-url
+// which returns short-lived signed URLs.
 //
 // Validation:
 //   * file size 1 byte .. 25 MB (matches DB CHECK + bucket cap)
 //   * MIME type allowlist (matches bucket allowed_mime_types)
-//   * max 5 files per submission (form context) or per message (inbox)
+//   * max 5 files per submission (form context), per message (inbox), or
+//     per deliverable (admin/deliverable context)
 
 import { preflight, jsonResponse, corsHeaders } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
@@ -49,6 +61,9 @@ const MAX_BYTES = 25 * 1024 * 1024;
 // Per-context limits to prevent abuse.
 const MAX_FILES_PER_SUBMISSION = 5;  // form context
 const MAX_FILES_PER_MESSAGE = 5;     // inbox context
+const MAX_FILES_PER_DELIVERABLE = 10; // admin/deliverable context — higher
+                                      // than form/inbox because deliverables
+                                      // often bundle multiple drafts/exports.
 
 function sanitiseFilename(name: string): string {
   // Keep alphanumerics, dash, underscore, dot, and space — replace
@@ -71,9 +86,14 @@ Deno.serve(async (req) => {
     const file = formData.get('file');
     let submissionIdInput = String(formData.get('submission_id') || '').trim();
     const messageIdInput = String(formData.get('message_id') || '').trim() || null;
+    const deliverableIdInput = String(formData.get('deliverable_id') || '').trim() || null;
     const sessionToken = String(formData.get('session_token') || '').trim();
     const conversationIdInput = String(formData.get('conversation_id') || '').trim();
     const conversationToken = String(formData.get('token') || '').trim();
+
+    // Resolved per-upload context. deliverable-scope writes also use this
+    // to remember the parent project for the storage path + activity_log.
+    let deliverableProjectId: string | null = null;
 
     if (!(file instanceof File)) {
       return jsonResponse({ ok: false, error: 'No file in the upload payload.' }, 400);
@@ -151,13 +171,35 @@ Deno.serve(async (req) => {
       uploadedByRole = 'studio';
       actor = `studio:conv:${conversationIdInput}`;
     } else {
-      // Admin path: JWT in Authorization header.
+      // Admin path: JWT in Authorization header. Two sub-cases:
+      //   * deliverable scope: deliverable_id supplied; submission_id is
+      //     derived from the deliverable's project (may be null for an
+      //     external-contact project).
+      //   * submission scope: submission_id supplied; legacy behaviour.
       const caller = await getCallerProfile(req);
       if (!caller) {
         return jsonResponse({ ok: false, error: 'Sign-in required to upload files.' }, 401);
       }
-      if (!submissionIdInput) {
-        return jsonResponse({ ok: false, error: 'submission_id is required.' }, 400);
+      if (deliverableIdInput) {
+        const { data: deliv } = await sb.from('deliverables')
+          .select('id, project_id, projects:project_id(id, submission_id, external_contact_id)')
+          .eq('id', deliverableIdInput)
+          .maybeSingle();
+        if (!deliv) {
+          return jsonResponse({ ok: false, error: 'Deliverable not found.' }, 404);
+        }
+        // Supabase returns the joined row as an object (single related row).
+        const proj = (deliv as { projects?: { id: string; submission_id: string | null; external_contact_id: string | null } | null }).projects;
+        if (!proj) {
+          return jsonResponse({ ok: false, error: 'Deliverable has no parent project.' }, 400);
+        }
+        deliverableProjectId = proj.id;
+        submissionIdInput = proj.submission_id || '';
+        if (!submissionIdInput && !proj.external_contact_id) {
+          return jsonResponse({ ok: false, error: 'Deliverable project has no recipient.' }, 400);
+        }
+      } else if (!submissionIdInput) {
+        return jsonResponse({ ok: false, error: 'submission_id or deliverable_id is required.' }, 400);
       }
       uploadedByRole = 'admin';
       uploadedByAdminId = caller.id;
@@ -165,7 +207,17 @@ Deno.serve(async (req) => {
     }
 
     // ---- Per-context file count enforcement
-    if (messageIdInput) {
+    if (deliverableIdInput) {
+      const { count } = await sb.from('submission_attachments')
+        .select('id', { count: 'exact', head: true })
+        .eq('deliverable_id', deliverableIdInput);
+      if ((count ?? 0) >= MAX_FILES_PER_DELIVERABLE) {
+        return jsonResponse({
+          ok: false,
+          error: `This deliverable already has ${MAX_FILES_PER_DELIVERABLE} files — the maximum allowed.`,
+        }, 400);
+      }
+    } else if (messageIdInput) {
       const { count } = await sb.from('submission_attachments')
         .select('id', { count: 'exact', head: true })
         .eq('message_id', messageIdInput);
@@ -177,11 +229,12 @@ Deno.serve(async (req) => {
       }
     } else {
       // Form context — count attachments on this submission that are
-      // NOT attached to a message.
+      // NOT attached to a message or deliverable.
       const { count } = await sb.from('submission_attachments')
         .select('id', { count: 'exact', head: true })
         .eq('submission_id', submissionIdInput)
-        .is('message_id', null);
+        .is('message_id', null)
+        .is('deliverable_id', null);
       if ((count ?? 0) >= MAX_FILES_PER_SUBMISSION) {
         return jsonResponse({
           ok: false,
@@ -191,12 +244,14 @@ Deno.serve(async (req) => {
     }
 
     // ---- Storage path and upload
-    // Path scheme keeps related files grouped per submission, and the
-    // UUID prefix prevents collisions even if two studios uploaded a file
-    // with the same name simultaneously.
+    // Path scheme keeps related files grouped, with a UUID prefix to prevent
+    // collisions. Deliverables on external-contact projects can't use a
+    // submission_id (there isn't one), so they live under projects/<id>/.
     const cleanName = sanitiseFilename(file.name);
     const objectId = crypto.randomUUID();
-    const storagePath = `${submissionIdInput}/${objectId}-${cleanName}`;
+    const storagePath = submissionIdInput
+      ? `${submissionIdInput}/${objectId}-${cleanName}`
+      : `projects/${deliverableProjectId}/${objectId}-${cleanName}`;
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const { error: uploadErr } = await sb.storage
@@ -216,8 +271,9 @@ Deno.serve(async (req) => {
     // ---- Metadata row
     const { data: row, error: rowErr } = await sb.from('submission_attachments')
       .insert({
-        submission_id: submissionIdInput,
+        submission_id: submissionIdInput || null,
         message_id: messageIdInput,
+        deliverable_id: deliverableIdInput,
         storage_path: storagePath,
         file_name: cleanName,
         mime_type: file.type,
@@ -225,7 +281,7 @@ Deno.serve(async (req) => {
         uploaded_by_role: uploadedByRole,
         uploaded_by_admin_id: uploadedByAdminId,
       })
-      .select('id, submission_id, message_id, file_name, mime_type, size_bytes, uploaded_at, expires_at')
+      .select('id, submission_id, message_id, deliverable_id, file_name, mime_type, size_bytes, uploaded_at, expires_at')
       .single();
 
     if (rowErr || !row) {
@@ -240,17 +296,20 @@ Deno.serve(async (req) => {
     }
 
     try {
+      const isDeliverableScope = !!deliverableIdInput;
       await sb.from('activity_log').insert({
-        submission_id: submissionIdInput,
-        action: 'attachment_uploaded',
+        submission_id: submissionIdInput || null,
+        project_id: isDeliverableScope ? deliverableProjectId : null,
+        action: isDeliverableScope ? 'deliverable_file_attached' : 'attachment_uploaded',
         actor,
         details: {
           attachment_id: row.id,
           file_name: row.file_name,
           size_bytes: row.size_bytes,
           mime_type: row.mime_type,
-          context: messageIdInput ? 'message' : 'form',
+          context: isDeliverableScope ? 'deliverable' : (messageIdInput ? 'message' : 'form'),
           message_id: messageIdInput,
+          deliverable_id: deliverableIdInput,
         },
       });
     } catch (e) { console.error('activity_log insert failed:', e); }

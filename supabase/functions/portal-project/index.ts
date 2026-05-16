@@ -3,12 +3,13 @@
 // page never sees admin internal notes or unrelated data.
 //
 // Actions:
-//   load — returns project header + recipient summary + linked invoices +
-//          client-visible activity events.
-//
-// Phase 6.3 will add deliverable actions (load deliverables, approve,
-// request revisions). Phase 6.4 will add file-attachment download URLs
-// and message-send hooks for project-scoped conversations.
+//   load                       — project header + recipient + invoices + activity
+//                                + client-visible deliverables (with their
+//                                client-visible attachments + comment counts)
+//   approve-deliverable        — { deliverable_id }
+//   request-revisions          — { deliverable_id, notes }
+//   list-deliverable-comments  — { deliverable_id } → comments thread
+//   add-deliverable-comment    — { deliverable_id, body } → append client comment
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
@@ -17,12 +18,18 @@ import { sendEmail } from '../_shared/mailgun.ts';
 import { deliverableApprovedAdmin, deliverableRevisionsRequestedAdmin } from '../_shared/email-templates.ts';
 
 interface RequestBody {
-  action: 'load' | 'approve-deliverable' | 'request-revisions';
+  action:
+    | 'load'
+    | 'approve-deliverable'
+    | 'request-revisions'
+    | 'list-deliverable-comments'
+    | 'add-deliverable-comment';
   project_id: string;
   token: string;
   // Per-action fields
-  deliverable_id?: string;     // approve / request-revisions
-  notes?: string;              // request-revisions
+  deliverable_id?: string;
+  notes?: string;
+  body?: string;
 }
 
 // Activity actions that are safe to surface on the client view. Anything
@@ -40,6 +47,8 @@ const CLIENT_VISIBLE_ACTIONS = new Set([
   'deliverable_revisions_requested',
   'deliverable_approved',
   'deliverable_delivered',
+  'deliverable_file_attached',
+  'deliverable_comment_added',
 ]);
 
 Deno.serve(async (req) => {
@@ -60,10 +69,12 @@ Deno.serve(async (req) => {
     if (!auth.ok) return jsonResponse({ ok: false, error: 'Invalid or expired link.' }, 401);
 
     switch (action) {
-      case 'load':                return await actLoad(sb, projectId, auth);
-      case 'approve-deliverable': return await actApproveDeliverable(sb, projectId, payload);
-      case 'request-revisions':   return await actRequestRevisions(sb, projectId, payload);
-      default:                    return jsonResponse({ ok: false, error: 'Unknown action.' }, 400);
+      case 'load':                       return await actLoad(sb, projectId, auth);
+      case 'approve-deliverable':        return await actApproveDeliverable(sb, projectId, payload);
+      case 'request-revisions':          return await actRequestRevisions(sb, projectId, payload);
+      case 'list-deliverable-comments':  return await actListDeliverableComments(sb, projectId, payload);
+      case 'add-deliverable-comment':    return await actAddDeliverableComment(sb, projectId, payload);
+      default:                           return jsonResponse({ ok: false, error: 'Unknown action.' }, 400);
     }
   } catch (err) {
     console.error('portal-project error:', err);
@@ -97,6 +108,33 @@ async function actLoad(sb: any, projectId: string, auth: { submissionId?: string
   ]);
 
   if (!project) return jsonResponse({ ok: false, error: 'Project not found.' }, 404);
+
+  // Fetch attachments + comment counts scoped to the client-visible
+  // deliverables in one round-trip each.
+  const deliverableIds = (deliverables || []).map((d: { id: string }) => d.id);
+  const attachmentsByDeliverable: Record<string, Array<{ id: string; file_name: string; mime_type: string; size_bytes: number; uploaded_at: string }>> = {};
+  const commentCountByDeliverable: Record<string, number> = {};
+  if (deliverableIds.length) {
+    const [{ data: atts }, { data: comments }] = await Promise.all([
+      sb.from('submission_attachments')
+        .select('id, deliverable_id, file_name, mime_type, size_bytes, uploaded_at')
+        .in('deliverable_id', deliverableIds)
+        .order('uploaded_at', { ascending: true }),
+      sb.from('deliverable_comments')
+        .select('deliverable_id')
+        .in('deliverable_id', deliverableIds),
+    ]);
+    for (const a of (atts || [])) {
+      const k = a.deliverable_id as string;
+      (attachmentsByDeliverable[k] = attachmentsByDeliverable[k] || []).push({
+        id: a.id, file_name: a.file_name, mime_type: a.mime_type, size_bytes: a.size_bytes, uploaded_at: a.uploaded_at,
+      });
+    }
+    for (const c of (comments || [])) {
+      const k = c.deliverable_id as string;
+      commentCountByDeliverable[k] = (commentCountByDeliverable[k] || 0) + 1;
+    }
+  }
 
   const isStudio = !!project.submission_id;
   const recipientName = isStudio
@@ -161,6 +199,8 @@ async function actLoad(sb: any, projectId: string, auth: { submissionId?: string
       approved_at: d.approved_at,
       delivered_at: d.delivered_at,
       revisions_notes: d.revisions_notes,
+      attachments: attachmentsByDeliverable[d.id] || [],
+      comment_count: commentCountByDeliverable[d.id] || 0,
     })),
     // Cosmetic-only flag for the client side. Never trust for authorisation
     // — the server already enforced the project token above.
@@ -261,11 +301,102 @@ async function actRequestRevisions(sb: any, projectId: string, payload: Partial<
 }
 
 // deno-lint-ignore no-explicit-any
+async function actListDeliverableComments(sb: any, projectId: string, payload: Partial<RequestBody>) {
+  const deliverableId = (payload.deliverable_id || '').trim();
+  if (!deliverableId) return jsonResponse({ ok: false, error: 'deliverable_id is required.' }, 400);
+
+  // Confirm the deliverable belongs to this project and is client-visible.
+  const { data: deliv } = await sb.from('deliverables')
+    .select('id, project_id, visibility')
+    .eq('id', deliverableId)
+    .maybeSingle();
+  if (!deliv || deliv.project_id !== projectId || deliv.visibility !== 'client') {
+    return jsonResponse({ ok: false, error: 'Forbidden.' }, 403);
+  }
+
+  const { data: rows } = await sb.from('deliverable_comments')
+    .select('id, author_kind, author_label, body, created_at')
+    .eq('deliverable_id', deliverableId)
+    .order('created_at', { ascending: true });
+
+  return jsonResponse({ ok: true, comments: rows || [] });
+}
+
+// deno-lint-ignore no-explicit-any
+async function actAddDeliverableComment(sb: any, projectId: string, payload: Partial<RequestBody>) {
+  const deliverableId = (payload.deliverable_id || '').trim();
+  const text = (payload.body || '').trim();
+  if (!deliverableId) return jsonResponse({ ok: false, error: 'deliverable_id is required.' }, 400);
+  if (!text) return jsonResponse({ ok: false, error: 'Comment cannot be empty.' }, 400);
+  if (text.length > 4000) return jsonResponse({ ok: false, error: 'Comment is too long.' }, 400);
+
+  const { data: deliv } = await sb.from('deliverables')
+    .select('id, project_id, visibility, title')
+    .eq('id', deliverableId)
+    .maybeSingle();
+  if (!deliv || deliv.project_id !== projectId || deliv.visibility !== 'client') {
+    return jsonResponse({ ok: false, error: 'Forbidden.' }, 403);
+  }
+
+  // Resolve a friendly author label from the project recipient — snapshot
+  // at write time so renames upstream don't rewrite historic comments.
+  const { data: project } = await sb.from('projects')
+    .select(`
+      id, submission_id, external_contact_id,
+      submission:submissions(studio_name, contact_email, first_name, last_name),
+      external_contact:external_contacts(name, email)
+    `)
+    .eq('id', projectId)
+    .maybeSingle();
+  const authorLabel = project?.submission_id
+    ? (project.submission?.studio_name
+      || [project.submission?.first_name, project.submission?.last_name].filter(Boolean).join(' ')
+      || project.submission?.contact_email
+      || 'Client')
+    : (project?.external_contact?.name || project?.external_contact?.email || 'Client');
+
+  const { data: inserted, error: insErr } = await sb.from('deliverable_comments')
+    .insert({
+      deliverable_id: deliverableId,
+      project_id: projectId,
+      author_kind: 'client',
+      author_admin_id: null,
+      author_label: authorLabel,
+      body: text,
+    })
+    .select('id, author_kind, author_label, body, created_at')
+    .single();
+  if (insErr || !inserted) {
+    return jsonResponse({ ok: false, error: insErr?.message || 'Comment insert failed.' }, 500);
+  }
+
+  try {
+    await sb.from('activity_log').insert({
+      project_id: projectId,
+      action: 'deliverable_comment_added',
+      actor: 'client',
+      details: { deliverable_id: deliverableId, author_kind: 'client', excerpt: text.slice(0, 200) },
+    });
+  } catch (_) {}
+
+  // Best-effort admin notification. Reuses the existing email notifier in
+  // 'comment' mode so admins see comment activity alongside approve /
+  // revisions events. Gated on stripe_mode in test like every other email.
+  try {
+    await notifyAdminsOfDeliverableEvent(sb, projectId, deliv.title, 'comment', text);
+  } catch (e) {
+    console.warn('admin deliverable_comment_added email failed:', e);
+  }
+
+  return jsonResponse({ ok: true, comment: inserted });
+}
+
+// deno-lint-ignore no-explicit-any
 async function notifyAdminsOfDeliverableEvent(
   sb: any,
   projectId: string,
   deliverableTitle: string,
-  kind: 'approved' | 'revisions',
+  kind: 'approved' | 'revisions' | 'comment',
   notes?: string,
 ) {
   const { data: project } = await sb.from('projects')
@@ -292,6 +423,9 @@ async function notifyAdminsOfDeliverableEvent(
   const adminOrigin = (Deno.env.get('ADMIN_APP_URL') || 'https://app.studiolabgrowth.com/admin/').replace(/\/$/, '/');
   const adminUrl = `${adminOrigin}#projects/${encodeURIComponent(projectId)}`;
 
+  // Comments piggy-back on the revisions template — same shape (recipient +
+  // deliverable + body block). Subject line is rewritten so admins can tell
+  // a comment apart from a revisions request at a glance.
   const t = kind === 'approved'
     ? deliverableApprovedAdmin({
         recipientName,
@@ -307,19 +441,23 @@ async function notifyAdminsOfDeliverableEvent(
         adminUrl,
       });
 
+  const subject = kind === 'comment'
+    ? `${recipientName} commented on “${deliverableTitle}”`
+    : t.subject;
+
   const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
   const isLive = (settings?.stripe_mode || 'test') === 'live';
   const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
 
   if (isLive) {
-    await sendEmail({ to, subject: t.subject, html: t.html });
+    await sendEmail({ to, subject, html: t.html });
   } else if (testRecipient) {
     await sendEmail({
       to: testRecipient,
-      subject: `[TEST · admin deliverable ${kind}] ${t.subject}`,
+      subject: `[TEST · admin deliverable ${kind}] ${subject}`,
       html: t.html,
     });
   } else {
-    await sendEmail({ to, subject: t.subject, html: t.html });
+    await sendEmail({ to, subject, html: t.html });
   }
 }

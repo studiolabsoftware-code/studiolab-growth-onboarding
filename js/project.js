@@ -56,6 +56,10 @@
     deliverables: [],
     billedCents: 0,
     activeTab: 'overview',
+    // Comments are loaded lazily — only when the client expands a card.
+    // Keyed by deliverable_id so re-rendering preserves loaded threads.
+    commentsByDeliverable: {},
+    expandedComments: new Set(),
   };
 
   const $ = (id) => document.getElementById(id);
@@ -196,6 +200,43 @@
       } else {
         statusBlock = `<span class="proj-status-pill">${ESC(DELIV_STATUS_LABEL[d.status] || d.status)}</span>`;
       }
+
+      const attachments = Array.isArray(d.attachments) ? d.attachments : [];
+      const filesHtml = attachments.length ? `
+        <div class="proj-deliv-files">
+          <div class="proj-deliv-files-hdr">Files</div>
+          ${attachments.map((a) => {
+            const kb = Math.max(1, Math.round((a.size_bytes || 0) / 1024));
+            const sizeLabel = kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
+            return `<button type="button" class="proj-deliv-file" data-deliv-act="download" data-att-id="${ESC(a.id)}" data-att-name="${ESC(a.file_name)}">
+              <span class="proj-deliv-file-name">${ESC(a.file_name)}</span>
+              <span class="proj-deliv-file-meta">${sizeLabel} · ${shortDate(a.uploaded_at)}</span>
+              <span class="proj-deliv-file-dl">↓ Download</span>
+            </button>`;
+          }).join('')}
+        </div>` : '';
+
+      const isExpanded = state.expandedComments.has(d.id);
+      const commentCount = d.comment_count || 0;
+      const commentsToggleLabel = isExpanded
+        ? 'Hide comments'
+        : (commentCount > 0
+          ? `View ${commentCount} comment${commentCount === 1 ? '' : 's'}`
+          : 'Add a comment');
+      const commentsBlock = isExpanded ? `
+        <div class="proj-deliv-comments" id="proj-comments-${ESC(d.id)}">
+          <div class="proj-deliv-comments-list">
+            <div class="portal-muted" style="font-size:13px;">Loading…</div>
+          </div>
+          <div class="proj-deliv-comment-compose">
+            <textarea data-deliv-id="${ESC(d.id)}" class="proj-deliv-comment-input" rows="2" placeholder="Reply to the team…"></textarea>
+            <div class="proj-deliv-comment-row">
+              <button type="button" class="btn btn-p" data-deliv-act="comment-send" data-deliv-id="${ESC(d.id)}">Post comment</button>
+              <span class="proj-deliv-comment-status" data-deliv-id="${ESC(d.id)}"></span>
+            </div>
+          </div>
+        </div>` : '';
+
       return `<div class="proj-deliv-card" data-deliv-id="${ESC(d.id)}">
         <div class="proj-deliv-hdr">
           <div class="proj-deliv-title">${ESC(d.title)}</div>
@@ -203,23 +244,167 @@
         </div>
         ${due}
         ${desc}
+        ${filesHtml}
         ${actionsHtml}
+        <div class="proj-deliv-comments-toggle">
+          <button type="button" class="btn-link" data-deliv-act="toggle-comments" data-deliv-id="${ESC(d.id)}">💬 ${commentsToggleLabel}</button>
+        </div>
+        ${commentsBlock}
       </div>`;
     }).join('');
     host.innerHTML = `<div class="proj-deliv-stack">${cards}</div>`;
 
-    host.addEventListener('click', onDeliverableClick, { once: false });
+    if (!host._bound) {
+      host._bound = true;
+      host.addEventListener('click', onDeliverableClick, { once: false });
+    }
+
+    // Hydrate any expanded comment threads — render whatever we have cached
+    // and kick off a refresh in the background.
+    for (const id of state.expandedComments) {
+      const listHost = document.querySelector(`#proj-comments-${cssId(id)} .proj-deliv-comments-list`);
+      if (!listHost) continue;
+      const cached = state.commentsByDeliverable[id];
+      if (cached) renderClientComments(listHost, cached);
+      loadDeliverableCommentsClient(id).then((rows) => {
+        state.commentsByDeliverable[id] = rows;
+        const stillHost = document.querySelector(`#proj-comments-${cssId(id)} .proj-deliv-comments-list`);
+        if (stillHost) renderClientComments(stillHost, rows);
+      });
+    }
   }
 
-  let _delivClickBound = false;
+  function cssId(id) {
+    // CSS attribute selectors choke on UUID dashes when used naïvely in
+    // template strings, but the id itself is fine inside an id="" — we
+    // just need a safe lookup helper that uses CSS.escape when present.
+    return (window.CSS && window.CSS.escape) ? CSS.escape(id) : id;
+  }
+
   function onDeliverableClick(e) {
     const btn = e.target.closest('[data-deliv-act]');
     if (!btn) return;
     e.preventDefault();
     const act = btn.getAttribute('data-deliv-act');
-    const id = btn.getAttribute('data-deliv-id');
-    if (act === 'approve') approveDeliverable(id);
-    if (act === 'revisions') openRevisionsDialog(id);
+    const id = btn.getAttribute('data-deliv-id') || btn.getAttribute('data-att-id');
+    if (act === 'approve') return approveDeliverable(id);
+    if (act === 'revisions') return openRevisionsDialog(id);
+    if (act === 'download') return downloadDeliverableFile(btn.getAttribute('data-att-id'), btn.getAttribute('data-att-name'));
+    if (act === 'toggle-comments') return toggleComments(btn.getAttribute('data-deliv-id'));
+    if (act === 'comment-send') return sendComment(btn.getAttribute('data-deliv-id'));
+  }
+
+  async function downloadDeliverableFile(attachmentId, fileName) {
+    if (!attachmentId) return;
+    try {
+      const resp = await fetch(FN_BASE + 'get-attachment-download-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attachment_id: attachmentId,
+          project_id: state.projectId,
+          token: state.token,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok || !data.url) {
+        alert(data.error || 'Could not get the download link. Please refresh and try again.');
+        return;
+      }
+      window.open(data.url, '_blank', 'noopener');
+    } catch (err) {
+      console.error('download failed:', err);
+      alert('Could not download ' + (fileName || 'the file') + '. Please try again.');
+    }
+  }
+
+  function toggleComments(deliverableId) {
+    if (state.expandedComments.has(deliverableId)) {
+      state.expandedComments.delete(deliverableId);
+    } else {
+      state.expandedComments.add(deliverableId);
+    }
+    renderDeliverables();
+  }
+
+  async function loadDeliverableCommentsClient(deliverableId) {
+    try {
+      const resp = await fetch(FN_BASE + 'portal-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'list-deliverable-comments',
+          project_id: state.projectId,
+          token: state.token,
+          deliverable_id: deliverableId,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) return [];
+      return data.comments || [];
+    } catch (err) {
+      console.error('comments load failed:', err);
+      return [];
+    }
+  }
+
+  function renderClientComments(host, comments) {
+    if (!comments.length) {
+      host.innerHTML = '<div class="portal-muted" style="font-size:13px;padding:6px 0;">No comments yet — start the conversation below.</div>';
+      return;
+    }
+    host.innerHTML = comments.map((c) => {
+      const isAdmin = c.author_kind === 'admin';
+      const bubbleCls = isAdmin ? 'proj-comment proj-comment-admin' : 'proj-comment proj-comment-client';
+      return `<div class="${bubbleCls}">
+        <div class="proj-comment-meta">
+          <strong>${ESC(c.author_label || (isAdmin ? 'StudioLAB team' : 'You'))}</strong>
+          <span>${ESC(shortDate(c.created_at))}</span>
+        </div>
+        <div class="proj-comment-body">${ESC(c.body)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  async function sendComment(deliverableId) {
+    const input = document.querySelector(`.proj-deliv-comment-input[data-deliv-id="${cssId(deliverableId)}"]`);
+    const statusEl = document.querySelector(`.proj-deliv-comment-status[data-deliv-id="${cssId(deliverableId)}"]`);
+    if (!input) return;
+    const text = (input.value || '').trim();
+    if (!text) {
+      if (statusEl) statusEl.textContent = 'Comment cannot be empty.';
+      return;
+    }
+    if (statusEl) statusEl.textContent = 'Posting…';
+    try {
+      const resp = await fetch(FN_BASE + 'portal-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add-deliverable-comment',
+          project_id: state.projectId,
+          token: state.token,
+          deliverable_id: deliverableId,
+          body: text,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        if (statusEl) statusEl.textContent = data.error || 'Could not post.';
+        return;
+      }
+      input.value = '';
+      if (statusEl) statusEl.textContent = '';
+      // Reload + re-render so the count and thread refresh together.
+      const rows = await loadDeliverableCommentsClient(deliverableId);
+      state.commentsByDeliverable[deliverableId] = rows;
+      const deliv = state.deliverables.find((d) => d.id === deliverableId);
+      if (deliv) deliv.comment_count = rows.length;
+      renderDeliverables();
+    } catch (err) {
+      console.error('comment send failed:', err);
+      if (statusEl) statusEl.textContent = 'Could not post. Try again.';
+    }
   }
 
   async function approveDeliverable(id) {

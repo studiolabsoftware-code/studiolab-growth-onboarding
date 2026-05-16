@@ -9,10 +9,11 @@
 //   mark-delivered    — body: { id } → status='delivered', delivered_at=now
 //   cancel            — body: { id } → status='cancelled', cancelled_at=now
 //   delete            — body: { id } → hard delete (admin override)
+//   add-comment       — body: { id, body } → append admin comment to thread
 //
 // All actions write to activity_log with project_id set so the project's
 // timeline reflects the lifecycle event. Client-side approve / request-
-// revisions live on portal-project (token-link auth), not here.
+// revisions / add-comment live on portal-project (token-link auth), not here.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
@@ -23,7 +24,7 @@ import { deliverableSubmittedForReview } from '../_shared/email-templates.ts';
 type Action =
   | 'create' | 'update'
   | 'submit-for-review' | 'mark-approved' | 'mark-delivered'
-  | 'cancel' | 'delete';
+  | 'cancel' | 'delete' | 'add-comment';
 
 interface RequestBody {
   action: Action;
@@ -36,10 +37,12 @@ interface RequestBody {
   assigned_admin_id?: string | null;
   order_index?: number;
   status?: 'pending' | 'in_progress';
+  body?: string;       // add-comment
 }
 
 const VALID_ACTIONS: Action[] = [
-  'create', 'update', 'submit-for-review', 'mark-approved', 'mark-delivered', 'cancel', 'delete',
+  'create', 'update', 'submit-for-review', 'mark-approved', 'mark-delivered',
+  'cancel', 'delete', 'add-comment',
 ];
 
 Deno.serve(async (req) => {
@@ -76,6 +79,7 @@ Deno.serve(async (req) => {
       case 'mark-delivered':    return await doMarkDelivered(sb, row, caller);
       case 'cancel':            return await doCancel(sb, row, caller);
       case 'delete':            return await doDelete(sb, row, caller);
+      case 'add-comment':       return await doAddComment(sb, row, body, caller);
     }
   } catch (err) {
     console.error('manage-deliverable error:', err);
@@ -332,6 +336,35 @@ async function doDelete(sb: any, row: any, caller: any) {
   } catch (_) {}
 
   return jsonResponse({ ok: true, action: 'delete' });
+}
+
+// deno-lint-ignore no-explicit-any
+async function doAddComment(sb: any, row: any, body: Partial<RequestBody>, caller: any) {
+  const text = (body.body || '').trim();
+  if (!text) return jsonResponse({ ok: false, error: 'Comment cannot be empty.' }, 400);
+  if (text.length > 4000) return jsonResponse({ ok: false, error: 'Comment is too long.' }, 400);
+
+  const { data: inserted, error: insErr } = await sb.from('deliverable_comments')
+    .insert({
+      deliverable_id: row.id,
+      project_id: row.project_id,
+      author_kind: 'admin',
+      author_admin_id: caller.id,
+      author_label: caller.email,
+      body: text,
+    })
+    .select('id, deliverable_id, project_id, author_kind, author_label, body, created_at')
+    .single();
+  if (insErr || !inserted) {
+    return jsonResponse({ ok: false, error: insErr?.message || 'Comment insert failed.' }, 500);
+  }
+
+  await logActivity(sb, { id: row.project_id, submission_id: null }, row.id, 'deliverable_comment_added', caller, {
+    author_kind: 'admin',
+    excerpt: text.slice(0, 200),
+  });
+
+  return jsonResponse({ ok: true, comment: inserted });
 }
 
 // deno-lint-ignore no-explicit-any

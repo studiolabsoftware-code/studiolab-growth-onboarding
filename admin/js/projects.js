@@ -668,9 +668,13 @@
     overlay.className = 'adm-modal';
     overlay.style.zIndex = '12000';
     overlay.hidden = false;
+    // Edit mode is wider so Files + Comments fit alongside the form. New
+    // mode stays narrow — no id yet, so no files/comments can be attached
+    // until after first save.
+    const cardMax = isEdit ? '720px' : '560px';
     overlay.innerHTML = `
       <div class="adm-modal-backdrop"></div>
-      <div class="adm-modal-card" style="max-width:560px;">
+      <div class="adm-modal-card" style="max-width:${cardMax};">
         <div class="adm-modal-hdr"><h3 class="adm-modal-title">${isEdit ? 'Edit deliverable' : 'New deliverable'}</h3></div>
         <div class="adm-modal-body">
           <label style="display:block;font-size:13px;font-weight:600;margin:10px 0 4px;">Title</label>
@@ -688,10 +692,40 @@
             <label style="display:flex;align-items:center;gap:6px;font-weight:400;"><input type="radio" name="del_vis" value="internal"${existing?.visibility === 'internal' ? ' checked' : ''}>Internal (team only)</label>
           </div>
           <div style="display:none;color:#B91C1C;font-size:13px;margin-top:8px;" id="del_err"></div>
+
+          ${isEdit ? `
+          <hr style="border:none;border-top:1px solid var(--g2);margin:18px 0;">
+
+          <h4 style="margin:0 0 6px;font-size:14px;font-weight:600;">Files</h4>
+          <p style="margin:0 0 8px;font-size:12px;color:var(--g6);">Up to 10 files per deliverable. PDF, PNG, JPG, SVG, DOCX, DOC, XLSX, XLS — max 25 MB each. Client-visible deliverables show these on the project page.</p>
+          <div id="del_files_host">
+            <div class="adm-empty" style="padding:10px 0;font-size:12px;">Loading files…</div>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="file" id="del_file_input" accept=".pdf,.png,.jpg,.jpeg,.svg,.docx,.doc,.xlsx,.xls" style="font-size:12px;">
+            <button type="button" class="btn btn-g" id="del_file_upload" style="padding:6px 14px;font-size:13px;">Upload</button>
+            <span id="del_file_status" style="font-size:12px;color:var(--g6);"></span>
+          </div>
+
+          <hr style="border:none;border-top:1px solid var(--g2);margin:18px 0;">
+
+          <h4 style="margin:0 0 6px;font-size:14px;font-weight:600;">Comments</h4>
+          <p style="margin:0 0 8px;font-size:12px;color:var(--g6);">Notes for the client on this deliverable. They see your comments and can reply from their project page.</p>
+          <div id="del_comments_host" style="max-height:240px;overflow-y:auto;border:1px solid var(--g2);border-radius:8px;padding:10px;background:var(--g1);">
+            <div class="adm-empty" style="padding:10px 0;font-size:12px;">Loading comments…</div>
+          </div>
+          <div style="margin-top:8px;">
+            <textarea id="del_comment_input" rows="2" placeholder="Add a comment for the client…" style="width:100%;font-family:inherit;font-size:13px;"></textarea>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+              <button type="button" class="btn btn-g" id="del_comment_send" style="padding:6px 14px;font-size:13px;">Post comment</button>
+              <span id="del_comment_status" style="font-size:12px;color:var(--g6);"></span>
+            </div>
+          </div>
+          ` : ''}
         </div>
         <div class="adm-modal-ftr">
-          <button type="button" class="btn btn-g" data-act="cancel">Cancel</button>
-          <button type="button" class="btn btn-p" data-act="save">${isEdit ? 'Save' : 'Create'}</button>
+          <button type="button" class="btn btn-g" data-act="cancel">${isEdit ? 'Close' : 'Cancel'}</button>
+          <button type="button" class="btn btn-p" data-act="save">${isEdit ? 'Save changes' : 'Create'}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -699,6 +733,7 @@
     function teardown() {
       overlay.remove();
       document.body.classList.remove('adm-modal-open');
+      openDetail(project.id);
     }
     overlay.querySelector('[data-act="cancel"]').addEventListener('click', teardown);
     overlay.querySelector('.adm-modal-backdrop').addEventListener('click', teardown);
@@ -722,12 +757,210 @@
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok || !data.ok) return err(data.error || `Failed (${resp.status})`);
         teardown();
-        openDetail(project.id);
       } catch (e) {
         err(String(e && e.message || e));
       }
     });
+
+    if (isEdit) {
+      wireDeliverableFiles(overlay, project, existing);
+      wireDeliverableComments(overlay, project, existing);
+    }
     setTimeout(() => overlay.querySelector('#del_title').focus(), 50);
+  }
+
+  // ── Deliverable files: list / upload / delete ─────────────────────────
+  async function loadDeliverableFiles(deliverableId) {
+    const sb = window.initSupabase && window.initSupabase();
+    if (!sb) return [];
+    const { data, error } = await sb.from('submission_attachments')
+      .select('id, file_name, mime_type, size_bytes, uploaded_at, uploaded_by_role')
+      .eq('deliverable_id', deliverableId)
+      .order('uploaded_at', { ascending: true });
+    if (error) { console.error('loadDeliverableFiles:', error); return []; }
+    return data || [];
+  }
+
+  function renderDeliverableFiles(host, files) {
+    if (!files.length) {
+      host.innerHTML = '<div class="adm-empty" style="padding:8px 0;font-size:12px;">No files yet.</div>';
+      return;
+    }
+    host.innerHTML = files.map((f) => {
+      const kb = Math.max(1, Math.round((f.size_bytes || 0) / 1024));
+      const sizeLabel = kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--g2);border-radius:6px;background:#fff;margin-bottom:6px;font-size:13px;">
+        <div style="min-width:0;flex:1;">
+          <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ESC(f.file_name)}</div>
+          <div style="font-size:11px;color:var(--g6);">${sizeLabel} · ${shortDate(f.uploaded_at)}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button type="button" class="btn-link" data-deliv-file-act="download" data-id="${ESC(f.id)}">Download</button>
+          <button type="button" class="btn-link" style="color:#B91C1C;" data-deliv-file-act="remove" data-id="${ESC(f.id)}" data-name="${ESC(f.file_name)}">Remove</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function wireDeliverableFiles(overlay, project, deliv) {
+    const host = overlay.querySelector('#del_files_host');
+    const fileInput = overlay.querySelector('#del_file_input');
+    const uploadBtn = overlay.querySelector('#del_file_upload');
+    const statusEl = overlay.querySelector('#del_file_status');
+    if (!host) return;
+
+    async function refresh() {
+      const files = await loadDeliverableFiles(deliv.id);
+      renderDeliverableFiles(host, files);
+    }
+    refresh();
+
+    uploadBtn.addEventListener('click', async () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) { statusEl.textContent = 'Pick a file first.'; return; }
+      statusEl.textContent = 'Uploading…';
+      uploadBtn.disabled = true;
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('deliverable_id', deliv.id);
+        const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+        const resp = await fetch(apiBase() + '/functions/v1/upload-submission-attachment', {
+          method: 'POST',
+          headers: {
+            'Authorization': jwt ? `Bearer ${jwt}` : '',
+            'apikey': (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '',
+          },
+          body: fd,
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          statusEl.textContent = data.error || `Upload failed (${resp.status})`;
+          return;
+        }
+        statusEl.textContent = 'Uploaded.';
+        fileInput.value = '';
+        await refresh();
+      } catch (e) {
+        statusEl.textContent = `Upload failed: ${e && e.message || e}`;
+      } finally {
+        uploadBtn.disabled = false;
+        setTimeout(() => { if (statusEl.textContent === 'Uploaded.') statusEl.textContent = ''; }, 2000);
+      }
+    });
+
+    host.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-deliv-file-act]');
+      if (!btn) return;
+      const act = btn.getAttribute('data-deliv-file-act');
+      const id = btn.getAttribute('data-id');
+      if (act === 'download') {
+        const resp = await fetch(apiBase() + '/functions/v1/get-attachment-download-url', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ attachment_id: id }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok || !data.url) {
+          alert(data.error || 'Could not get download URL.');
+          return;
+        }
+        window.open(data.url, '_blank', 'noopener');
+        return;
+      }
+      if (act === 'remove') {
+        const name = btn.getAttribute('data-name') || 'this file';
+        const ok = await (window.AdminModal?.confirm
+          ? window.AdminModal.confirm({ title: 'Remove file?', message: `<p>Permanently remove <strong>${ESC(name)}</strong>? The client will no longer see this file.</p>`, confirmLabel: 'Remove', destructive: true })
+          : confirm(`Remove ${name}?`));
+        if (!ok) return;
+        const resp = await fetch(apiBase() + '/functions/v1/delete-submission-attachment', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ attachment_id: id }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data.ok === false) {
+          alert(data.error || `Remove failed (${resp.status})`);
+          return;
+        }
+        await refresh();
+      }
+    });
+  }
+
+  // ── Deliverable comments: list / post ─────────────────────────────────
+  async function loadDeliverableComments(deliverableId) {
+    const sb = window.initSupabase && window.initSupabase();
+    if (!sb) return [];
+    const { data, error } = await sb.from('deliverable_comments')
+      .select('id, author_kind, author_label, body, created_at')
+      .eq('deliverable_id', deliverableId)
+      .order('created_at', { ascending: true });
+    if (error) { console.error('loadDeliverableComments:', error); return []; }
+    return data || [];
+  }
+
+  function renderDeliverableComments(host, comments) {
+    if (!comments.length) {
+      host.innerHTML = '<div class="adm-empty" style="padding:8px 0;font-size:12px;">No comments yet.</div>';
+      return;
+    }
+    host.innerHTML = comments.map((c) => {
+      const isAdmin = c.author_kind === 'admin';
+      const bubble = isAdmin
+        ? 'background:#fff;border:1px solid var(--g2);'
+        : 'background:#EEF2FF;border:1px solid #C7D2FE;';
+      return `<div style="margin-bottom:8px;">
+        <div style="font-size:11px;color:var(--g6);margin-bottom:2px;">
+          <strong>${ESC(c.author_label || (isAdmin ? 'Admin' : 'Client'))}</strong>
+          <span style="margin-left:6px;">${shortDate(c.created_at)}</span>
+          ${isAdmin ? '' : ' <span class="inv-list-tag">Client</span>'}
+        </div>
+        <div style="${bubble}border-radius:8px;padding:8px 10px;font-size:13px;white-space:pre-wrap;line-height:1.45;">${ESC(c.body)}</div>
+      </div>`;
+    }).join('');
+    host.scrollTop = host.scrollHeight;
+  }
+
+  function wireDeliverableComments(overlay, project, deliv) {
+    const host = overlay.querySelector('#del_comments_host');
+    const input = overlay.querySelector('#del_comment_input');
+    const sendBtn = overlay.querySelector('#del_comment_send');
+    const statusEl = overlay.querySelector('#del_comment_status');
+    if (!host) return;
+
+    async function refresh() {
+      const comments = await loadDeliverableComments(deliv.id);
+      renderDeliverableComments(host, comments);
+    }
+    refresh();
+
+    sendBtn.addEventListener('click', async () => {
+      const text = input.value.trim();
+      if (!text) { statusEl.textContent = 'Comment cannot be empty.'; return; }
+      sendBtn.disabled = true;
+      statusEl.textContent = 'Posting…';
+      try {
+        const resp = await fetch(apiBase() + '/functions/v1/manage-deliverable', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ action: 'add-comment', id: deliv.id, body: text }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          statusEl.textContent = data.error || `Failed (${resp.status})`;
+          return;
+        }
+        input.value = '';
+        statusEl.textContent = '';
+        await refresh();
+      } catch (e) {
+        statusEl.textContent = `Failed: ${e && e.message || e}`;
+      } finally {
+        sendBtn.disabled = false;
+      }
+    });
   }
 
   window.AdminProjects = {
