@@ -111,8 +111,8 @@
       const studioCurrency = currencyForCountry(ctx.submission.country) || 'AUD';
       lockCurrency(studioCurrency,
         studioCurrency === 'AUD'
-          ? 'Australian studio — AUD with GST is required.'
-          : 'Overseas studio — USD without GST is required.');
+          ? 'AU studio: quoted in AUD with 10% GST.'
+          : 'Overseas studio: quoted in USD with no GST.');
     } else {
       $('#qStudioName').textContent = 'No studio selected';
       $('#qStudioMeta').textContent = '';
@@ -197,8 +197,8 @@
       const c = currencyForCountry(currentContext.submission.country) || 'AUD';
       lockCurrency(c,
         c === 'AUD'
-          ? 'Australian studio — AUD with GST is required.'
-          : 'Overseas studio — USD without GST is required.');
+          ? 'AU studio: quoted in AUD with 10% GST.'
+          : 'Overseas studio: quoted in USD with no GST.');
     } else {
       // External: re-evaluate based on the country dropdown.
       onExternalCountryChange();
@@ -209,9 +209,9 @@
     const country = $('#qExtCountry').value;
     const c = currencyForCountry(country);
     if (c === 'AUD') {
-      lockCurrency('AUD', 'Australian recipient — AUD with GST is required.');
+      lockCurrency('AUD', 'AU recipient: quoted in AUD with 10% GST.');
     } else if (c === 'USD') {
-      lockCurrency('USD', 'Overseas recipient — USD without GST is required.');
+      lockCurrency('USD', 'Overseas recipient: quoted in USD with no GST.');
     } else {
       lockCurrency(null);
     }

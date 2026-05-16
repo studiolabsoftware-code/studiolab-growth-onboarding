@@ -50,11 +50,11 @@ export function submissionConfirmation(opts: { studioName: string; ref: string }
   const subject = `We have your StudioLAB Growth details, ${opts.studioName}`;
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Thanks, we have everything we need</h1>
-    <p style="margin:0 0 14px;">Hi from the StudioLAB Growth team. Your onboarding details have come through and we are getting started.</p>
+    <p style="margin:0 0 14px;">Hi from the StudioLAB team. Your onboarding details have come through and we are getting started.</p>
     <p style="margin:0 0 14px;">A team member will review what you sent and reach out shortly to confirm next steps. If anything is missing, we will send you a quick link to add it without filling out the whole form again.</p>
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
     <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
-    <p style="margin:0;">Speak soon,<br>The StudioLAB Growth team</p>`;
+    <p style="margin:0;">Speak soon,<br>The StudioLAB team</p>`;
   return { subject, html: layout({ previewText: 'We have your StudioLAB Growth onboarding details.', body }) };
 }
 
@@ -103,7 +103,7 @@ export function paymentReceiptImmediate(opts: {
   invoiceUrl?: string | null;
 }): { subject: string; html: string } {
   const amountDisplay = formatAmountDisplay(opts);
-  const subject = `Payment received — StudioLAB Growth setup for ${opts.studioName}`;
+  const subject = `Payment received: StudioLAB Growth setup for ${opts.studioName}`;
   const invoiceLine = opts.invoiceUrl
     ? `<p style="margin:0 0 14px;">A tax invoice is attached to the receipt Stripe sent you, and you can also <a href="${escape(opts.invoiceUrl)}" style="color:${COL.in};">view it online here</a>.</p>`
     : `<p style="margin:0 0 14px;">A tax invoice is on its way to your inbox.</p>`;
@@ -120,8 +120,8 @@ export function paymentReceiptImmediate(opts: {
     ${invoiceLine}
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
     <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
-    <p style="margin:0;">Speak soon,<br>The StudioLAB Growth team</p>`;
-  return { subject, html: layout({ previewText: `Payment received — ${amountDisplay}`, body }) };
+    <p style="margin:0;">Speak soon,<br>The StudioLAB team</p>`;
+  return { subject, html: layout({ previewText: `Payment received: ${amountDisplay}`, body }) };
 }
 
 export function paymentReceiptHold(opts: {
@@ -132,16 +132,16 @@ export function paymentReceiptHold(opts: {
   includesGst: boolean;
 }): { subject: string; html: string } {
   const amountDisplay = formatAmountDisplay(opts);
-  const subject = `Card authorised — StudioLAB Growth setup for ${opts.studioName}`;
+  const subject = `Card authorised: StudioLAB Growth setup for ${opts.studioName}`;
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your card has been authorised</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
-    <p style="margin:0 0 14px;">Your card has been authorised for <strong>${escape(amountDisplay)}</strong>. We have not taken the funds yet — we will only complete the charge once your setup begins. You may see a pending authorisation on your statement until then.</p>
+    <p style="margin:0 0 14px;">Your card has been authorised for <strong>${escape(amountDisplay)}</strong>. We have not taken the funds yet. We will only complete the charge once your setup begins, and you may see a pending authorisation on your statement until then.</p>
     <p style="margin:0 0 14px;">Your onboarding details are saved and our team will be in touch shortly to schedule the work.</p>
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
     <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
-    <p style="margin:0;">Speak soon,<br>The StudioLAB Growth team</p>`;
-  return { subject, html: layout({ previewText: `Card authorised — ${amountDisplay}`, body }) };
+    <p style="margin:0;">Speak soon,<br>The StudioLAB team</p>`;
+  return { subject, html: layout({ previewText: `Card authorised: ${amountDisplay}`, body }) };
 }
 
 export function paymentReceiptSaveCard(opts: {
@@ -152,7 +152,7 @@ export function paymentReceiptSaveCard(opts: {
   includesGst: boolean;
 }): { subject: string; html: string } {
   const amountDisplay = formatAmountDisplay(opts);
-  const subject = `Card saved — StudioLAB Growth setup for ${opts.studioName}`;
+  const subject = `Card saved: StudioLAB Growth setup for ${opts.studioName}`;
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your card has been saved securely</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
@@ -160,8 +160,8 @@ export function paymentReceiptSaveCard(opts: {
     <p style="margin:0 0 14px;">Your onboarding details are saved and our team will be in touch shortly with timing.</p>
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
     <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
-    <p style="margin:0;">Speak soon,<br>The StudioLAB Growth team</p>`;
-  return { subject, html: layout({ previewText: `Card saved — ${amountDisplay} will be charged when setup begins`, body }) };
+    <p style="margin:0;">Speak soon,<br>The StudioLAB team</p>`;
+  return { subject, html: layout({ previewText: `Card saved: ${amountDisplay} will be charged when setup begins`, body }) };
 }
 
 // Submission-row shape (subset). All fields are optional in the email
@@ -333,7 +333,7 @@ export function submissionDigestHtml(sub: SubmissionRowLike, attachments?: Attac
 
   if (isAi) {
     const persona = sub.kb_assistant_persona_type === 'named' && sub.kb_assistant_persona_name
-      ? `Named — ${sub.kb_assistant_persona_name}`
+      ? `Named: ${sub.kb_assistant_persona_name}`
       : 'Studio name';
     sections.push(sectionWrap('AI knowledge base', rowsTable([
       ['Assistant persona', persona],
@@ -508,10 +508,10 @@ export function handoffEmail(opts: {
     </tr></table>` : '';
 
   const body = `
-    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">${verb} — ${escape(opts.studioName)}</h1>
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">${verb}: ${escape(opts.studioName)}</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.assigneeName)},</p>
     ${revisionBanner}
-    <p style="margin:0 0 14px;">Attached is the handoff document for <strong>${escape(opts.studioName)}</strong> on the <strong>${escape(planLabel)}</strong> plan. Open it in Word or Google Docs — each field is on its own line so you can triple-click a value and copy it straight into GHL.</p>
+    <p style="margin:0 0 14px;">Attached is the handoff document for <strong>${escape(opts.studioName)}</strong> on the <strong>${escape(planLabel)}</strong> plan. Open it in Word or Google Docs. Each field is on its own line so you can triple-click a value and copy it straight into GHL.</p>
     <p style="margin:0 0 14px;">Section order matches the GHL implementation flow:</p>
     <ol style="margin:0 0 14px;padding-left:22px;font-size:13px;line-height:1.7;">
       <li>Account setup</li>
@@ -524,7 +524,7 @@ export function handoffEmail(opts: {
     </ol>
     <p style="margin:0 0 14px;">When you're done, mark the assignment <strong>Completed</strong> in the admin panel.</p>
     <p style="margin:0;color:${COL.g6};font-size:12px;">If anything looks incomplete, ping back with what's missing.</p>`;
-  const text = `${verb} — ${opts.studioName}\n\nAttached is the handoff document. Open in Word or Google Docs.\n${opts.isRevision ? `\nUpdated fields: ${opts.changedFields.join(', ')}\n` : ''}\nWhen done, mark the assignment Completed in the admin panel.`;
+  const text = `${verb}: ${opts.studioName}\n\nAttached is the handoff document. Open in Word or Google Docs.\n${opts.isRevision ? `\nUpdated fields: ${opts.changedFields.join(', ')}\n` : ''}\nWhen done, mark the assignment Completed in the admin panel.`;
   return { subject, html: layout({ previewText: subject, body }), text };
 }
 
@@ -539,7 +539,7 @@ export function inboxMessageEmail(opts: {
   previewText: string;
 }): { subject: string; html: string } {
   const body = `
-    <p style="margin:0 0 10px;color:${COL.g6};font-size:12px;letter-spacing:0.4px;text-transform:uppercase;">${escape(opts.studioName)} — message thread</p>
+    <p style="margin:0 0 10px;color:${COL.g6};font-size:12px;letter-spacing:0.4px;text-transform:uppercase;">${escape(opts.studioName)} · message thread</p>
     <p style="margin:0 0 14px;font-size:13px;color:${COL.g8};"><strong>${escape(opts.senderName)}</strong> wrote:</p>
     <div style="background:${COL.g1};border:1px solid ${COL.g2};border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.55;color:${COL.g8};white-space:pre-wrap;">${opts.bodyHtml}</div>
     ${opts.footerHtml}`;
@@ -561,10 +561,10 @@ export function quoteReminderNudge(opts: {
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Just checking in</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.recipientName)},</p>
     <p style="margin:0 0 14px;">A quick follow-up on quote <strong>${escape(opts.quoteNumber)}</strong> for <strong>${escape(opts.amountDisplay)}</strong>. It's still open for the next ${opts.expiresInDays} day${opts.expiresInDays === 1 ? '' : 's'}.</p>
-    <p style="margin:0 0 14px;">If you have any questions about the scope, timing, or what's included, just reply to this email and we'll talk it through. Otherwise, you can accept directly from the original quote email — that creates an invoice with a pay link ready to go.</p>
+    <p style="margin:0 0 14px;">If you have any questions about the scope, timing, or what's included, just reply to this email and we'll talk it through. Otherwise, you can accept directly from the original quote email. Accepting turns the quote into an invoice you can pay straight away.</p>
     <p style="margin:0 0 14px;">No pressure either way.</p>
-    <p style="margin:0;">— The StudioLAB Growth team</p>`;
-  return { subject, html: layout({ previewText: `Quote ${opts.quoteNumber} is still open — let us know if you need anything.`, body }) };
+    <p style="margin:0;">The StudioLAB team</p>`;
+  return { subject, html: layout({ previewText: `Quote ${opts.quoteNumber} is still open. Let us know if you need anything.`, body }) };
 }
 
 // Expiry warning — sent 5 days before expires_at as a final heads-up.
@@ -575,13 +575,14 @@ export function quoteExpiryWarning(opts: {
   expiresInDays: number;        // typically 5; we pass through what the cron calculates
 }): { subject: string; html: string } {
   const dayWord = opts.expiresInDays === 1 ? 'tomorrow' : `in ${opts.expiresInDays} days`;
+  const headlineWord = opts.expiresInDays === 1 ? 'tomorrow' : `in ${opts.expiresInDays} days`;
   const subject = `Quote ${opts.quoteNumber} expires ${dayWord}`;
   const body = `
-    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Heads-up — quote expires ${escape(dayWord)}</h1>
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your quote closes ${escape(headlineWord)}</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.recipientName)},</p>
     <p style="margin:0 0 14px;">Quote <strong>${escape(opts.quoteNumber)}</strong> for <strong>${escape(opts.amountDisplay)}</strong> closes ${escape(dayWord)}. After that the pricing and scope on it will lapse, and we'd need to issue a fresh quote if you want to come back to it.</p>
-    <p style="margin:0 0 14px;">If you're keen to go ahead, you can accept directly from the original quote email. If you'd rather pause or have questions, just reply — we'll work it out.</p>
-    <p style="margin:0;">— The StudioLAB Growth team</p>`;
+    <p style="margin:0 0 14px;">If you're keen to go ahead, you can accept directly from the original quote email. If you'd rather pause or have questions, just reply and we'll work it out.</p>
+    <p style="margin:0;">The StudioLAB team</p>`;
   return { subject, html: layout({ previewText: `Quote ${opts.quoteNumber} expires ${dayWord}.`, body }) };
 }
 
@@ -632,7 +633,7 @@ export function deliverableSubmittedForReview(opts: {
     ${dueLine}
     <p style="margin:0 0 14px;">Open your project page to approve it or request revisions:</p>
     ${cta('Review on your project page', opts.projectUrl)}
-    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">If you have questions, reply to this email — it goes straight to the team.</p>`;
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">If you have questions, reply to this email and it goes straight to the team.</p>`;
   return { subject, html: layout({ previewText: `${opts.deliverableTitle} is ready for your review on ${opts.projectName}.`, body }) };
 }
 
@@ -665,7 +666,7 @@ export function deliverableApprovedAdmin(opts: {
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Deliverable approved</h1>
     <p style="margin:0 0 14px;"><strong>${escape(opts.recipientName)}</strong> just approved <strong>${escape(opts.deliverableTitle)}</strong> on <strong>${escape(opts.projectName)}</strong>.</p>
-    <p style="margin:0 0 14px;">No action required — this is a heads-up. Mark it delivered when you ship the final asset.</p>
+    <p style="margin:0 0 14px;">No action required. This is a heads-up so you can mark it delivered when you ship the final asset.</p>
     ${cta('Open project in admin', opts.adminUrl)}`;
   return { subject, html: layout({ previewText: `${opts.recipientName} approved ${opts.deliverableTitle}.`, body }) };
 }
@@ -689,7 +690,7 @@ export function adminInvoicePaymentFailed(opts: {
     ? `${opts.currency.toUpperCase()} $${(opts.amountCents / 100).toFixed(2)}`
     : '—';
   const invoiceLabel = opts.invoiceNumber || '(unnumbered)';
-  const subject = `Payment failed: ${invoiceLabel} — ${opts.recipientLabel}`;
+  const subject = `Payment failed: ${invoiceLabel} for ${opts.recipientLabel}`;
   const reasonBlock = opts.reason
     ? `<p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Stripe reported</p>
        <div style="margin:0 0 18px;padding:14px 16px;background:${COL.g1};border-left:3px solid ${COL.in};border-radius:6px;white-space:pre-wrap;font-size:14px;">${escape(opts.reason)}</div>`
@@ -706,7 +707,7 @@ export function adminInvoicePaymentFailed(opts: {
     <p style="margin:0 0 14px;">Stripe will retry automatically and emails the recipient its own dunning notice. Open the invoice if you want to chase the customer, edit the invoice, or void and reissue.</p>
     ${cta('Open invoice in admin', opts.adminUrl)}
     ${stripeLink}
-    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">No action required from the recipient — this is a heads-up so the team can follow up if needed.</p>`;
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">No action required from the recipient. This is a heads-up so the team can follow up if needed.</p>`;
   return { subject, html: layout({ previewText: `Stripe reported payment_failed on ${invoiceLabel} for ${opts.recipientLabel}.`, body }) };
 }
 
