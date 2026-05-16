@@ -217,7 +217,7 @@
     overlay.hidden = false;
     overlay.innerHTML = `
       <div class="adm-modal-backdrop"></div>
-      <div class="adm-modal-panel" style="max-width:520px;">
+      <div class="adm-modal-card" style="max-width:520px;">
         <div class="adm-modal-hdr"><h3 class="adm-modal-title">New project</h3></div>
         <div class="adm-modal-body">
           <p style="margin-top:0;color:var(--g6);font-size:13px;">For engagements that aren't billed through this system, or that started before invoicing was wired in. Most projects spawn automatically when you mark an external invoice paid.</p>

@@ -1045,7 +1045,7 @@
       overlay.hidden = false;
       overlay.innerHTML = `
         <div class="adm-modal-backdrop"></div>
-        <div class="adm-modal-panel" style="max-width:480px;">
+        <div class="adm-modal-card" style="max-width:480px;">
           <div class="adm-modal-hdr">
             <h3 class="adm-modal-title">${ESC(title)}</h3>
           </div>
