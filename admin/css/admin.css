@@ -21,6 +21,12 @@
    look is preserved by the .adm-hdr override below. */
 .btn-link:hover { color: var(--mg-d); background: rgba(225, 28, 132, 0.08); text-decoration: underline; }
 .btn-link:focus-visible { outline: 2px solid var(--mg); outline-offset: 2px; }
+/* Danger variant for destructive row actions (Cancel quote, etc.). Pulls
+   from the semantic crit token so it stays consistent with the pill
+   palette and form-side colours. */
+.btn-link-danger { color: var(--rd); }
+.btn-link-danger:hover { color: var(--rd); background: rgba(185, 28, 28, 0.08); text-decoration: underline; }
+.btn-link-danger:focus-visible { outline: 2px solid var(--rd); outline-offset: 2px; }
 /* Inside the dark admin header bar, swap back to white-on-purple so the
    header actions still read against the dark backdrop. */
 .adm-hdr .btn-link { color: #fff; }
@@ -838,3 +844,59 @@ body.role-va .adm-preview-link { display: none !important; }
 }
 .inv-drawer-when { color: var(--g6); min-width: 96px; font-size: 12px; flex-shrink: 0; }
 .inv-drawer-what { color: var(--g8); }
+
+/* ── Quote modal: sticky totals + success-screen parity ────────────────
+   The modal body scrolls (.adm-modal-body { overflow-y: auto }), so a
+   sticky totals row stays pinned to the bottom of the scroll region
+   while the admin fills out the form. Z-index keeps it above the line-
+   item rows above when they overlap during scroll. */
+.q-totals {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--g1);
+  border: 1px solid var(--g2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 -8px 14px -10px rgba(19,16,46,0.15);
+}
+.q-totals-row { display: flex; justify-content: space-between; font-size: 13px; }
+.q-totals-row-mute { font-size: 12px; color: var(--g6); margin-top: 2px; }
+.q-totals-row-total {
+  font-weight: 700;
+  margin-top: 6px;
+  border-top: 1px solid var(--g2);
+  padding-top: 6px;
+}
+.q-totals-lbl { color: var(--g6); }
+
+/* Success screen — matches the invoice success layout so admins get the
+   same shape on both flows. */
+.q-success { text-align: center; padding: 8px 0; }
+.q-success-tick { font-size: 36px; line-height: 1; margin-bottom: 8px; }
+.q-success-title { margin: 0 0 4px; font-size: 18px; }
+.q-success-body { color: var(--g6); font-size: 13px; line-height: 1.55; }
+.q-success-acts { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+
+/* Visible currency-lock affordance. The <select> goes disabled when the
+   recipient's country fixes the currency choice (AU -> AUD/GST, others
+   -> USD/no-GST). Previously this was signalled only by the [disabled]
+   attribute and the title= tooltip — invisible on touch. Now a 🔒 glyph
+   appears next to the select and a helper line reads out the reason. */
+.cur-lock-host { display: flex; align-items: center; gap: 8px; }
+.cur-lock-host select { flex: 1; }
+.cur-lock-glyph {
+  display: none;
+  font-size: 14px;
+  color: var(--g6);
+  user-select: none;
+}
+.cur-lock-host select[disabled] ~ .cur-lock-glyph { display: inline-flex; }
+.cur-lock-hint {
+  display: none;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--g6);
+  line-height: 1.45;
+}
+.cur-lock-hint.vis { display: block; }

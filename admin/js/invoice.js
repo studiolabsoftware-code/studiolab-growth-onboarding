@@ -105,13 +105,22 @@
   function lockCurrency(currency, reason) {
     const sel = $('#invCurrency');
     if (!sel) return;
+    const hint = $('#invCurrencyLockHint');
     if (currency) {
       sel.value = currency;
       sel.disabled = true;
       sel.title = reason || '';
+      if (hint) {
+        hint.textContent = reason || '';
+        hint.classList.toggle('vis', !!reason);
+      }
     } else {
       sel.disabled = false;
       sel.title = '';
+      if (hint) {
+        hint.textContent = '';
+        hint.classList.remove('vis');
+      }
     }
   }
 

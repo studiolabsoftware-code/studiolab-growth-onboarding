@@ -57,6 +57,24 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   }
 
+  // Thin wrappers so we can use AdminModal.alert / .confirm where loaded,
+  // and fall back to the native dialogs in older bundles. Mirrors the
+  // helpers in invoice.js.
+  async function showAlert(opts) {
+    if (window.AdminModal && window.AdminModal.alert) {
+      return window.AdminModal.alert(opts);
+    }
+    const msg = typeof opts === 'string' ? opts : (opts.message || opts.title || 'Action failed');
+    alert(msg.replace(/<[^>]+>/g, ''));
+    return Promise.resolve();
+  }
+  async function showConfirm(opts) {
+    if (window.AdminModal && window.AdminModal.confirm) {
+      return window.AdminModal.confirm(opts);
+    }
+    return confirm(typeof opts === 'string' ? opts : (opts.message || opts.title || 'Confirm?'));
+  }
+
   // Strict country-to-currency mapping. AU recipients are always invoiced in
   // AUD with GST; everyone else is invoiced in USD without GST. This is
   // load-bearing for tax handling — quoting an AU recipient in USD would
@@ -73,13 +91,22 @@
   function lockCurrency(currency, reason) {
     const sel = $('#qCurrency');
     if (!sel) return;
+    const hint = $('#qCurrencyLockHint');
     if (currency) {
       sel.value = currency;
       sel.disabled = true;
       sel.title = reason || '';
+      if (hint) {
+        hint.textContent = reason || '';
+        hint.classList.toggle('vis', !!reason);
+      }
     } else {
       sel.disabled = false;
       sel.title = '';
+      if (hint) {
+        hint.textContent = '';
+        hint.classList.remove('vis');
+      }
     }
   }
 
@@ -151,6 +178,7 @@
     $('#qSuccess').hidden = true;
     $('#qForm').hidden = false;
     $('#qSendBtn').disabled = false;
+    $('#qSendBtn').hidden = false;
     $('#qSendBtn').textContent = 'Create and send';
 
     modal.hidden = false;
@@ -386,6 +414,12 @@
       $('#qSuccessNumber').textContent = q.number || '(pending number)';
       $('#qSuccessAmount').textContent = moneyFmt(q.total_cents, q.currency);
       $('#qSuccess').hidden = false;
+      // Hide the footer Send button once the success screen renders. The
+      // in-panel "View in panel" / "Send another" buttons take over from
+      // here. The footer Close stays so keyboard users can still tab to a
+      // dismiss control.
+      const sendBtn = $('#qSendBtn');
+      if (sendBtn) sendBtn.hidden = true;
 
       // Parent-cancellation on revise is now handled server-side inside
       // create-quote (atomically, before the parent is marked 'revised').
@@ -451,7 +485,7 @@
             actions.push(`<a class="btn-link" href="#" data-q-act="pdf" data-q-idx="${idx}">PDF</a>`);
             if (isLive) {
               actions.push(`<a class="btn-link" href="#" data-q-act="revise" data-q-idx="${idx}">Revise</a>`);
-              actions.push(`<a class="btn-link" style="color:#B91C1C;" href="#" data-q-act="cancel" data-q-idx="${idx}">Cancel</a>`);
+              actions.push(`<a class="btn-link btn-link-danger" href="#" data-q-act="cancel" data-q-idx="${idx}">Cancel</a>`);
             }
             if (isAccepted && r.resulting_invoice_id) {
               actions.push(`<span style="color:var(--g6);font-size:12px;">Invoice raised</span>`);
@@ -519,7 +553,7 @@
       });
       if (!resp.ok) {
         const j = await resp.json().catch(() => ({}));
-        alert(j.error || `Could not download PDF (${resp.status}).`);
+        await showAlert({ title: 'Could not download PDF', message: ESC(j.error || `Status ${resp.status}.`) });
         return;
       }
       const blob = await resp.blob();
@@ -533,12 +567,20 @@
       setTimeout(() => URL.revokeObjectURL(objUrl), 5000);
     } catch (err) {
       console.error('PDF download failed:', err);
-      alert('Could not download PDF: ' + (err && err.message || err));
+      await showAlert({ title: 'Could not download PDF', message: ESC((err && err.message) || String(err)) });
     }
   }
 
   async function cancelQuote(quote, submissionIdForRefresh) {
-    if (!confirm(`Cancel quote ${quote.number || quote.id}? The recipient will see it as withdrawn.`)) return;
+    const label = quote.number || quote.id;
+    const ok = await showConfirm({
+      title: `Cancel quote ${label}?`,
+      message: `<p>This withdraws the quote from the recipient and can't be undone.</p>`,
+      confirmLabel: 'Cancel quote',
+      destructive: true,
+      danger: true,
+    });
+    if (!ok) return;
     const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/cancel-quote';
     const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
     try {
@@ -553,7 +595,7 @@
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.ok) {
-        alert(data.error || `Could not cancel quote (${resp.status}).`);
+        await showAlert({ title: 'Could not cancel quote', message: ESC(data.error || `Status ${resp.status}.`) });
         return;
       }
       // The Stripe webhook updates the ledger row to 'cancelled'/'declined'.
@@ -561,7 +603,7 @@
       if (submissionIdForRefresh) refreshStudioQuotesPanel(submissionIdForRefresh);
     } catch (err) {
       console.error('cancel-quote failed:', err);
-      alert('Could not cancel quote: ' + (err && err.message || err));
+      await showAlert({ title: 'Could not cancel quote', message: ESC((err && err.message) || String(err)) });
     }
   }
 
@@ -570,12 +612,12 @@
     // cancel the original once the new one is sent. We open the modal with
     // a "revising" flag; on successful create we cancel the parent.
     if (!submission) {
-      alert('Revise needs the studio context — open the quote from a studio page.');
+      await showAlert({ title: 'Revise needs studio context', message: '<p>Open the quote from a studio page to revise it.</p>' });
       return;
     }
     const sb = window.initSupabase && window.initSupabase();
     if (!sb) {
-      alert('Supabase client unavailable.');
+      await showAlert({ title: 'Supabase unavailable', message: '<p>The Supabase client failed to load. Refresh the page and try again.</p>' });
       return;
     }
     // public.quotes doesn't store individual line items, so we pre-fill one
@@ -610,6 +652,16 @@
       if (e.target.matches('[data-act="add-q-line"]')) addLineItemRow();
       if (e.target.matches('[data-act="pick-from-catalog-q"]')) openCatalogPicker();
       if (e.target.matches('[data-act="send-quote"]')) submit();
+      // Success-screen actions. "View in panel" just dismisses the modal
+      // so the newly-issued quote (already added to the panel below) is
+      // visible. "Send another" resets the form for a fresh quote within
+      // the same context (same studio if studio-mode, otherwise external).
+      if (e.target.matches('[data-act="view-quote-in-panel"]')) close();
+      if (e.target.matches('[data-act="send-another-quote"]')) {
+        const ctx = currentContext;
+        close();
+        open(ctx || { mode: 'external' });
+      }
     });
     modal.addEventListener('change', (e) => {
       if (e.target.name === 'qRecipient') updateModeUI();

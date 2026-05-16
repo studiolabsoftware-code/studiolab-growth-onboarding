@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/form.css">
-<link rel="stylesheet" href="css/admin.css?v=20260516m">
+<link rel="stylesheet" href="css/admin.css?v=20260516n">
 <link rel="icon" type="image/png" href="/assets/studiolab-icon.png">
 <link rel="apple-touch-icon" href="/assets/studiolab-icon.png">
 <link rel="shortcut icon" href="/assets/studiolab-icon.png">
@@ -427,10 +427,14 @@
 
         <div class="f">
           <label for="invCurrency">Currency</label>
-          <select id="invCurrency">
-            <option value="AUD">AUD — Australian Dollars (GST 10%)</option>
-            <option value="USD">USD — US Dollars (no GST)</option>
-          </select>
+          <div class="cur-lock-host">
+            <select id="invCurrency">
+              <option value="AUD">AUD &mdash; Australian Dollars (GST 10%)</option>
+              <option value="USD">USD &mdash; US Dollars (no GST)</option>
+            </select>
+            <span class="cur-lock-glyph" aria-hidden="true" title="Currency locked by recipient country">🔒</span>
+          </div>
+          <p class="cur-lock-hint" id="invCurrencyLockHint" role="note" aria-live="polite"></p>
         </div>
 
         <div class="f">
@@ -564,10 +568,14 @@
 
         <div class="f">
           <label for="qCurrency">Currency</label>
-          <select id="qCurrency">
-            <option value="AUD">AUD — Australian Dollars (GST 10%)</option>
-            <option value="USD">USD — US Dollars (no GST)</option>
-          </select>
+          <div class="cur-lock-host">
+            <select id="qCurrency">
+              <option value="AUD">AUD &mdash; Australian Dollars (GST 10%)</option>
+              <option value="USD">USD &mdash; US Dollars (no GST)</option>
+            </select>
+            <span class="cur-lock-glyph" aria-hidden="true" title="Currency locked by recipient country">🔒</span>
+          </div>
+          <p class="cur-lock-hint" id="qCurrencyLockHint" role="note" aria-live="polite"></p>
         </div>
 
         <div class="f">
@@ -581,16 +589,15 @@
           <div id="qItems"></div>
         </div>
 
-        <div class="f" style="background:var(--g1);border:1px solid var(--g2);border-radius:8px;padding:10px 12px;">
-          <div style="display:flex;justify-content:space-between;font-size:13px;">
-            <span style="color:var(--g6);">Subtotal</span><span id="qSubtotal">—</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--g6);margin-top:2px;">
-            <span>Tax</span><span id="qTax">—</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:6px;border-top:1px solid var(--g2);padding-top:6px;">
-            <span>Total (estimated)</span><span id="qTotal">—</span>
-          </div>
+        <!-- Sticky totals panel. On 1366x768 with 3+ line items the
+             previous static totals scrolled off-screen as the admin filled
+             in the rest of the form. Keeping it pinned to the bottom of
+             the scrolling modal body means the final amount is always
+             visible while editing. -->
+        <div class="f q-totals">
+          <div class="q-totals-row"><span class="q-totals-lbl">Subtotal</span><span id="qSubtotal">&mdash;</span></div>
+          <div class="q-totals-row q-totals-row-mute"><span>Tax</span><span id="qTax">&mdash;</span></div>
+          <div class="q-totals-row q-totals-row-total"><span>Total (estimated)</span><span id="qTotal">&mdash;</span></div>
         </div>
 
         <div class="f">
@@ -634,13 +641,17 @@
         <div class="submit-err" id="qErr" role="alert">Could not create quote. Please try again.</div>
       </div>
 
-      <div id="qSuccess" hidden style="text-align:center;padding:8px 0;">
-        <div style="font-size:36px;line-height:1;margin-bottom:8px;">✅</div>
-        <h3 style="margin:0 0 4px;font-size:18px;">Quote sent</h3>
-        <div style="color:var(--g6);font-size:13px;line-height:1.55;">
+      <div id="qSuccess" class="q-success" hidden>
+        <div class="q-success-tick">✅</div>
+        <h3 class="q-success-title">Quote sent</h3>
+        <div class="q-success-body">
           <strong id="qSuccessNumber"></strong> for <strong id="qSuccessAmount"></strong> has been issued.
           The recipient is receiving a view-and-accept email from Stripe now.
           The quote will appear on this studio's page with live status as it's viewed, accepted, or declined.
+        </div>
+        <div class="q-success-acts">
+          <button type="button" class="btn btn-g" id="qSuccessViewPanel" data-act="view-quote-in-panel">View in panel</button>
+          <button type="button" class="btn btn-p" id="qSuccessSendAnother" data-act="send-another-quote">Send another</button>
         </div>
       </div>
     </div>
@@ -686,9 +697,9 @@
 <script src="js/dashboard.js?v=20260513b"></script>
 <script src="js/detail.js?v=20260515d"></script>
 <script src="js/catalog-picker.js?v=20260516a"></script>
-<script src="js/invoice.js?v=20260516l"></script>
+<script src="js/invoice.js?v=20260516n"></script>
 <script src="js/projects.js?v=20260516l"></script>
-<script src="js/quote.js?v=20260515g"></script>
+<script src="js/quote.js?v=20260516n"></script>
 <script src="js/change-request.js?v=20260513a"></script>
 <script src="js/users.js?v=20260513b"></script>
 <script src="js/catalog.js?v=20260516b"></script>

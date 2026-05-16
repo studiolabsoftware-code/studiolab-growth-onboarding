@@ -11,6 +11,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/form.css?v=20260514a">
 <style>
+  /* Local semantic-status tokens. Mirrors the admin pill palette so studio
+     and admin views read identically for paid / authorised / card_saved /
+     pending / info / crit / muted statuses. */
+  :root {
+    --st-ok-fg:    #047857;  --st-ok-bg:    #D1FAE5;
+    --st-warn-fg:  #B45309;  --st-warn-bg:  #FEF3C7;
+    --st-info-fg:  #1E40AF;  --st-info-bg:  #DBEAFE;
+    --st-crit-fg:  #B91C1C;  --st-crit-bg:  #FEE2E2;
+    --st-err-fg:   #991B1B;  --st-err-bg:   #FEF2F2;  --st-err-bd: #FCA5A5;
+  }
   .acct-wrap { max-width: 880px; margin: 32px auto 80px; padding: 0 16px; }
   .acct-hdr { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
   .acct-hdr h1 { font-size: 26px; font-weight: 800; color: var(--in-d); margin: 0 0 4px; letter-spacing: -0.4px; }
@@ -18,14 +28,14 @@
   .acct-pills { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .acct-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; }
   .acct-pill-plan { background: var(--in-l); color: var(--in-d); }
-  .acct-pill-status-paid { background: #D1FAE5; color: #047857; }
-  .acct-pill-status-authorised { background: #FEF3C7; color: #B45309; }
-  .acct-pill-status-card_saved { background: #DBEAFE; color: #1E40AF; }
+  .acct-pill-status-paid { background: var(--st-ok-bg); color: var(--st-ok-fg); }
+  .acct-pill-status-authorised { background: var(--st-warn-bg); color: var(--st-warn-fg); }
+  .acct-pill-status-card_saved { background: var(--st-info-bg); color: var(--st-info-fg); }
   .acct-pill-status-pending { background: var(--g2); color: var(--g6); }
   /* Quote-specific pill variants. Sent/Viewed = info blue. Cancelled/
      Declined = red. Expired/Revised = neutral grey. */
-  .acct-pill-status-info { background: #DBEAFE; color: #1E40AF; }
-  .acct-pill-status-crit { background: #FEE2E2; color: #B91C1C; }
+  .acct-pill-status-info { background: var(--st-info-bg); color: var(--st-info-fg); }
+  .acct-pill-status-crit { background: var(--st-crit-bg); color: var(--st-crit-fg); }
   .acct-pill-status-muted { background: var(--g2); color: var(--g6); }
 
   .acct-card { background: #fff; border-radius: 14px; box-shadow: 0 4px 22px rgba(19,16,46,.06); padding: 22px 24px; margin-bottom: 18px; }
@@ -43,9 +53,13 @@
   .acct-inv-table th { text-align: left; font-weight: 600; color: var(--g6); padding: 8px 8px 8px 0; border-bottom: 1px solid var(--g2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
   .acct-inv-table td { padding: 12px 8px 12px 0; border-bottom: 1px solid var(--g1); vertical-align: middle; }
   .acct-inv-table tr:last-child td { border-bottom: 0; }
-  .acct-inv-table .acct-actions { display: flex; gap: 12px; }
-  .acct-inv-table .acct-actions a { color: var(--in); font-weight: 600; text-decoration: none; font-size: 12px; }
+  .acct-inv-table .acct-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  /* WCAG 2.5.5 (AAA target size). Inv/quote actions are inline text links;
+     pad them up to a 44px effective target without breaking the inline
+     flow of the cell. */
+  .acct-inv-table .acct-actions a { color: var(--in); font-weight: 600; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; min-height: 44px; padding: 6px 0; }
   .acct-inv-table .acct-actions a:hover { text-decoration: underline; }
+  .acct-inv-table .acct-actions a:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; border-radius: 4px; }
 
   .acct-msg { display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: var(--in-l); border-radius: 10px; }
   .acct-msg-text { flex: 1; }
@@ -58,7 +72,7 @@
   .acct-btn-secondary:hover { background: var(--in); color: #fff; }
 
   .acct-loading, .acct-empty { color: var(--g6); font-style: italic; padding: 12px 0; }
-  .acct-error { background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; font-size: 13px; }
+  .acct-error { background: var(--st-err-bg); border: 1px solid var(--st-err-bd); color: var(--st-err-fg); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; font-size: 13px; }
   .acct-foot { text-align: center; margin-top: 28px; color: var(--g6); font-size: 12px; line-height: 1.6; }
   .acct-foot a { color: var(--in); font-weight: 600; }
 </style>
@@ -306,19 +320,20 @@
         }
       </div>
 
-      ${quotes.length === 0 ? '' : `
       <div class="acct-card">
         <h2>Quotes</h2>
-        <table class="acct-inv-table">
-          <thead>
-            <tr><th>Number</th><th>Status</th><th>Amount</th><th>Expires</th><th>Actions</th></tr>
-          </thead>
-          <tbody>${quoteRows}</tbody>
-        </table>
-        <p style="margin:14px 0 0;color:var(--g6);font-size:12px;line-height:1.55;">
-          You'll receive your quote by email from Stripe — use the link in that email to view and accept. Accepting creates an invoice with a Pay link, which will also appear in your Invoices above.
-        </p>
-      </div>`}
+        ${quotes.length === 0
+          ? '<div class="acct-empty">No quotes yet. If our team sends you one, it will appear here so you can track its status.</div>'
+          : `<table class="acct-inv-table">
+              <thead>
+                <tr><th>Number</th><th>Status</th><th>Amount</th><th>Expires</th><th>Actions</th></tr>
+              </thead>
+              <tbody>${quoteRows}</tbody>
+            </table>
+            <p style="margin:14px 0 0;color:var(--g6);font-size:12px;line-height:1.55;">
+              You'll receive your quote by email from Stripe. Use the link in that email to view and accept. Accepting creates an invoice with a Pay link, which will also appear in your Invoices above.
+            </p>`}
+      </div>
 
       <div class="acct-card">
         <h2>Your submission</h2>
