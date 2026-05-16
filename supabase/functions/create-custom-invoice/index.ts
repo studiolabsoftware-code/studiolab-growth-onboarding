@@ -62,6 +62,10 @@ interface RequestBody {
   // (external invoices always spawn per the spawn rules). For studios this
   // is admin-controlled via the modal checkbox.
   spawn_project_on_paid?: boolean;
+  // Phase 6.3b: catalog SKU links per picked line. The post-payment hook
+  // materialises each linked SKU's deliverable_template as deliverables
+  // on the spawned project. Free-text lines produce no entries.
+  source_sku_links?: Array<{ kind: 'upgrade' | 'general'; id: string }>;
 }
 
 function isoCountryForStripe(stored: string | null | undefined): string | null {
@@ -108,6 +112,28 @@ Deno.serve(async (req) => {
     // admin checkbox; default false.
     const recipientIsExternal = !!recipient && recipient.type === 'external';
     const spawnProjectOnPaid = recipientIsExternal ? true : (body.spawn_project_on_paid === true);
+
+    // Validate + normalise source_sku_links. Unknown shapes are dropped
+    // silently — the materialiser is downstream, so a malformed entry
+    // shouldn't fail the whole invoice. UUIDs are validated as RFC-4122-ish
+    // (loose regex; create-custom-invoice itself doesn't query the SKU,
+    // post-payment.ts does that with a defensive read).
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const sourceSkuLinks: Array<{ kind: 'upgrade' | 'general'; id: string }> = [];
+    const seenSku = new Set<string>();
+    if (Array.isArray(body.source_sku_links)) {
+      for (const link of body.source_sku_links) {
+        if (!link || typeof link !== 'object') continue;
+        const kind = (link as { kind?: unknown }).kind;
+        const id = (link as { id?: unknown }).id;
+        if (kind !== 'upgrade' && kind !== 'general') continue;
+        if (typeof id !== 'string' || !uuidRe.test(id)) continue;
+        const key = `${kind}:${id}`;
+        if (seenSku.has(key)) continue;
+        seenSku.add(key);
+        sourceSkuLinks.push({ kind, id });
+      }
+    }
 
     if (!recipient) return badRequest('Recipient is required.');
     if (currency !== 'AUD' && currency !== 'USD') return badRequest('Currency must be AUD or USD.');
@@ -453,6 +479,7 @@ Deno.serve(async (req) => {
         collection_method: collectionMethod,
         email_sent_at: emailSentAtIso,
         spawn_project_on_paid: spawnProjectOnPaid,
+        source_sku_links: sourceSkuLinks,
         created_by: caller.id,
       }, { onConflict: 'stripe_invoice_id' })
       .select('id')

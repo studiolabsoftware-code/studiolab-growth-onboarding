@@ -284,15 +284,19 @@
     const currency = ($('#invCurrency').value || 'AUD').toUpperCase();
     window.AdminCatalogPicker.open({
       currency,
-      onPick(row) {
+      onPick(row, meta) {
         const amount = ((row.amount_cents || 0) / 100).toFixed(2);
         const includesNote = Array.isArray(row.includes) && row.includes.length
           ? ' — ' + row.includes.join('; ')
           : '';
+        // Stamp SKU kind + id onto the line row so submit() can aggregate
+        // source_sku_links for the post-payment materialiser.
         addLineItemRow({
           description: row.name + (row.description ? ' · ' + row.description : '') + includesNote,
           quantity: 1,
           amount,
+          source_sku_id: row.id,
+          source_sku_kind: meta && meta.kind === 'general' ? 'general' : 'upgrade',
         });
         updateTotalsUI();
       },
@@ -303,6 +307,11 @@
   function addLineItemRow(initial) {
     const row = document.createElement('div');
     row.className = 'inv-row';
+    // Stash the catalog SKU id + kind on the row's dataset so collectSourceSkuLinks
+    // can rebuild the source_sku_links array at submit time. Free-text lines
+    // (no SKU picked) leave both blank and contribute nothing.
+    if (initial?.source_sku_id) row.dataset.sourceSkuId = initial.source_sku_id;
+    if (initial?.source_sku_kind) row.dataset.sourceSkuKind = initial.source_sku_kind;
     row.innerHTML = `
       <input type="text" data-fld="description" placeholder="Description" value="${ESC(initial?.description || '')}">
       <input type="number" data-fld="quantity" min="1" step="1" value="${ESC(initial?.quantity || 1)}" style="width:70px;">
@@ -326,6 +335,27 @@
       quantity: parseInt(r.querySelector('[data-fld="quantity"]').value, 10) || 1,
       amount_cents: Math.round(parseFloat(r.querySelector('[data-fld="amount"]').value || '0') * 100),
     }));
+  }
+
+  // Walk the line rows and pull out their catalog-SKU stamps. Deduped per
+  // (kind,id) — if the admin added the same SKU twice (e.g. quantity 2 across
+  // two rows) we still only materialise one set of template deliverables.
+  // Kept separate from collectLineItems so the create-custom-invoice request
+  // body stays free of UI-only fields.
+  function collectSourceSkuLinks() {
+    const rows = $$('#invItems .inv-row');
+    const seen = new Set();
+    const out = [];
+    for (const r of rows) {
+      const id = r.dataset.sourceSkuId;
+      const kind = r.dataset.sourceSkuKind;
+      if (!id || (kind !== 'upgrade' && kind !== 'general')) continue;
+      const key = `${kind}:${id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ kind, id });
+    }
+    return out;
   }
 
   function updateTotalsUI() {
@@ -398,6 +428,9 @@
         ...(isStudio && $('#invSpawnProject') && $('#invSpawnProject').checked
           ? { spawn_project_on_paid: true }
           : {}),
+        // Catalog SKU links per line row (deduped). Empty array when no
+        // SKU was picked — the post-payment materialiser is a no-op then.
+        source_sku_links: collectSourceSkuLinks(),
       } : null,
     };
   }

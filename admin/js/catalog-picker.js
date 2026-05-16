@@ -103,7 +103,11 @@
       const id = row.getAttribute('data-cp-id');
       const picked = state.rows.find((r) => r.id === id);
       if (picked && typeof state.onPick === 'function') {
-        try { state.onPick(picked); } catch (err) { console.error('onPick:', err); }
+        // Hand the caller a second `meta` arg with the source kind
+        // ('upgrade' | 'general'). Callers wired to the legacy one-arg
+        // signature still work — the second arg is just ignored.
+        const meta = { kind: state.source === 'general' ? 'general' : 'upgrade' };
+        try { state.onPick(picked, meta); } catch (err) { console.error('onPick:', err); }
       }
       close();
     });

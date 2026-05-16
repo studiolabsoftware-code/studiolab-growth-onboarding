@@ -233,6 +233,106 @@
     else            { await loadGenerals(); renderGenerals(); }
   }
 
+  // ── Deliverables template (shared by upgrade + general editors) ────────
+  // Renders a small list editor below the catalog editor body. Each row =
+  // one deliverable that will be auto-created on the spawned project when
+  // an invoice picking this SKU is paid. Read back via readDeliverableTemplate().
+  function renderDeliverableTemplateSection(template, idPrefix) {
+    const items = Array.isArray(template) ? template : [];
+    return `
+      <div class="cat-form-row" style="margin-top:14px;border-top:1px solid var(--g2);padding-top:14px;">
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <span>Deliverables template</span>
+          <button type="button" class="btn-link" data-cat-dt-act="add" data-target="${idPrefix}List">+ Add deliverable</button>
+        </label>
+        <p class="set-hint" style="margin-top:4px;">When an invoice picks this SKU and gets paid, each row below is auto-created as a deliverable on the spawned project.</p>
+        <div id="${idPrefix}List" style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+          ${items.length ? items.map((r) => renderDeliverableTemplateRow(r)).join('') : `<div class="adm-empty" data-empty>No template — invoices for this SKU will spawn a project with no auto-deliverables.</div>`}
+        </div>
+      </div>`;
+  }
+
+  function renderDeliverableTemplateRow(r) {
+    const title = r?.title || '';
+    const desc = r?.description || '';
+    const vis = r?.visibility === 'internal' ? 'internal' : 'client';
+    const offset = (r && r.default_due_offset_days != null) ? r.default_due_offset_days : '';
+    return `
+      <div class="cat-dt-row" style="border:1px solid var(--g2);border-radius:8px;padding:10px;background:#fff;">
+        <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:end;">
+          <div>
+            <label style="font-size:11px;color:var(--g6);">Title</label>
+            <input type="text" data-dt="title" value="${escapeHtml(title)}" placeholder="e.g. Website draft v1" maxlength="200">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--g6);">Visibility</label>
+            <select data-dt="visibility">
+              <option value="client"${vis==='client'?' selected':''}>Client visible</option>
+              <option value="internal"${vis==='internal'?' selected':''}>Internal only</option>
+            </select>
+          </div>
+          <button type="button" class="btn-link" data-cat-dt-act="del" title="Remove" style="white-space:nowrap;">Remove</button>
+        </div>
+        <div style="margin-top:8px;display:grid;grid-template-columns:3fr 1fr;gap:8px;align-items:end;">
+          <div>
+            <label style="font-size:11px;color:var(--g6);">Description (optional)</label>
+            <textarea data-dt="description" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--g2);border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:var(--g8);">${escapeHtml(desc)}</textarea>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--g6);">Due in (days)</label>
+            <input type="number" data-dt="offset" min="0" step="1" value="${offset === '' ? '' : escapeHtml(offset)}" placeholder="blank = no due">
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Delegated click handler for add/remove rows. Returns the listener so the
+  // caller can detach it after the modal closes.
+  function bindDeliverableTemplateHandlers() {
+    const handler = (e) => {
+      const addBtn = e.target.closest('[data-cat-dt-act="add"]');
+      if (addBtn) {
+        e.preventDefault();
+        const list = document.getElementById(addBtn.dataset.target);
+        if (!list) return;
+        const empty = list.querySelector('[data-empty]');
+        if (empty) empty.remove();
+        list.insertAdjacentHTML('beforeend', renderDeliverableTemplateRow({}));
+        return;
+      }
+      const delBtn = e.target.closest('[data-cat-dt-act="del"]');
+      if (delBtn) {
+        e.preventDefault();
+        const row = delBtn.closest('.cat-dt-row');
+        if (row) row.remove();
+      }
+    };
+    document.addEventListener('click', handler);
+    return handler;
+  }
+
+  function readDeliverableTemplate(listId) {
+    const list = document.getElementById(listId);
+    if (!list) return [];
+    const rows = list.querySelectorAll('.cat-dt-row');
+    const out = [];
+    rows.forEach((row) => {
+      const title = row.querySelector('[data-dt="title"]').value.trim();
+      if (!title) return;
+      const description = row.querySelector('[data-dt="description"]').value.trim();
+      const visibility = row.querySelector('[data-dt="visibility"]').value === 'internal' ? 'internal' : 'client';
+      const offsetRaw = row.querySelector('[data-dt="offset"]').value.trim();
+      const offset = offsetRaw === '' ? null : parseInt(offsetRaw, 10);
+      out.push({
+        title: title.slice(0, 200),
+        description: description.slice(0, 4000),
+        visibility,
+        default_due_offset_days: Number.isFinite(offset) && offset >= 0 ? offset : null,
+      });
+    });
+    return out;
+  }
+
   // Full edit modal for an upgrade SKU (or a fresh new path). Pass `null`
   // to open the editor in "new upgrade" mode; pass a {from_plan,to_plan,
   // from_setup,to_setup} key to edit an existing path.
@@ -240,15 +340,31 @@
     const isNew = !key;
     let aud = null, usd = null, head = null;
     if (!isNew) {
+      // Re-fetch with deliverable_template (the cached `upgrades` array is
+      // loaded without it to keep the table render lean). Falls back to the
+      // cached row if the fresh fetch fails.
       const parts = key.split('|');
       const [fp, tp, fs, ts] = parts;
-      const matches = upgrades.filter((u) => u.from_plan===fp && u.to_plan===tp && u.from_setup===fs && u.to_setup===ts);
-      aud = matches.find((u) => u.currency === 'AUD') || null;
-      usd = matches.find((u) => u.currency === 'USD') || null;
+      const client = sb();
+      if (client) {
+        const { data } = await client
+          .from('upgrade_products')
+          .select('id, category, from_plan, to_plan, from_setup, to_setup, currency, amount_cents, name, description, includes, active, sort_order, deliverable_template')
+          .eq('from_plan', fp).eq('to_plan', tp).eq('from_setup', fs).eq('to_setup', ts);
+        if (Array.isArray(data) && data.length) {
+          aud = data.find((u) => u.currency === 'AUD') || null;
+          usd = data.find((u) => u.currency === 'USD') || null;
+        }
+      }
+      if (!aud && !usd) {
+        const matches = upgrades.filter((u) => u.from_plan===fp && u.to_plan===tp && u.from_setup===fs && u.to_setup===ts);
+        aud = matches.find((u) => u.currency === 'AUD') || null;
+        usd = matches.find((u) => u.currency === 'USD') || null;
+      }
       head = aud || usd;
       if (!head) return;
     }
-    const draft = head || { category: 'plan_upgrade', from_plan: 'launch', to_plan: 'scale', from_setup: 'guided', to_setup: 'guided', name: '', description: '', includes: [], active: true, sort_order: 100 };
+    const draft = head || { category: 'plan_upgrade', from_plan: 'launch', to_plan: 'scale', from_setup: 'guided', to_setup: 'guided', name: '', description: '', includes: [], active: true, sort_order: 100, deliverable_template: [] };
     const includesText = (draft.includes || []).join('\n');
     const audAmt = aud ? ((aud.amount_cents||0)/100).toFixed(2) : '';
     const usdAmt = usd ? ((usd.amount_cents||0)/100).toFixed(2) : '';
@@ -331,8 +447,15 @@
             <input type="checkbox" id="catUpActive"${(isNew || (aud&&aud.active) || (usd&&usd.active)) ? ' checked' : ''}> Active (visible in picker)
           </label>
         </div>
+        ${renderDeliverableTemplateSection(draft.deliverable_template, 'catUpDt')}
       </div>`;
-    const ok = await window.AdminModal.confirm({ title: isNew ? 'Add upgrade' : 'Edit upgrade', message: body, confirmLabel: 'Save', size: 'wide' });
+    const dtHandler = bindDeliverableTemplateHandlers();
+    let ok;
+    try {
+      ok = await window.AdminModal.confirm({ title: isNew ? 'Add upgrade' : 'Edit upgrade', message: body, confirmLabel: 'Save', size: 'wide' });
+    } finally {
+      document.removeEventListener('click', dtHandler);
+    }
     if (!ok) return;
 
     const patch = {
@@ -346,6 +469,7 @@
       includes: $('catUpIncl').value.split('\n').map((s) => s.trim()).filter(Boolean),
       sort_order: parseInt($('catUpSort').value, 10) || 100,
       active: $('catUpActive').checked,
+      deliverable_template: readDeliverableTemplate('catUpDtList'),
     };
     const audCents = Math.round((parseFloat($('catUpAud').value) || 0) * 100);
     const usdCents = Math.round((parseFloat($('catUpUsd').value) || 0) * 100);
@@ -481,13 +605,28 @@
     const isNew = !sku;
     let aud = null, usd = null, head = null;
     if (!isNew) {
-      const matches = generals.filter((g) => g.sku === sku);
-      aud = matches.find((g) => g.currency === 'AUD') || null;
-      usd = matches.find((g) => g.currency === 'USD') || null;
+      // Re-fetch with deliverable_template (cached `generals` is loaded
+      // without it). Falls back to the cached row if the fresh fetch fails.
+      const client = sb();
+      if (client) {
+        const { data } = await client
+          .from('general_products')
+          .select('id, sku, category, currency, amount_cents, tax_code, name, description, includes, active, sort_order, updated_at, deliverable_template')
+          .eq('sku', sku);
+        if (Array.isArray(data) && data.length) {
+          aud = data.find((g) => g.currency === 'AUD') || null;
+          usd = data.find((g) => g.currency === 'USD') || null;
+        }
+      }
+      if (!aud && !usd) {
+        const matches = generals.filter((g) => g.sku === sku);
+        aud = matches.find((g) => g.currency === 'AUD') || null;
+        usd = matches.find((g) => g.currency === 'USD') || null;
+      }
       head = aud || usd;
       if (!head) return;
     }
-    const draft = head || { sku: '', category: 'consulting', name: '', description: '', includes: [], active: true, sort_order: 100 };
+    const draft = head || { sku: '', category: 'consulting', name: '', description: '', includes: [], active: true, sort_order: 100, deliverable_template: [] };
     const includesText = (draft.includes || []).join('\n');
     const audAmt = aud ? ((aud.amount_cents||0)/100).toFixed(2) : '';
     const usdAmt = usd ? ((usd.amount_cents||0)/100).toFixed(2) : '';
@@ -533,8 +672,15 @@
             <input type="checkbox" id="catGpActive"${(isNew || (aud&&aud.active) || (usd&&usd.active)) ? ' checked' : ''}> Active (visible in picker)
           </label>
         </div>
+        ${renderDeliverableTemplateSection(draft.deliverable_template, 'catGpDt')}
       </div>`;
-    const ok = await window.AdminModal.confirm({ title: isNew ? 'Add general product' : 'Edit product', message: body, confirmLabel: 'Save', size: 'wide' });
+    const dtHandler = bindDeliverableTemplateHandlers();
+    let ok;
+    try {
+      ok = await window.AdminModal.confirm({ title: isNew ? 'Add general product' : 'Edit product', message: body, confirmLabel: 'Save', size: 'wide' });
+    } finally {
+      document.removeEventListener('click', dtHandler);
+    }
     if (!ok) return;
 
     const nameVal = $('catGpName').value.trim();
@@ -551,6 +697,7 @@
       includes: $('catGpIncl').value.split('\n').map((s) => s.trim()).filter(Boolean),
       sort_order: parseInt($('catGpSort').value, 10) || 100,
       active: $('catGpActive').checked,
+      deliverable_template: readDeliverableTemplate('catGpDtList'),
     };
     const audCents = Math.round((parseFloat($('catGpAud').value) || 0) * 100);
     const usdCents = Math.round((parseFloat($('catGpUsd').value) || 0) * 100);

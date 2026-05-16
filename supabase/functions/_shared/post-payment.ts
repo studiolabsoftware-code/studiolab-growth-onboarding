@@ -56,7 +56,7 @@ export async function spawnProjectFromInvoice(
   opts: { force?: boolean; actorEmail?: string; name?: string; projectType?: string } = {},
 ): Promise<{ ok: true; project_id: string } | { ok: false; reason: string }> {
   const { data: inv } = await sb.from('invoices')
-    .select('id, project_id, submission_id, external_contact_id, currency, description, spawn_project_on_paid, total_cents, number, kind, status')
+    .select('id, project_id, submission_id, external_contact_id, currency, description, spawn_project_on_paid, total_cents, number, kind, status, source_sku_links')
     .eq('id', invoiceId)
     .maybeSingle();
   if (!inv) return { ok: false, reason: 'Invoice not found.' };
@@ -147,7 +147,151 @@ export async function spawnProjectFromInvoice(
     console.warn('[post-payment] activity_log insert failed:', e);
   }
 
+  // Phase 6.3b: materialise each linked SKU's deliverable_template onto the
+  // freshly spawned project. Defensive: an unknown SKU id, an empty template,
+  // or a malformed entry is skipped silently — the project is already live so
+  // we never want to throw and double-spawn on retry.
+  await materialiseDeliverableTemplates(sb, {
+    projectId: project.id,
+    submissionId: inv.submission_id,
+    sourceSkuLinks: inv.source_sku_links,
+    actorEmail: opts.actorEmail,
+  });
+
   return { ok: true, project_id: project.id };
+}
+
+interface SkuLink { kind: 'upgrade' | 'general'; id: string }
+
+interface TemplateRow {
+  title: string;
+  description?: string;
+  visibility?: string;
+  default_due_offset_days?: number | null;
+}
+
+async function materialiseDeliverableTemplates(
+  sb: Sb,
+  args: {
+    projectId: string;
+    submissionId: string | null;
+    sourceSkuLinks: unknown;
+    actorEmail?: string;
+  },
+): Promise<void> {
+  const links = normaliseSkuLinks(args.sourceSkuLinks);
+  if (links.length === 0) return;
+
+  const upgradeIds = links.filter((l) => l.kind === 'upgrade').map((l) => l.id);
+  const generalIds = links.filter((l) => l.kind === 'general').map((l) => l.id);
+
+  const skuById = new Map<string, { kind: 'upgrade' | 'general'; name: string; template: TemplateRow[] }>();
+
+  if (upgradeIds.length) {
+    const { data: rows } = await sb.from('upgrade_products')
+      .select('id, name, deliverable_template')
+      .in('id', upgradeIds);
+    for (const r of (rows || [])) {
+      skuById.set(`upgrade:${r.id}`, {
+        kind: 'upgrade',
+        name: r.name || '',
+        template: Array.isArray(r.deliverable_template) ? r.deliverable_template : [],
+      });
+    }
+  }
+  if (generalIds.length) {
+    const { data: rows } = await sb.from('general_products')
+      .select('id, name, deliverable_template')
+      .in('id', generalIds);
+    for (const r of (rows || [])) {
+      skuById.set(`general:${r.id}`, {
+        kind: 'general',
+        name: r.name || '',
+        template: Array.isArray(r.deliverable_template) ? r.deliverable_template : [],
+      });
+    }
+  }
+
+  // Preserve picked order for stable order_index assignment across SKUs.
+  // 100, 110, 120 … matches the manual-create default ordering used in
+  // manage-deliverable so they slot in cleanly.
+  let order = 100;
+  const today = new Date();
+
+  for (const link of links) {
+    const sku = skuById.get(`${link.kind}:${link.id}`);
+    if (!sku || sku.template.length === 0) continue;
+
+    for (const tpl of sku.template) {
+      if (!tpl || typeof tpl !== 'object') continue;
+      const title = (typeof tpl.title === 'string' ? tpl.title : '').trim().slice(0, 200);
+      if (!title) continue;
+      const description = (typeof tpl.description === 'string' ? tpl.description : '').slice(0, 4000);
+      const visibility = tpl.visibility === 'internal' ? 'internal' : 'client';
+
+      let dueDate: string | null = null;
+      const offset = tpl.default_due_offset_days;
+      if (typeof offset === 'number' && Number.isFinite(offset) && offset >= 0) {
+        const due = new Date(today.getTime());
+        due.setUTCDate(due.getUTCDate() + Math.floor(offset));
+        dueDate = due.toISOString().slice(0, 10);
+      }
+
+      const { data: deliv, error: delivErr } = await sb.from('deliverables')
+        .insert({
+          project_id: args.projectId,
+          title,
+          description,
+          visibility,
+          due_date: dueDate,
+          source_sku: `${link.kind}:${link.id}`,
+          order_index: order,
+        })
+        .select('id')
+        .single();
+      order += 10;
+      if (delivErr) {
+        console.warn('[post-payment] template deliverable insert failed:', delivErr);
+        continue;
+      }
+
+      try {
+        await sb.from('activity_log').insert({
+          submission_id: args.submissionId,
+          project_id: args.projectId,
+          action: 'deliverable_template_materialised',
+          actor: args.actorEmail || 'system',
+          details: {
+            project_id: args.projectId,
+            deliverable_id: deliv.id,
+            source_sku: `${link.kind}:${link.id}`,
+            sku_name: sku.name,
+            title,
+          },
+        });
+      } catch (e) {
+        console.warn('[post-payment] template activity_log insert failed:', e);
+      }
+    }
+  }
+}
+
+function normaliseSkuLinks(raw: unknown): SkuLink[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SkuLink[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const kind = (entry as { kind?: unknown }).kind;
+    const id = (entry as { id?: unknown }).id;
+    if (kind !== 'upgrade' && kind !== 'general') continue;
+    if (typeof id !== 'string' || !id) continue;
+    const key = `${kind}:${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ kind, id });
+  }
+  return out;
 }
 
 async function maybeSpawnProject(sb: Sb, ctx: PostPaymentContext): Promise<void> {
