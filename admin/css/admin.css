@@ -658,3 +658,46 @@ body.role-va .adm-preview-link { display: none !important; }
 .inv-menu .inv-menu-item.destructive { color: var(--rd); }
 .inv-menu .inv-menu-item.destructive:hover { background: var(--rd-l); }
 .inv-menu .inv-menu-div { border: none; border-top: 1px solid var(--g2); margin: 4px 0; }
+
+/* Project detail page layout. Single grid of cards on the page; cards mark
+   themselves as wide when the content needs the full row. */
+.proj-detail { padding: 24px 0; }
+.proj-detail-hdr { margin-bottom: 24px; }
+.proj-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.proj-card {
+  background: #fff;
+  border: 1px solid var(--g2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.proj-card-wide { grid-column: 1 / -1; }
+.proj-card-hdr {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--g2);
+  background: var(--g1);
+}
+.proj-card-hdr h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--g6);
+}
+.proj-card-body { padding: 16px 18px; }
+
+.proj-activity { list-style: none; padding: 0; margin: 0; }
+.proj-activity li {
+  display: flex;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--g1);
+  font-size: 13px;
+}
+.proj-activity li:last-child { border-bottom: 0; }
+.proj-activity-when { color: var(--g6); min-width: 110px; font-size: 12px; }
+.proj-activity-what { color: var(--g8); }

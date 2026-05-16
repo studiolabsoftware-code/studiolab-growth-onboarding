@@ -57,6 +57,11 @@ interface RequestBody {
   // edit-and-send-later. Drafts are surfaced in the admin invoice list and
   // finalised via manage-invoice action='finalize-draft'.
   save_as_draft?: boolean;
+  // When true, paying this invoice auto-spawns a project (Phase 6.2a).
+  // For external recipients we always force this true on the server side
+  // (external invoices always spawn per the spawn rules). For studios this
+  // is admin-controlled via the modal checkbox.
+  spawn_project_on_paid?: boolean;
 }
 
 function isoCountryForStripe(stored: string | null | undefined): string | null {
@@ -99,6 +104,10 @@ Deno.serve(async (req) => {
     const description = (body.description || '').trim() || null;
     const memo = (body.memo || '').trim() || null;
     const saveAsDraft = body.save_as_draft === true;
+    // External invoices always spawn (forced true). Studios respect the
+    // admin checkbox; default false.
+    const recipientIsExternal = !!recipient && recipient.type === 'external';
+    const spawnProjectOnPaid = recipientIsExternal ? true : (body.spawn_project_on_paid === true);
 
     if (!recipient) return badRequest('Recipient is required.');
     if (currency !== 'AUD' && currency !== 'USD') return badRequest('Currency must be AUD or USD.');
@@ -443,6 +452,7 @@ Deno.serve(async (req) => {
         description,
         collection_method: collectionMethod,
         email_sent_at: emailSentAtIso,
+        spawn_project_on_paid: spawnProjectOnPaid,
         created_by: caller.id,
       }, { onConflict: 'stripe_invoice_id' })
       .select('id')

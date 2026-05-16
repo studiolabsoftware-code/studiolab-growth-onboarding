@@ -150,6 +150,11 @@
     $('#invDueDays').value = '14';
     $('#invDescription').value = '';
     $('#invMemo').value = '';
+    // Phase 6.2a: "Create project on payment" — studio invoices opt-in (off
+    // by default), external invoices always spawn (toggle hidden because
+    // the server forces true regardless).
+    const spawnBox = $('#invSpawnProject');
+    if (spawnBox) spawnBox.checked = false;
     $('#invItems').innerHTML = '';
     const rev = ctx && ctx.revision;
     if (rev && Array.isArray(rev.lines) && rev.lines.length) {
@@ -241,6 +246,11 @@
     $('#invExternalBlock').hidden = isStudio;
     const send = $('#invCollection').value === 'send_invoice';
     $('#invDueDaysRow').hidden = !send;
+    // Spawn-project toggle is studio-only. External invoices always spawn
+    // server-side, so we hide the control rather than confusing the admin
+    // with an option that has no effect.
+    const spawnRow = $('#invSpawnProjectRow');
+    if (spawnRow) spawnRow.hidden = !isStudio;
     if (isStudio && currentContext?.submission) {
       const c = currencyForCountry(currentContext.submission.country) || 'AUD';
       lockCurrency(c,
@@ -383,6 +393,11 @@
         description: $('#invDescription').value.trim() || undefined,
         memo: $('#invMemo').value.trim() || undefined,
         ...(opts && opts.saveAsDraft ? { save_as_draft: true } : {}),
+        // Studio-only field. External invoices always spawn server-side, so
+        // omit the field for clarity — the edge function infers the flag.
+        ...(isStudio && $('#invSpawnProject') && $('#invSpawnProject').checked
+          ? { spawn_project_on_paid: true }
+          : {}),
       } : null,
     };
   }
@@ -510,7 +525,7 @@
       return;
     }
     const { data, error } = await sb.from('invoices')
-      .select('id, number, kind, status, currency, total_cents, amount_paid_cents, amount_refunded_cents, issued_at, paid_at, hosted_url, pdf_url, description, stripe_invoice_id, email_sent_at, last_resent_at, resend_count, voided_at, marked_paid_manually, manual_payment_method, manual_payment_date, manual_payment_reference, submission_id, external_contact_id, collection_method')
+      .select('id, number, kind, status, currency, total_cents, amount_paid_cents, amount_refunded_cents, issued_at, paid_at, hosted_url, pdf_url, description, stripe_invoice_id, email_sent_at, last_resent_at, resend_count, voided_at, marked_paid_manually, manual_payment_method, manual_payment_date, manual_payment_reference, submission_id, external_contact_id, collection_method, project_id')
       .eq('submission_id', submissionId)
       .order('created_at', { ascending: false });
     if (error) {
@@ -550,32 +565,51 @@
     const isDraft = r.status === 'draft';
     const isOpen = r.status === 'open' || r.status === 'past_due';
     const isPaid = r.status === 'paid' || r.status === 'partially_refunded';
+    const hasProject = !!r.project_id;
 
-    const primary = []; // 0–1 inline button (the most common action for this status)
+    const primary = []; // 0–1 inline button — points at the next in-platform action
     const menu = [];    // everything else, inside the kebab
 
-    if (isDraft) {
+    // Primary action priority (Phase 6.2a):
+    //   project_id set    → Open project (in-platform)
+    //   draft             → Edit draft
+    //   open / past_due   → Mark paid (the action that moves it forward)
+    //   paid, no project  → Create project (retroactive spawn)
+    //   else              → kebab-only
+    if (hasProject) {
+      primary.push({ label: 'Open project', act: 'open-project' });
+    } else if (isDraft) {
       primary.push({ label: 'Edit draft', act: 'edit-draft' });
+    } else if (isOpen) {
+      primary.push({ label: 'Mark paid', act: 'mark-paid' });
+    } else if (isPaid) {
+      primary.push({ label: 'Create project', act: 'create-project' });
+    }
+
+    // Kebab contents — status-specific lifecycle actions, with Stripe links
+    // buried at the bottom (receipt for paid, hosted invoice for open).
+    if (isDraft) {
       menu.push({ label: 'Finalize and send', act: 'finalize-draft' });
       menu.push({ divider: true });
       menu.push({ label: 'Delete draft', act: 'delete-draft', destructive: true });
-    } else if (r.hosted_url) {
-      primary.push({ label: 'Open', href: r.hosted_url, external: true });
-    }
-
-    if (!isDraft && r.pdf_url) {
-      menu.push({ label: 'Download PDF', href: r.pdf_url, external: true });
-    }
-    if (isOpen) {
-      if (menu.length) menu.push({ divider: true });
+    } else if (isOpen) {
       menu.push({ label: 'Resend email', act: 'resend' });
-      menu.push({ label: 'Mark as paid', act: 'mark-paid' });
       menu.push({ label: 'Revise (void + recreate)', act: 'revise' });
+      if (r.hosted_url) menu.push({ label: 'View Stripe invoice', href: r.hosted_url, external: true });
+      if (r.pdf_url) menu.push({ label: 'Download PDF', href: r.pdf_url, external: true });
       menu.push({ divider: true });
       menu.push({ label: 'Void invoice', act: 'void', destructive: true });
-    } else if (isPaid && !r.marked_paid_manually) {
-      if (menu.length) menu.push({ divider: true });
-      menu.push({ label: 'Issue refund', act: 'refund', destructive: true });
+    } else if (isPaid) {
+      if (r.hosted_url) menu.push({ label: 'View Stripe receipt', href: r.hosted_url, external: true });
+      if (r.pdf_url) menu.push({ label: 'Download PDF', href: r.pdf_url, external: true });
+      if (!r.marked_paid_manually) {
+        menu.push({ divider: true });
+        menu.push({ label: 'Issue refund', act: 'refund', destructive: true });
+      }
+    } else {
+      // Voided / refunded — read-only Stripe access only.
+      if (r.hosted_url) menu.push({ label: 'View on Stripe', href: r.hosted_url, external: true });
+      if (r.pdf_url) menu.push({ label: 'Download PDF', href: r.pdf_url, external: true });
     }
 
     if (showRecipient && r._isStudio) {
@@ -776,6 +810,51 @@
     if (act === 'mark-paid')      return doMarkPaid(row, onReload);
     if (act === 'refund')         return doRefund(row, onReload);
     if (act === 'void')           return doVoidAction(row, onReload);
+    if (act === 'open-project')   return doOpenProject(row);
+    if (act === 'create-project') return doCreateProject(row, onReload);
+  }
+
+  function doOpenProject(row) {
+    if (!row.project_id) return;
+    if (window.AdminProjects && window.AdminProjects.openDetail) {
+      if (window.AdminAuth && window.AdminAuth.showSection) {
+        // Mark the Projects nav active so the breadcrumb context lines up.
+        document.querySelectorAll('.adm-nav-link').forEach((b) => {
+          b.classList.toggle('active', b.dataset.section === 'projects');
+        });
+      }
+      window.AdminProjects.openDetail(row.project_id);
+    } else {
+      console.warn('AdminProjects not loaded');
+    }
+  }
+
+  async function doCreateProject(row, onReload) {
+    const ok = await showConfirm({
+      title: 'Create a project for this invoice?',
+      message: `<p>This invoice (<strong>${ESC(row.number || '')}</strong>) doesn't have a project yet. Creating one gives you somewhere to track deliverables, files, and review cycles for the work it funded.</p><p style="color:var(--g6);font-size:12px;">You can rename it from the project page.</p>`,
+      confirmLabel: 'Create project',
+    });
+    if (!ok) return;
+    try {
+      const resp = await fetch(apiBase() + '/functions/v1/create-project', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ mode: 'from_invoice', invoice_id: row.id }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        await showAlert({ title: 'Could not create project', message: ESC(data.error || `Status ${resp.status}.`) });
+        return;
+      }
+      if (typeof onReload === 'function') await onReload();
+      if (window.AdminProjects && window.AdminProjects.openDetail) {
+        window.AdminProjects.openDetail(data.project_id);
+      }
+    } catch (err) {
+      console.error('create-project failed:', err);
+      await showAlert('Could not create the project.');
+    }
   }
 
   // ── manage-invoice helpers ──────────────────────────────────────────────
@@ -1274,7 +1353,7 @@
         hosted_url, pdf_url, description, submission_id, external_contact_id,
         stripe_invoice_id, email_sent_at, last_resent_at, resend_count, voided_at,
         marked_paid_manually, manual_payment_method, manual_payment_date, manual_payment_reference,
-        collection_method,
+        collection_method, project_id,
         submission:submissions(id, studio_name, contact_email),
         external_contact:external_contacts(id, name, email)
       `)
