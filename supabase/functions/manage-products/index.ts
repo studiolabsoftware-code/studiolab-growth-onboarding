@@ -140,12 +140,29 @@ Deno.serve(async (req) => {
 
       let stripeResult;
       if (product.stripe_product_id) {
+        // Try to update the linked Product first.
         stripeResult = await stripeRequest(
           'POST',
           `products/${encodeURIComponent(product.stripe_product_id)}`,
           payload,
           secretKey,
         );
+        // Cross-account migration fallback: if the stored ID doesn't exist
+        // on the current Stripe account (404), create a fresh Product
+        // instead of failing. Triggers when we cut over from a sandbox
+        // account to a live account — the sandbox prod_XXX IDs are
+        // meaningless on the live account but we don't want admins to
+        // have to manually null + re-sync each row.
+        if (!stripeResult.ok && stripeResult.status === 404) {
+          console.warn('product ID 404 on current account — creating fresh:', product.stripe_product_id);
+          stripeResult = await stripeRequest(
+            'POST',
+            'products',
+            payload,
+            secretKey,
+            `studiolab-product-${product.id}-${Date.now()}`,
+          );
+        }
       } else {
         stripeResult = await stripeRequest(
           'POST',
