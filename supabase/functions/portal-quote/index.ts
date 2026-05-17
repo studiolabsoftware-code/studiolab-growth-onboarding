@@ -58,6 +58,10 @@ Deno.serve(async (req) => {
 // deno-lint-ignore no-explicit-any
 async function actLoad(sb: any, quoteId: string, auth: { submissionId?: string | null; externalContactId?: string | null; status?: string | null; terminalStatus?: boolean }) {
   // Pull the row + the studio/external context for the brand header.
+  // resulting_invoice is the back-linked invoice row (populated by the
+  // webhook on invoice.finalized); surfacing it on load means the page
+  // shows "Your invoice SLG-NNNN is ready — Pay now" on every visit,
+  // not just immediately after acceptance.
   const { data: quote } = await sb.from('quotes')
     .select(`
       id, number, status, currency, acceptance_mode,
@@ -65,7 +69,8 @@ async function actLoad(sb: any, quoteId: string, auth: { submissionId?: string |
       sent_at, accepted_at, declined_at, cover_note, resulting_invoice_id,
       stripe_quote_id, submission_id, external_contact_id,
       submission:submissions(studio_name, contact_email, first_name, last_name),
-      external_contact:external_contacts(name, email)
+      external_contact:external_contacts(name, email),
+      resulting_invoice:invoices!quotes_resulting_invoice_id_fkey(id, number, status, hosted_url, total_cents, currency)
     `)
     .eq('id', quoteId)
     .maybeSingle();
@@ -118,6 +123,17 @@ async function actLoad(sb: any, quoteId: string, auth: { submissionId?: string |
       declined_at: quote.declined_at,
       cover_note: quote.cover_note,
       resulting_invoice_id: quote.resulting_invoice_id,
+      // Surface the back-linked invoice so the page can show "Pay now"
+      // with a real Stripe-hosted URL. Null until the webhook has
+      // processed invoice.finalized for the quote-derived invoice.
+      resulting_invoice: quote.resulting_invoice ? {
+        id: quote.resulting_invoice.id,
+        number: quote.resulting_invoice.number,
+        status: quote.resulting_invoice.status,
+        hosted_url: quote.resulting_invoice.hosted_url,
+        total_cents: quote.resulting_invoice.total_cents,
+        currency: quote.resulting_invoice.currency,
+      } : null,
       recipient_label: recipientLabel,
       line_items: lineItems,
       // Page uses this to show the read-only "this quote is closed" state
@@ -142,11 +158,15 @@ async function actAccept(sb: any, quoteId: string, auth: { status?: string | nul
   const secretKey = getStripeKey(mode);
 
   // Stripe /accept moves the quote to 'accepted' and creates the invoice
-  // for collection. Stripe then handles invoice delivery (POST
-  // /v1/invoices/{id}/send still works for invoices — they did not drop
-  // that endpoint, only the quotes /send endpoint). The webhook fires
-  // quote.accepted + invoice.finalized which exercise the existing
-  // ledger updates with the conditional-update race guard.
+  // in DRAFT status. Stripe does NOT auto-finalize or send the invoice
+  // email — that's our job. Two-step follow-up:
+  //   1. POST /v1/invoices/{invoice_id}/finalize  → marks the invoice
+  //      open, assigns a number, generates the hosted page + PDF, and
+  //      fires invoice.finalized which our webhook uses to write the
+  //      invoice row + back-link resulting_invoice_id on the quote.
+  //   2. POST /v1/invoices/{invoice_id}/send → triggers the Stripe-sent
+  //      "Pay this invoice" email to the recipient (the invoice /send
+  //      endpoint still exists; only the quotes /send was removed).
   const accept = await stripeRequest<{ id: string; status: string; invoice: string | null }>(
     'POST',
     `quotes/${encodeURIComponent(q.stripe_quote_id)}/accept`,
@@ -184,13 +204,53 @@ async function actAccept(sb: any, quoteId: string, auth: { status?: string | nul
     });
   } catch (e) { console.error('activity_log insert failed:', e); }
 
+  // Finalize + send the resulting invoice. Both are best-effort: if
+  // either fails we still report acceptance as successful (the quote IS
+  // accepted at Stripe and the draft invoice exists). Admin can finalize
+  // + send manually from the Invoices panel as a fallback.
+  const stripeInvoiceId = accept.body?.invoice || null;
+  let invoiceHostedUrl: string | null = null;
+  let invoiceNumber: string | null = null;
+  if (stripeInvoiceId) {
+    try {
+      const finalised = await stripeRequest<{ id: string; number: string | null; hosted_invoice_url: string | null }>(
+        'POST',
+        `invoices/${encodeURIComponent(stripeInvoiceId)}/finalize`,
+        null,
+        secretKey,
+        `slg-quote-invoice-finalize-${q.id}`,
+      );
+      if (finalised.ok) {
+        invoiceHostedUrl = finalised.body?.hosted_invoice_url || null;
+        invoiceNumber = finalised.body?.number || null;
+        // Send the Stripe-hosted "Pay this invoice" email. Idempotent on
+        // Stripe's side — calling /send twice doesn't double-mail.
+        const sent = await stripeRequest(
+          'POST',
+          `invoices/${encodeURIComponent(stripeInvoiceId)}/send`,
+          null,
+          secretKey,
+          `slg-quote-invoice-send-${q.id}`,
+        );
+        if (!sent.ok) {
+          console.warn('invoice /send returned non-ok:', sent.error);
+        }
+      } else {
+        console.warn('invoice /finalize after quote-accept failed:', finalised.error);
+      }
+    } catch (e) {
+      console.error('invoice finalize+send after quote-accept threw:', e);
+    }
+  }
+
   return jsonResponse({
     ok: true,
     accepted_at: nowIso,
-    // Stripe creates the invoice synchronously on /accept; the recipient
-    // will receive the Stripe-sent invoice email with the Pay link
-    // shortly. The page surfaces a "next step" message based on this.
-    invoice_creating: !!accept.body?.invoice,
+    // Frontend surfaces these so the recipient sees "Your invoice
+    // SLG-NNNN is ready — Pay now" with a real deep-link rather than
+    // the generic "we've emailed you" message.
+    invoice_number: invoiceNumber,
+    invoice_hosted_url: invoiceHostedUrl,
   });
 }
 

@@ -239,11 +239,33 @@
       $('qActionsCard').querySelector('.q-acts').style.display = 'none';
       $('qExpiryLine').style.display = 'none';
       const msg = q.status === 'accepted'
-        ? 'You accepted this quote on ' + dayFmt(q.accepted_at || q.sent_at) + '. We have emailed you the invoice with a Pay link.'
+        ? 'You accepted this quote on ' + dayFmt(q.accepted_at || q.sent_at) + '.'
         : q.status === 'declined'
         ? 'This quote was declined on ' + dayFmt(q.declined_at || q.sent_at) + '. Reply to the email if you want to revisit it.'
         : 'This quote is ' + statusLabel.toLowerCase() + '. Reply to the email if you want a fresh quote.';
       $('qActionsCopy').textContent = msg;
+
+      // Accepted quotes surface the resulting invoice with a Pay button.
+      // When the webhook hasn't yet processed invoice.finalized the
+      // resulting_invoice field is null — show a "preparing" state so
+      // the recipient isn't left on a dead end.
+      if (q.status === 'accepted') {
+        const inv = q.resulting_invoice;
+        const invHtml = inv && inv.hosted_url
+          ? `<div class="q-success" style="margin-top:14px;">
+               <strong>Invoice ${esc(inv.number || '')} is ready.</strong>
+               ${inv.status === 'paid'
+                 ? ' Paid in full — thank you!'
+                 : ' We have emailed it to you, and you can also pay it directly from the link below.'}
+               <div class="q-acts" style="margin-top:12px;">
+                 <a href="${esc(inv.hosted_url)}" target="_blank" rel="noopener noreferrer" class="q-btn q-btn-accept">${inv.status === 'paid' ? 'View receipt' : 'Pay invoice now'}</a>
+               </div>
+             </div>`
+          : `<div class="q-success" style="margin-top:14px; background: var(--g1); color: var(--g6); border-color: var(--g2);">
+               <strong>Preparing your invoice…</strong> This usually takes a few seconds. Refresh in a moment to see the Pay link, or check your inbox for the Stripe-sent invoice email.
+             </div>`;
+        $('qActionsCard').insertAdjacentHTML('beforeend', invHtml);
+      }
     }
 
     // PDF link goes through get-quote-pdf with the same token. Wire as a
@@ -296,8 +318,20 @@
     const box = $('qSuccessBox');
     box.className = 'q-success';
     box.style.display = '';
-    box.innerHTML = '<strong>Quote accepted.</strong> We are sending you the invoice email now — check your inbox in the next minute or two. The invoice has a Pay link you can use straight away.';
-    location.reload();
+    // accept response includes invoice_number + invoice_hosted_url when
+    // the finalize+send chain ran successfully. Show the Pay button
+    // immediately rather than waiting for the page reload.
+    const invNum = r.data && r.data.invoice_number;
+    const invUrl = r.data && r.data.invoice_hosted_url;
+    if (invUrl) {
+      box.innerHTML = '<strong>Quote accepted.</strong> Invoice <strong>' + esc(invNum || '') + '</strong> is ready to pay.'
+        + '<div class="q-acts" style="margin-top:12px;"><a href="' + esc(invUrl) + '" target="_blank" rel="noopener noreferrer" class="q-btn q-btn-accept">Pay invoice now</a></div>';
+    } else {
+      box.innerHTML = '<strong>Quote accepted.</strong> We are sending you the invoice email now — check your inbox in the next minute or two. The invoice has a Pay link you can use straight away.';
+    }
+    // Reload after a beat so the page state matches the back-end and the
+    // read-only accepted view + invoice card render correctly.
+    setTimeout(() => location.reload(), 3000);
   }
 
   async function doDecline() {
