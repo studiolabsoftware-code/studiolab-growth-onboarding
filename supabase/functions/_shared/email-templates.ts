@@ -587,6 +587,8 @@ export function quoteReadyForReview(opts: {
     ${noteBlock}
     <p style="margin:0 0 14px;">Open the link below to view the full breakdown, download the PDF, and accept or decline.</p>
     ${cta('Review and accept your quote', opts.acceptUrl)}
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:11px;line-height:1.5;">If the button does not work in your email client, copy this link into your browser:</p>
+    <p style="margin:0 0 18px;font-size:12px;line-height:1.45;word-break:break-all;"><a href="${escape(opts.acceptUrl)}" target="_blank" rel="noopener noreferrer" style="color:${COL.in};text-decoration:underline;">${escape(opts.acceptUrl)}</a></p>
     <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">This quote is valid until ${escape(expiresDisplay)}. Reply to this email if you have any questions.</p>`;
   return { subject, html: layout({ previewText: `Quote ${opts.quoteNumber} for ${opts.amountDisplay} is ready for review.`, body }) };
 }
