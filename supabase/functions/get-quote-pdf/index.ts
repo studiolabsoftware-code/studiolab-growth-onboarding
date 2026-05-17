@@ -43,16 +43,30 @@ Deno.serve(async (req) => {
     if (!quoteRow) return jsonResponse({ ok: false, error: 'Quote not found.' }, 404);
     if (!quoteRow.stripe_quote_id) return jsonResponse({ ok: false, error: 'Quote not yet finalised.' }, 409);
 
-    // ---- Authorization
+    // ---- Authorization. Three paths:
+    //   1. Admin JWT (admin dashboard download)
+    //   2. Quote portal token (quote.token, minted by create-quote — works for
+    //      both studio and external recipients via the public quote.html page)
+    //   3. Studio session_token (legacy — session_token_hash on submissions)
     let authorised = false;
     let actor = 'unknown';
     const caller = await getCallerProfile(req);
     if (caller) {
       authorised = true;
       actor = `admin:${caller.email}`;
-    } else if (sessionToken && quoteRow.submission_id) {
-      // Studio path. The session_token is the same anchor save-draft uses,
-      // hashed and stored on submissions.session_token_hash with an expiry.
+    }
+    if (!authorised && sessionToken) {
+      // Path 2: quote.token check — covers external + studio recipients
+      // clicking Download PDF from the quote portal page.
+      const { verifyQuoteToken } = await import('../_shared/quotes.ts');
+      const auth = await verifyQuoteToken(sb, quoteRow.id, sessionToken);
+      if (auth.ok) {
+        authorised = true;
+        actor = quoteRow.submission_id ? `quote-portal:studio:${quoteRow.submission_id}` : 'quote-portal:external';
+      }
+    }
+    if (!authorised && sessionToken && quoteRow.submission_id) {
+      // Path 3: legacy studio session_token (account.html → Download PDF)
       const sessionHash = await sha256Hex(sessionToken);
       const { data: sub } = await sb.from('submissions')
         .select('id, session_expires_at')

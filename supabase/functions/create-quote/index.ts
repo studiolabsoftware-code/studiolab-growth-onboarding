@@ -432,10 +432,29 @@ Deno.serve(async (req) => {
     if (submissionId) quoteMeta.submission_id = submissionId;
     if (externalContactId) quoteMeta.external_contact_id = externalContactId;
 
+    // Mint our own SLG-Q-NNNN number via the SECURITY DEFINER function
+    // from migration 034 (wraps nextval on quote_number_seq with the
+    // SLG-Q- prefix + zero-padding). Stripe's default quote numbers
+    // aren't dashboard-customisable; passing `number` on POST /v1/quotes
+    // overrides them. If the RPC call fails for any reason we fall
+    // through to Stripe's default rather than failing the whole create.
+    let customQuoteNumber: string | null = null;
+    try {
+      const { data: nextNumber, error: rpcErr } = await sb.rpc('next_quote_number');
+      if (rpcErr) {
+        console.error('next_quote_number rpc failed:', rpcErr);
+      } else if (typeof nextNumber === 'string' && nextNumber.startsWith('SLG-Q-')) {
+        customQuoteNumber = nextNumber;
+      }
+    } catch (e) {
+      console.error('quote number mint failed, falling back to Stripe default:', e);
+    }
+
     const quoteBody: Record<string, unknown> = {
       customer: stripeCustomerId,
       collection_method: 'send_invoice',
       expires_at: expiresAtSec,
+      ...(customQuoteNumber ? { number: customQuoteNumber } : {}),
       // The "header" is the cover note shown at the top of the hosted quote
       // and PDF. "description" goes to the resulting invoice's description
       // field once Stripe materialises the invoice.
