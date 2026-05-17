@@ -40,19 +40,21 @@ function layout(opts: { previewText: string; body: string }): string {
 }
 
 function cta(label: string, url: string): string {
+  // Bulletproof button: background + border-radius live on the <a>
+  // itself, not the wrapping <td>. Previous shape (colored <td> + plain
+  // <a> inside) failed in Gmail when display:inline-block was stripped:
+  // only the text glyphs were clickable while the surrounding colored
+  // pill was dead space. Putting the visible styling on the <a> means
+  // the whole pill IS the link in every renderer.
+  //
   // Escape the URL — unescaped `&` in href values is invalid HTML and
   // some clients mangle `&t=…` as a malformed entity.
   //
-  // target="_blank" + rel="noopener noreferrer" — without target, a
-  // left-click in Gmail tries to navigate the Gmail tab itself, which
-  // Gmail silently suppresses. The link looks dead from the user's
-  // perspective. target=_blank tells Gmail to open in a new tab, which
-  // it allows. (Right-click → Copy link still gives the correct URL
-  // regardless, which is why the symptom is "click does nothing" while
-  // pasting the same URL works.)
+  // target="_blank" + rel="noopener noreferrer" so Gmail opens the link
+  // in a new tab instead of suppressing the same-tab navigation.
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr>
-    <td style="background:${COL.in};border-radius:999px;">
-      <a href="${escape(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 24px;color:#fff;text-decoration:none;font-weight:600;font-size:14px;">${escape(label)}</a>
+    <td>
+      <a href="${escape(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:${COL.in};color:#fff;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;line-height:1;mso-padding-alt:0;">${escape(label)}</a>
     </td></tr></table>`;
 }
 

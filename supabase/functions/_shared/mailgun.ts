@@ -32,6 +32,14 @@ export async function sendEmail(args: SendArgs): Promise<void> {
   form.append('html', args.html);
   if (args.text) form.append('text', args.text);
   if (args.replyTo) form.append('h:Reply-To', args.replyTo);
+  // Disable Mailgun's link-tracking proxy and open-tracking pixel by
+  // default. Click tracking rewrites every <a href> to go through
+  // `email.<domain>/c/...` and requires the click-tracking CNAME to be
+  // configured separately; without it, clicks navigate to an
+  // unresolvable host. We have no analytics consumer for either signal,
+  // so disable them outright on transactional sends.
+  form.append('o:tracking-clicks', 'no');
+  form.append('o:tracking-opens', 'no');
   if (args.headers) {
     for (const [name, value] of Object.entries(args.headers)) {
       if (value) form.append(`h:${name}`, value);
