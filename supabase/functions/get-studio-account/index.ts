@@ -59,6 +59,14 @@ Deno.serve(async (req) => {
       .eq('submission_id', submission.id)
       .order('sent_at', { ascending: false, nullsFirst: false });
 
+    // Service requests ledger — structured change asks (plan upgrade,
+    // setup switch, custom add-on, other). Newest first so the most
+    // recent request reads at the top of the studio's history list.
+    const { data: serviceRequests } = await sb.from('service_requests')
+      .select('id, kind, target_plan, target_setup_type, notes, status, quote_id, declined_reason, created_at, applied_at')
+      .eq('submission_id', submission.id)
+      .order('created_at', { ascending: false });
+
     // Conversation + studio_token for the inline Messages composer on
     // account.html. Both must exist before the page renders so the studio
     // can send their first message without waiting for an admin to seed
@@ -131,6 +139,7 @@ Deno.serve(async (req) => {
       },
       invoices: invoices || [],
       quotes: quotes || [],
+      service_requests: serviceRequests || [],
       conversation: {
         id: conversationId,
         token: studioToken,

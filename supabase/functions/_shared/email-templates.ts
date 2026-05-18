@@ -868,6 +868,30 @@ export function studioActivated(opts: {
   return { subject, html: layout({ previewText: 'Your StudioLAB Growth account is now active.', body }) };
 }
 
+// Admin notification when a studio raises a structured service request
+// (plan upgrade, setup change, custom add-on, other). Plain layout with
+// the request summary + notes so admin can decide whether to open the
+// quote modal or reply in-thread without opening the dashboard.
+export function adminNewServiceRequest(opts: {
+  studioName: string;
+  contactEmail: string;
+  summary: string;
+  notes: string;
+  adminUrl: string;
+}): { subject: string; html: string } {
+  const subject = `${opts.studioName} raised a request: ${opts.summary}`;
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">New studio request</h1>
+    <p style="margin:0 0 4px;color:${COL.g6};font-size:13px;">${escape(opts.studioName)} &middot; ${escape(opts.contactEmail)}</p>
+    <p style="margin:14px 0 4px;color:${COL.g6};font-size:12px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;">What they're asking for</p>
+    <p style="margin:0 0 14px;font-size:14px;color:${COL.in_d};font-weight:600;">${escape(opts.summary)}</p>
+    <p style="margin:14px 0 4px;color:${COL.g6};font-size:12px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;">Their notes</p>
+    <div style="margin:0 0 18px;padding:12px 14px;background:${COL.g1};border-radius:8px;font-size:13px;line-height:1.55;color:${COL.in_d};white-space:pre-wrap;">${escape(opts.notes)}</div>
+    ${opts.adminUrl ? cta('Open in admin', opts.adminUrl) : ''}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">Open requests live on the submission detail page. From there you can send a quote, decline, or reply in-thread.</p>`;
+  return { subject, html: layout({ previewText: opts.summary, body }) };
+}
+
 function escape(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
 }
