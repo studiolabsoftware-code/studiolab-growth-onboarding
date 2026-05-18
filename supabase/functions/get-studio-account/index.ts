@@ -5,6 +5,7 @@
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
+import { ensureConversationForSubmission, ensureStudioToken } from '../_shared/inbox.ts';
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
@@ -50,17 +51,25 @@ Deno.serve(async (req) => {
       .eq('submission_id', submission.id)
       .order('sent_at', { ascending: false, nullsFirst: false });
 
-    // Conversation token — for the in-portal Messages tab. The studio_token
-    // is the magic-link we already email; surfacing it here lets the
-    // account page link to portal.html without a separate email round-trip.
+    // Conversation + studio_token for the inline Messages composer on
+    // account.html. Both must exist before the page renders so the studio
+    // can send their first message without waiting for an admin to seed
+    // anything. ensureConversationForSubmission is idempotent (returns the
+    // existing conversation id if one is already on the row), and
+    // ensureStudioToken mints a token only when none is set.
+    const conversationId = await ensureConversationForSubmission(
+      sb,
+      submission.id,
+      submission.studio_name,
+    );
+    const studioToken = await ensureStudioToken(sb, conversationId);
+
     const { data: conversation } = await sb.from('conversations')
-      .select('id, studio_token, studio_unread_count')
-      .eq('submission_id', submission.id)
+      .select('id, studio_unread_count')
+      .eq('id', conversationId)
       .maybeSingle();
 
-    const portalUrl = conversation && conversation.studio_token
-      ? `/portal.html?conv=${conversation.id}&t=${encodeURIComponent(conversation.studio_token)}`
-      : null;
+    const portalUrl = `/portal.html?conv=${conversationId}&t=${encodeURIComponent(studioToken)}`;
 
     return jsonResponse({
       ok: true,
@@ -90,7 +99,8 @@ Deno.serve(async (req) => {
       invoices: invoices || [],
       quotes: quotes || [],
       conversation: {
-        id: conversation?.id || null,
+        id: conversationId,
+        token: studioToken,
         unread: conversation?.studio_unread_count || 0,
         portal_url: portalUrl,
       },

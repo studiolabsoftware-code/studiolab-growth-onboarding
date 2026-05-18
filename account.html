@@ -48,6 +48,45 @@
 
   .acct-next ol { margin: 0; padding-left: 20px; color: var(--in-d); }
   .acct-next li { margin-bottom: 8px; line-height: 1.55; }
+  /* "What happens next" upgraded layout — a four-step status block that
+     reads as a definition list rather than a numbered queue, so the studio
+     understands what we have, what we're doing, what we need from them,
+     and what happens at the end. Plan-agnostic copy lives in JS. */
+  .acct-stages { display: grid; gap: 14px; }
+  .acct-stage { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: flex-start; }
+  .acct-stage-icon { width: 28px; height: 28px; border-radius: 999px; background: var(--in-l); color: var(--in-d); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .acct-stage-label { font-size: 13px; font-weight: 700; color: var(--in-d); margin: 4px 0 2px; }
+  .acct-stage-body { font-size: 13px; line-height: 1.55; color: var(--g6); }
+
+  /* Inline message thread + composer. Replaces the old "reply to email"
+     dead-end with a directly-usable thread on the account page itself.
+     Mirrors portal.html visual idiom but compacted for embed. */
+  .acct-thread { display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; padding: 4px 2px; margin-bottom: 14px; scrollbar-gutter: stable; }
+  .acct-thread-empty { color: var(--g6); font-style: italic; text-align: center; padding: 28px 12px; font-size: 13px; }
+  .acct-thread-loading { color: var(--g6); font-style: italic; padding: 12px 0; font-size: 13px; }
+  .acct-msg-bubble { max-width: 88%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; word-wrap: break-word; }
+  .acct-msg-bubble .acct-msg-meta { font-size: 11px; color: var(--g6); margin-bottom: 4px; font-weight: 600; }
+  .acct-msg-bubble .acct-msg-body { color: var(--in-d); }
+  .acct-msg-bubble .acct-msg-body p { margin: 0 0 6px; }
+  .acct-msg-bubble .acct-msg-body p:last-child { margin-bottom: 0; }
+  .acct-msg-bubble .acct-msg-body a { color: var(--in); }
+  .acct-msg-mine { align-self: flex-end; background: var(--in); color: #fff; }
+  .acct-msg-mine .acct-msg-meta { color: rgba(255,255,255,0.85); }
+  .acct-msg-mine .acct-msg-body { color: #fff; }
+  .acct-msg-mine .acct-msg-body a { color: #fff; text-decoration: underline; }
+  .acct-msg-them { align-self: flex-start; background: var(--g1); }
+  .acct-msg-system { align-self: center; background: transparent; padding: 4px 12px; color: var(--g6); font-size: 12px; font-style: italic; }
+  .acct-msg-system .acct-msg-body { color: var(--g6); }
+
+  .acct-compose { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--g1); padding-top: 14px; }
+  .acct-compose textarea { width: 100%; min-height: 80px; padding: 12px 14px; border: 1px solid var(--g2); border-radius: 10px; font-family: inherit; font-size: 13px; line-height: 1.5; resize: vertical; color: var(--in-d); background: #fff; }
+  .acct-compose textarea:focus { outline: 2px solid var(--in); outline-offset: 1px; border-color: var(--in); }
+  .acct-compose-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .acct-compose-hint { color: var(--g6); font-size: 12px; flex: 1; min-width: 200px; }
+  .acct-compose-hint a { color: var(--in); font-weight: 600; }
+  .acct-compose-err { color: var(--st-err-fg); font-size: 12px; }
+  .acct-compose button { min-width: 96px; }
+  .acct-compose button[disabled] { opacity: 0.55; cursor: not-allowed; }
 
   .acct-inv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .acct-inv-table th { text-align: left; font-weight: 600; color: var(--g6); padding: 8px 8px 8px 0; border-bottom: 1px solid var(--g2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
@@ -206,16 +245,23 @@
       return;
     }
 
-    const nextSteps = sub.plan === 'ai'
+    // Four-stage status block. Plan-agnostic structure (have / doing /
+     // need / next), with copy tweaked for AI vs Launch+Scale because the
+     // turnaround windows differ. No prediction of GHL platform steps —
+     // that's out of scope here; communication moves to the platform itself
+     // once admin activates the account.
+    const stages = sub.plan === 'ai'
       ? [
-        'Our team reviews your knowledge base and tunes the AI voice + chat agents.',
-        'We test everything against your studio profile and let you know when it\'s ready.',
-        'Your account typically goes live 7–10 business days after KB approval.',
+        { label: 'What we have', body: 'Your studio details, branding, knowledge base, and payment. Everything\'s in.' },
+        { label: 'What we\'re doing now', body: 'Reviewing your knowledge base and tuning your AI voice and chat agents to match your studio. This typically takes 7–10 business days.' },
+        { label: 'What we\'ll need from you', body: 'Nothing right now. If we have follow-up questions on your knowledge base, we\'ll send you a message below — you\'ll also get an email.' },
+        { label: 'What happens next', body: 'You\'ll receive a welcome email with your login the moment your AI is ready to go live.' },
       ]
       : [
-        'Our team confirms your details and starts your setup, usually within 1–2 business days.',
-        'We email you the moment your account is ready to go live.',
-        'If we need anything from you in the meantime, you\'ll hear from us by email.',
+        { label: 'What we have', body: 'Your studio details, branding, and payment. Everything we need to start.' },
+        { label: 'What we\'re doing now', body: 'Reviewing your submission and setting up your account behind the scenes. This typically takes 1–2 business days.' },
+        { label: 'What we\'ll need from you', body: 'Nothing right now. If anything needs clarifying, we\'ll send you a message below — you\'ll also get an email.' },
+        { label: 'What happens next', body: 'You\'ll receive a welcome email with your login the moment your account is ready to go live.' },
       ];
 
     const invoiceRows = invoices.map((inv) => `
@@ -271,17 +317,23 @@
       </tr>
     `).join('');
 
-    const messagesBlock = conv.portal_url
-      ? `<div class="acct-msg">
-           <div class="acct-msg-text">
-             <strong>Messages with our team</strong>${conv.unread ? `<span class="acct-msg-unread">${esc(conv.unread)} new</span>` : ''}
-             <p>Reply to your confirmation email, or open the full thread to send attachments and see system events.</p>
-           </div>
-           <a class="acct-btn" href="${esc(conv.portal_url)}">Open messages →</a>
-         </div>`
-      : `<p style="margin:0;color:var(--g6);font-size:13px;line-height:1.55;">
-           Reply to your confirmation email to send our team a message. We'll set up your conversation thread here once the first message is exchanged.
-         </p>`;
+    // Inline thread + composer. The DOM is rendered now; loadThread()
+    // hydrates it after the page paints so the rest of the account view
+    // stays interactive while messages are fetching.
+    const messagesBlock = `
+      <div class="acct-thread" id="acctThread">
+        <div class="acct-thread-loading">Loading your conversation…</div>
+      </div>
+      <form class="acct-compose" id="acctCompose" novalidate>
+        <textarea id="acctMsgBody" rows="3" placeholder="Type a message to our team… (Cmd/Ctrl-Enter to send)" maxlength="10000"></textarea>
+        <div class="acct-compose-bar">
+          <span class="acct-compose-hint">
+            Need to send a file? <a href="${esc(conv.portal_url || '#')}">Open the full thread</a> to attach PDFs or images.
+          </span>
+          <span class="acct-compose-err" id="acctMsgErr" role="alert"></span>
+          <button type="submit" class="acct-btn" id="acctMsgSend">Send</button>
+        </div>
+      </form>`;
 
     document.getElementById('acctRoot').innerHTML = `
       <div class="acct-hdr">
@@ -296,14 +348,21 @@
       </div>
 
       <div class="acct-card">
-        <h2>What happens next</h2>
-        <div class="acct-next">
-          <ol>${nextSteps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
+        <h2>Where you're at</h2>
+        <div class="acct-stages">
+          ${stages.map((s, i) => `
+            <div class="acct-stage">
+              <div class="acct-stage-icon" aria-hidden="true">${i + 1}</div>
+              <div>
+                <div class="acct-stage-label">${esc(s.label)}</div>
+                <div class="acct-stage-body">${esc(s.body)}</div>
+              </div>
+            </div>`).join('')}
         </div>
       </div>
 
       <div class="acct-card">
-        <h2>Messages</h2>
+        <h2>Messages with our team</h2>
         ${messagesBlock}
       </div>
 
@@ -342,12 +401,21 @@
         <div class="acct-row"><div class="acct-k">Primary contact</div><div class="acct-v">${esc(fullName || '—')}${sub.contact_email ? ' · <a href="mailto:' + esc(sub.contact_email) + '">' + esc(sub.contact_email) + '</a>' : ''}</div></div>
         <div class="acct-row"><div class="acct-k">Country / timezone</div><div class="acct-v">${esc(sub.country || '—')}${sub.timezone ? ' · ' + esc(sub.timezone) : ''}</div></div>
         <div class="acct-row"><div class="acct-k">Submitted</div><div class="acct-v">${esc(dateTimeFmt(sub.submitted_at))}</div></div>
-        <div class="acct-row"><div class="acct-k">Need to update something?</div><div class="acct-v">Reply to your confirmation email and ask — we'll send you a secure link to update only the fields that need changing.</div></div>
+        <div class="acct-row"><div class="acct-k">Need to update something?</div><div class="acct-v">Send us a message above and tell us what to change — we'll update your record on our side.</div></div>
       </div>
 
       <div class="acct-foot">
-        Need to reach us? Email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a> or reply to any email from our team.
+        Need to reach us? Send a message above, or email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.
       </div>`;
+
+    // Hydrate the inline message thread + composer. Kicked off after the
+    // main render so the rest of the page is usable while messages load.
+    // Stash sender name/email globally so onMsgSend can stamp messages
+    // without re-resolving from state — the inline composer is a sibling
+    // of renderAccount's closure, not a child of it.
+    window.__acctSenderName = fullName || sub.studio_name || null;
+    window.__acctSenderEmail = sub.contact_email || null;
+    initMessages(conv);
 
     // PDF download handler — POSTs the session_token in the request body
     // to keep it off the URL bar and server logs. Streams the PDF back as
@@ -389,6 +457,147 @@
         alert('We could not reach the server. Check your connection and try again.');
       }
     });
+  }
+
+  // ------------------------------------------------------------------
+  // Inline messages — thread + composer hydration. Auths against
+  // portal-conversation using the conversation_id + studio_token returned
+  // by get-studio-account (both always exist now; the loader mints them
+  // if they don't already). Polls every 15s while the tab is visible so
+  // admin replies render without a manual refresh. We can't use Supabase
+  // realtime here because messages has admin-only RLS and the studio has
+  // no JWT — polling matches the existing portal.html pattern.
+  const msgState = { convId: null, token: null, sending: false, pollTimer: null };
+
+  function initMessages(conv) {
+    if (!conv || !conv.id || !conv.token) {
+      const thread = document.getElementById('acctThread');
+      if (thread) thread.innerHTML = '<div class="acct-thread-empty">We could not load your conversation. Please refresh the page.</div>';
+      return;
+    }
+    msgState.convId = conv.id;
+    msgState.token = conv.token;
+
+    const form = document.getElementById('acctCompose');
+    const body = document.getElementById('acctMsgBody');
+    if (form) form.addEventListener('submit', onMsgSend);
+    if (body) {
+      body.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+          e.preventDefault();
+          form.requestSubmit();
+        }
+      });
+    }
+
+    loadThread(true).then(() => markThreadRead());
+    startMsgPolling();
+  }
+
+  async function msgApi(action, extra) {
+    const resp = await fetch(FN_BASE + 'portal-conversation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        conversation_id: msgState.convId,
+        token: msgState.token,
+        ...(extra || {}),
+      }),
+    });
+    let data = null;
+    try { data = await resp.json(); } catch (_) { /* ignore */ }
+    return { ok: resp.ok && data?.ok !== false, status: resp.status, data };
+  }
+
+  async function loadThread(scroll) {
+    const res = await msgApi('load');
+    const host = document.getElementById('acctThread');
+    if (!host) return;
+    if (!res.ok) {
+      host.innerHTML = '<div class="acct-thread-empty">We could not load your conversation. Please refresh.</div>';
+      return;
+    }
+    const messages = res.data?.messages || [];
+    if (!messages.length) {
+      host.innerHTML = '<div class="acct-thread-empty">No messages yet — say hello below and we will get back to you shortly.</div>';
+      return;
+    }
+    host.innerHTML = messages.map(renderThreadMsg).join('');
+    if (scroll) host.scrollTop = host.scrollHeight;
+  }
+
+  function renderThreadMsg(m) {
+    const isStudio = m.sender_role === 'studio';
+    const isSystem = m.sender_role === 'system';
+    const cls = isSystem
+      ? 'acct-msg-bubble acct-msg-system'
+      : (isStudio ? 'acct-msg-bubble acct-msg-mine' : 'acct-msg-bubble acct-msg-them');
+    const who = isSystem ? '' : (isStudio ? (m.sender_name || 'You') : (m.sender_name || 'StudioLAB Growth'));
+    const ts = new Date(m.created_at).toLocaleString('en-AU', {
+      dateStyle: 'medium', timeStyle: 'short', timeZone: 'Australia/Sydney',
+    });
+    const bodyHtml = m.body_html || textToHtml(m.body_text || '');
+    if (isSystem) {
+      return `<div class="${cls}"><div class="acct-msg-body">${bodyHtml} · ${esc(ts)}</div></div>`;
+    }
+    return `
+      <div class="${cls}">
+        <div class="acct-msg-meta">${esc(who)} · ${esc(ts)}</div>
+        <div class="acct-msg-body">${bodyHtml}</div>
+      </div>`;
+  }
+
+  // Plain-text → minimal HTML for client-side rendering of any message
+  // that didn't ship body_html (system events, legacy rows). Server-side
+  // textToHtml in portal-conversation does the heavier lifting for new
+  // studio sends; this is just a render fallback.
+  function textToHtml(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+  }
+
+  async function onMsgSend(e) {
+    e.preventDefault();
+    if (msgState.sending) return;
+    const errEl = document.getElementById('acctMsgErr');
+    const sendBtn = document.getElementById('acctMsgSend');
+    const bodyEl = document.getElementById('acctMsgBody');
+    errEl.textContent = '';
+    const text = (bodyEl.value || '').trim();
+    if (!text) { errEl.textContent = 'Type a message first.'; return; }
+    if (text.length > 10000) { errEl.textContent = 'Message is too long (max 10,000 characters).'; return; }
+
+    msgState.sending = true;
+    sendBtn.disabled = true;
+    const senderName = window.__acctSenderName || null;
+    const senderEmail = window.__acctSenderEmail || null;
+    const res = await msgApi('send', { body_text: text, sender_name: senderName, sender_email: senderEmail });
+    msgState.sending = false;
+    sendBtn.disabled = false;
+    if (!res.ok) {
+      errEl.textContent = (res.data && res.data.error) || 'Could not send. Please try again.';
+      return;
+    }
+    bodyEl.value = '';
+    await loadThread(true);
+  }
+
+  async function markThreadRead() {
+    try { await msgApi('mark-read'); } catch (_) { /* best effort */ }
+  }
+
+  function startMsgPolling() {
+    if (msgState.pollTimer) return;
+    msgState.pollTimer = setInterval(() => {
+      if (document.hidden) return;
+      // Preserve scroll position unless the user is already at the bottom.
+      const host = document.getElementById('acctThread');
+      if (!host) return;
+      const wasAtBottom = host.scrollHeight - host.scrollTop - host.clientHeight < 40;
+      loadThread(wasAtBottom);
+    }, 15000);
   }
 
   async function load() {
