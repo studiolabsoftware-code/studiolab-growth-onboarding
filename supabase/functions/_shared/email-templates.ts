@@ -868,6 +868,69 @@ export function studioActivated(opts: {
   return { subject, html: layout({ previewText: 'Your StudioLAB Growth account is now active.', body }) };
 }
 
+// Studio notification when admin sends a quote in response to a service
+// request. Brief by design -- the quote itself goes out via Stripe's
+// hosted email with full pricing detail. This just nudges them at the
+// portal so they don't miss the Stripe email landing in spam.
+export function studioRequestQuoted(opts: {
+  studioName: string;
+  summary: string;
+  accountUrl?: string | null;
+}): { subject: string; html: string } {
+  const subject = `Your quote is ready: ${opts.summary}`;
+  const accountCta = opts.accountUrl ? cta('View on Billing tab', opts.accountUrl + '#billing') : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your quote is ready</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
+    <p style="margin:0 0 14px;">We've prepared a quote for your request: <strong>${escape(opts.summary)}</strong>.</p>
+    <p style="margin:0 0 14px;">Stripe will send you the quote with full pricing detail in a separate email. You can also see it any time on the Billing tab of your account.</p>
+    ${accountCta}
+    <p style="margin:0;">Questions? Reply to this email and we'll help.</p>`;
+  return { subject, html: layout({ previewText: opts.summary, body }) };
+}
+
+// Studio notification when admin applies the upgrade/change after a
+// paid quote. Confirms the change is now live on our side so the studio
+// knows it's done before they see it reflected on the platform.
+export function studioRequestApplied(opts: {
+  studioName: string;
+  summary: string;
+  accountUrl?: string | null;
+}): { subject: string; html: string } {
+  const subject = `Done: ${opts.summary}`;
+  const accountCta = opts.accountUrl ? cta('View your account', opts.accountUrl) : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your change is live</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
+    <p style="margin:0 0 14px;">We've applied your request: <strong>${escape(opts.summary)}</strong>.</p>
+    <p style="margin:0 0 14px;">If you're already active on the StudioLAB Growth platform, the change is reflected there too. If not, it'll be in place the moment your account goes live.</p>
+    ${accountCta}
+    <p style="margin:0;">Thanks for choosing to grow with us,<br>The StudioLAB team</p>`;
+  return { subject, html: layout({ previewText: opts.summary, body }) };
+}
+
+// Studio notification when admin declines a service request. Warm
+// language because no is still a customer-facing moment.
+export function studioRequestDeclined(opts: {
+  studioName: string;
+  summary: string;
+  reason: string;
+  accountUrl?: string | null;
+}): { subject: string; html: string } {
+  const subject = `About your request: ${opts.summary}`;
+  const accountCta = opts.accountUrl ? cta('View your account', opts.accountUrl) : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">A note on your request</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
+    <p style="margin:0 0 14px;">Thanks for raising <strong>${escape(opts.summary)}</strong>. Unfortunately we're not able to take this one on right now.</p>
+    <p style="margin:14px 0 4px;color:${COL.g6};font-size:12px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;">Why</p>
+    <div style="margin:0 0 14px;padding:12px 14px;background:${COL.g1};border-radius:8px;font-size:13px;line-height:1.55;color:${COL.in_d};white-space:pre-wrap;">${escape(opts.reason)}</div>
+    <p style="margin:0 0 14px;">Happy to chat through alternatives — reply to this email and we'll work something out.</p>
+    ${accountCta}
+    <p style="margin:0;">All the best,<br>The StudioLAB team</p>`;
+  return { subject, html: layout({ previewText: 'Update on your StudioLAB Growth request.', body }) };
+}
+
 // Admin notification when a studio raises a structured service request
 // (plan upgrade, setup change, custom add-on, other). Plain layout with
 // the request summary + notes so admin can decide whether to open the

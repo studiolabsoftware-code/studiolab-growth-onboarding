@@ -1115,7 +1115,7 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
   // invoice side.
   if (ledger && classification.source === 'studiolab-growth-quote' && invoice.quote) {
     const { data: quoteRow } = await sb.from('quotes')
-      .select('id, submission_id, external_contact_id, resulting_invoice_id, project_id')
+      .select('id, submission_id, external_contact_id, resulting_invoice_id, project_id, service_request_id')
       .eq('stripe_quote_id', invoice.quote)
       .maybeSingle();
     if (quoteRow) {
@@ -1150,6 +1150,23 @@ async function handleInvoiceUpdate(sb: Sb, invoice: InvoiceObj, eventType: strin
         invoicePatch.project_id = quoteRow.project_id;
       }
       await sb.from('invoices').update(invoicePatch).eq('id', ledger.id);
+
+      // Service-request lifecycle hook. When a quote-driven invoice is
+      // paid AND the originating quote was created from a service
+      // request, flip the linked request to 'paid' so admin sees an
+      // Apply button on the detail page. We don't auto-apply because
+      // some kinds (custom_addon, other) don't have a structured target
+      // -- the human still has to action delivery.
+      if (eventType === 'invoice.payment_succeeded' && quoteRow.service_request_id) {
+        try {
+          await sb.from('service_requests')
+            .update({ status: 'paid' })
+            .eq('id', quoteRow.service_request_id)
+            .in('status', ['quoted']);  // only transition awaiting-acceptance rows
+        } catch (e) {
+          console.error('service_request paid transition failed:', e);
+        }
+      }
     }
   }
 

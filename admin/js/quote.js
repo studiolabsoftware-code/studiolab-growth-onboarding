@@ -369,6 +369,7 @@
         cover_note: $('#qCoverNote').value.trim() || undefined,
         description: $('#qDescription').value.trim() || undefined,
         parent_quote_id: parentQuoteId,
+        service_request_id: currentContext?.serviceRequest?.id || undefined,
       } : null,
       parentQuoteId,
     };
@@ -832,7 +833,15 @@
   }
 
   window.AdminQuote = {
-    openForStudio(submission) { open({ mode: 'studio', submission }); },
+    openForStudio(submission, opts) {
+      // opts.serviceRequest -- when the modal is opened from the
+      // "Send quote" button on the Open requests strip, this carries
+      // the request row so we can show the studio's notes as a banner
+      // and stamp service_request_id on the created quote.
+      const ctx = { mode: 'studio', submission };
+      if (opts && opts.serviceRequest) ctx.serviceRequest = opts.serviceRequest;
+      open(ctx);
+    },
     openExternal() { open({ mode: 'external' }); },
     close,
     renderStudioQuotesPanel,

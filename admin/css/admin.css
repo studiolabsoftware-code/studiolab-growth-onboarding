@@ -80,6 +80,35 @@
 .bdg-st-setup_in_progress{ background: var(--mg-l); color: var(--mg-d); }
 .bdg-st-complete         { background: var(--gr-l); color: var(--gr); }
 .bdg-st-active           { background: #065F46; color: #fff; }
+
+/* Service request status badges. Distinct palette so admin sees at a
+   glance which requests need their attention (open / paid — needs apply
+   are the action-bearing ones; quoted / applied / declined are stable). */
+.bdg-req-open       { background: #DBEAFE; color: #1E40AF; }
+.bdg-req-quoted     { background: #DBEAFE; color: #1E40AF; }
+.bdg-req-paid       { background: #FEF3C7; color: #B45309; }
+.bdg-req-applied    { background: #D1FAE5; color: #047857; }
+.bdg-req-declined   { background: #F3F4F6; color: #6B7280; }
+.bdg-req-withdrawn  { background: #F3F4F6; color: #6B7280; }
+
+/* Service requests strip at the top of the Overview tab on detail.js.
+   Open and paid requests render as full rows with their actions next
+   to a status pill. Closed requests fold into a one-line summary. */
+.req-section { background: #fff; border: 1px solid var(--g2); border-radius: 12px; margin-bottom: 14px; }
+.req-section .det-section-hdr { padding: 14px 18px; border-bottom: 1px solid var(--g2); }
+.req-section .det-section-hdr h2 { margin: 0; font-size: 14px; font-weight: 700; color: var(--in-d); }
+.req-section .det-section-body { padding: 14px 18px; }
+.req-list { display: flex; flex-direction: column; gap: 10px; }
+.req-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 14px 16px; background: var(--g1); border-radius: 10px; align-items: start; }
+.req-row-kind { font-size: 13px; font-weight: 700; color: var(--in-d); }
+.req-row-kind .req-row-target { color: var(--g6); font-weight: 500; }
+.req-row-meta { font-size: 11px; color: var(--g6); margin-top: 2px; }
+.req-row-notes { font-size: 12px; color: var(--in-d); line-height: 1.55; margin-top: 8px; white-space: pre-wrap; }
+.req-row-side { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; min-width: 200px; }
+.req-row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.req-row-actions .btn { padding: 6px 12px; font-size: 12px; }
+.req-empty { font-size: 13px; color: var(--g6); font-style: italic; }
+.req-closed-line { font-size: 12px; color: var(--g6); margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--g2); }
 /* Quote-lifecycle terminal states. Differentiated so admin can tell at a
    glance whether a dead quote was withdrawn by us (cancelled, red),
    declined by the recipient (declined, red), expired without action

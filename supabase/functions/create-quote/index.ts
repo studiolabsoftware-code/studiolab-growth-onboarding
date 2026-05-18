@@ -92,6 +92,11 @@ Deno.serve(async (req) => {
     const coverNote = (body.cover_note || '').trim() || null;
     const description = (body.description || '').trim() || null;
     const parentQuoteId = (body.parent_quote_id || '').trim() || null;
+    // Optional link back to a studio service_request. Set when the
+    // admin opens the quote modal from the Open requests strip on the
+    // detail page. The linked request flips to 'quoted' after the
+    // ledger row lands so the studio sees a status transition.
+    const serviceRequestId = ((body as { service_request_id?: string }).service_request_id || '').trim() || null;
 
     if (!recipient) return badRequest('Recipient is required.');
     if (currency !== 'AUD' && currency !== 'USD') return badRequest('Currency must be AUD or USD.');
@@ -550,6 +555,7 @@ Deno.serve(async (req) => {
         status,
         acceptance_mode: acceptanceMode,
         parent_quote_id: parentQuoteId,
+        service_request_id: serviceRequestId,
         currency,
         subtotal_cents: subtotalCents,
         tax_cents: taxCents,
@@ -585,6 +591,65 @@ Deno.serve(async (req) => {
         error: 'Could not record the quote on our side. The Stripe quote was rolled back — please try again.',
         code: 'ledger_insert_failed',
       }, 500);
+    }
+
+    // Service-request lifecycle hook. When the quote was opened from a
+    // request context, flip the request to 'quoted' and stamp quote_id
+    // so the studio sees their request transition + a deep-link to the
+    // Billing tab on their next reload. Fire-and-forget: the quote is
+    // already live in Stripe by this point; we'd rather succeed without
+    // the linkage than fail the whole call.
+    if (serviceRequestId && ledgerRow?.id) {
+      try {
+        await sb.from('service_requests')
+          .update({ status: 'quoted', quote_id: ledgerRow.id })
+          .eq('id', serviceRequestId)
+          .in('status', ['open']);  // only transition fresh requests
+        // Studio nudge -- short email pointing them at the Billing tab.
+        // The Stripe-hosted quote email goes out separately with full
+        // pricing; this just helps when the Stripe email lands in spam.
+        if (submissionId) {
+          const { data: subRow } = await sb.from('submissions')
+            .select('studio_name, contact_email')
+            .eq('id', submissionId)
+            .maybeSingle();
+          const { data: reqRow } = await sb.from('service_requests')
+            .select('kind, target_plan, target_setup_type')
+            .eq('id', serviceRequestId)
+            .maybeSingle();
+          if (subRow?.contact_email && reqRow) {
+            const PLAN_LABEL: Record<string, string> = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
+            const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guided self-setup' };
+            const summary = reqRow.kind === 'plan_upgrade'
+              ? `Plan upgrade to ${PLAN_LABEL[String(reqRow.target_plan)] || reqRow.target_plan}`
+              : reqRow.kind === 'setup_change'
+                ? `Setup change to ${SETUP_LABEL[String(reqRow.target_setup_type)] || reqRow.target_setup_type}`
+                : reqRow.kind === 'custom_addon' ? 'Custom add-on' : 'Your request';
+            const { studioRequestQuoted } = await import('../_shared/email-templates.ts');
+            const { createGatedSender } = await import('../_shared/email-gated.ts');
+            const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
+            const isLive = (settings?.stripe_mode || 'test') === 'live';
+            const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
+            const sendGated = createGatedSender({ isLive, testRecipient });
+            const appUrl = Deno.env.get('APP_URL') || '';
+            const accountUrl = appUrl ? `${appUrl}/account.html` : null;
+            const tpl = studioRequestQuoted({
+              studioName: subRow.studio_name || 'there',
+              summary,
+              accountUrl,
+            });
+            await sendGated({
+              to: subRow.contact_email,
+              subject: tpl.subject,
+              html: tpl.html,
+              replyTo: 'info@studiolabsoftware.com',
+              intent: 'studio request quoted',
+            });
+          }
+        }
+      } catch (e) {
+        console.error('service_request status update / email failed:', e);
+      }
     }
 
     // Revision parent handling. ORDER OF OPERATIONS IS LOAD-BEARING:

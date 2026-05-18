@@ -23,6 +23,10 @@
   let current = null;
   let currentAssignment = null;
   let currentAssignees = [];
+  // Service requests for the open submission. Stashed at load time so
+  // the Overview render and the action handlers (Send quote, Apply,
+  // Decline) operate on the same dataset without redundant queries.
+  let currentRequests = [];
 
   // Tabbed detail view (Phase: 2026-05-15 — replaces the long stacked
   // page). Lazy-hydrates non-Overview tabs the first time they're shown so
@@ -78,6 +82,16 @@
       client.from('invoices').select('id', { count: 'exact', head: true }).eq('submission_id', id),
       client.from('quotes').select('id', { count: 'exact', head: true }).eq('submission_id', id),
     ]);
+
+    // Service requests come in a separate fetch so the destructuring on
+    // the bulk load above stays readable. Cheap query (small payload,
+    // single submission scope) so a second round trip is fine.
+    const { data: reqRows } = await client.from('service_requests')
+      .select('id, kind, target_plan, target_setup_type, notes, status, quote_id, declined_reason, created_at, applied_at, applied_by, updated_at')
+      .eq('submission_id', id)
+      .order('created_at', { ascending: false });
+    currentRequests = reqRows || [];
+
     if (error || !sub) {
       screen.innerHTML = '<div class="adm-empty">Could not load this submission.</div>';
       return;
@@ -253,6 +267,7 @@
     if (syncOne) syncOne.addEventListener('click', syncThisToSheet);
     const markActiveBtn = document.getElementById('detMarkActive');
     if (markActiveBtn) markActiveBtn.addEventListener('click', markActive);
+    bindServiceRequestHandlers();
 
     // Tab bar wiring (delegation for keyboard + click).
     const tabBar = screen.querySelector('.det-tabs');
@@ -398,6 +413,8 @@
     const isScale = sub.plan === 'scale';
     const isAi = sub.plan === 'ai';
     return `
+      ${serviceRequestsBlock(sub)}
+
       ${section('🏫 Studio details', [
         ['Studio name', fmtVal(sub.studio_name), undefined, 'studio_name'],
         ['Legal business name', fmtVal(sub.legal_name), undefined, 'legal_name'],
@@ -1195,6 +1212,190 @@
     tabHydrated = { overview: false, messages: false, invoices: false, quotes: false, activity: false };
     render(current);
     activateTab(savedTab);
+  }
+
+  // Service requests strip at the top of Overview. Shows open / quoted
+  // / paid requests prominently because they're action-bearing; closed
+  // ones (applied, declined, withdrawn) fold into a quiet history line
+  // so they don't crowd the page once volume builds up.
+  const REQ_KIND_LABEL = {
+    plan_upgrade: 'Plan upgrade',
+    setup_change: 'Setup type change',
+    custom_addon: 'Custom add-on',
+    other: 'General request',
+  };
+  const REQ_PLAN_LABEL = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
+  const REQ_SETUP_LABEL = { dfy: 'Done-For-You', guided: 'Guided self-setup' };
+  const REQ_STATUS_LABEL = {
+    open:      { cls: 'bdg-req-open',      label: 'New' },
+    quoted:    { cls: 'bdg-req-quoted',    label: 'Quoted — awaiting acceptance' },
+    paid:      { cls: 'bdg-req-paid',      label: 'Paid — needs apply' },
+    applied:   { cls: 'bdg-req-applied',   label: 'Applied' },
+    declined:  { cls: 'bdg-req-declined',  label: 'Declined' },
+    withdrawn: { cls: 'bdg-req-withdrawn', label: 'Withdrawn' },
+  };
+
+  function describeReq(r, sub) {
+    if (r.kind === 'plan_upgrade') {
+      return `${REQ_PLAN_LABEL[sub.plan] || sub.plan} → ${REQ_PLAN_LABEL[r.target_plan] || r.target_plan}`;
+    }
+    if (r.kind === 'setup_change') {
+      return `${REQ_SETUP_LABEL[sub.setup_type] || sub.setup_type} → ${REQ_SETUP_LABEL[r.target_setup_type] || r.target_setup_type}`;
+    }
+    if (r.kind === 'custom_addon') return 'Custom add-on';
+    return 'General request';
+  }
+
+  function serviceRequestsBlock(sub) {
+    if (!currentRequests.length) return '';
+    const open = currentRequests.filter((r) => r.status !== 'applied' && r.status !== 'declined' && r.status !== 'withdrawn');
+    const closed = currentRequests.filter((r) => !open.includes(r));
+    if (!open.length && !closed.length) return '';
+
+    const rowsHtml = open.map((r) => {
+      const st = REQ_STATUS_LABEL[r.status] || REQ_STATUS_LABEL.open;
+      const kindLabel = REQ_KIND_LABEL[r.kind] || r.kind;
+      const target = describeReq(r, sub);
+      const created = new Date(r.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
+      const actions = [];
+      if (r.status === 'open') {
+        actions.push(`<button type="button" class="btn btn-p" data-req-quote="${ESC(r.id)}">Send quote</button>`);
+        actions.push(`<button type="button" class="btn" data-req-decline="${ESC(r.id)}">Decline</button>`);
+      } else if (r.status === 'quoted') {
+        actions.push(`<button type="button" class="btn" data-req-decline="${ESC(r.id)}">Decline</button>`);
+      } else if (r.status === 'paid') {
+        actions.push(`<button type="button" class="btn btn-p" data-req-apply="${ESC(r.id)}">Apply now</button>`);
+      }
+      return `
+        <div class="req-row">
+          <div class="req-row-main">
+            <div class="req-row-kind">${ESC(kindLabel)} · <span class="req-row-target">${ESC(target)}</span></div>
+            <div class="req-row-meta">Raised ${ESC(created)}</div>
+            <div class="req-row-notes">${ESC(r.notes || '')}</div>
+          </div>
+          <div class="req-row-side">
+            <span class="bdg ${st.cls}">${ESC(st.label)}</span>
+            <div class="req-row-actions">${actions.join('')}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const closedLine = closed.length
+      ? `<div class="req-closed-line">${closed.length} previous request${closed.length === 1 ? '' : 's'} — ${closed.map((r) => ESC(REQ_STATUS_LABEL[r.status]?.label || r.status)).join(', ')}.</div>`
+      : '';
+
+    return `
+      <section class="det-section req-section">
+        <div class="det-section-hdr">
+          <h2 class="det-section-title">🔁 Service requests</h2>
+        </div>
+        <div class="det-section-body">
+          ${open.length ? `<div class="req-list">${rowsHtml}</div>` : '<div class="req-empty">No open requests right now.</div>'}
+          ${closedLine}
+        </div>
+      </section>`;
+  }
+
+  function bindServiceRequestHandlers() {
+    document.querySelectorAll('[data-req-quote]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-req-quote');
+        const r = currentRequests.find((x) => x.id === id);
+        if (!r || !current) return;
+        // Open the existing quote modal with a service_request context
+        // so it stamps service_request_id on the created quote row.
+        if (window.AdminQuote && window.AdminQuote.openForStudio) {
+          window.AdminQuote.openForStudio(current, { serviceRequest: r });
+        }
+      });
+    });
+    document.querySelectorAll('[data-req-apply]').forEach((btn) => {
+      btn.addEventListener('click', () => applyRequest(btn.getAttribute('data-req-apply'), btn));
+    });
+    document.querySelectorAll('[data-req-decline]').forEach((btn) => {
+      btn.addEventListener('click', () => declineRequest(btn.getAttribute('data-req-decline')));
+    });
+  }
+
+  async function applyRequest(id, btn) {
+    const r = currentRequests.find((x) => x.id === id);
+    if (!r || !current) return;
+    const target = describeReq(r, current);
+    const confirmed = await (window.AdminModal && window.AdminModal.confirm
+      ? window.AdminModal.confirm({
+          title: 'Apply this request?',
+          message: `<p>Applying <strong>${ESC(REQ_KIND_LABEL[r.kind] || r.kind)}</strong> (${ESC(target)}) will:</p>
+            <ul style="margin:0 0 12px 18px;line-height:1.6;font-size:13px;">
+              ${r.kind === 'plan_upgrade' ? '<li>Switch their plan on the submission record.</li>' : ''}
+              ${r.kind === 'setup_change' ? '<li>Switch their setup type on the submission record.</li>' : ''}
+              <li>Mark the request as Applied and stamp the apply time + your email for audit.</li>
+              <li>Post a system event into their inbox thread.</li>
+              <li>Email them confirming the change is live on our side.</li>
+            </ul>
+            <p style="margin:0;">Only do this once the linked quote has been paid (it has).</p>`,
+          confirmText: 'Apply',
+          confirmStyle: 'primary',
+        })
+      : Promise.resolve(confirm('Apply this request? Sends the studio a confirmation email.')));
+    if (!confirmed) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Applying…'; }
+    try {
+      const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+      const resp = await fetch(window.SUPABASE_CONFIG.url + '/functions/v1/admin-apply-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(jwt ? { Authorization: 'Bearer ' + jwt } : {}) },
+        body: JSON.stringify({ request_id: id }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Apply now'; }
+        if (window.AdminModal?.alert) {
+          window.AdminModal.alert({ title: 'Apply failed', message: ESC((data && data.error) || `Status ${resp.status}.`) });
+        } else { alert((data && data.error) || `Could not apply (status ${resp.status}).`); }
+        return;
+      }
+      open(current.id);
+    } catch (err) {
+      console.error('apply request failed', err);
+      if (btn) { btn.disabled = false; btn.textContent = 'Apply now'; }
+      alert('We could not reach the server. Check your connection and try again.');
+    }
+  }
+
+  async function declineRequest(id) {
+    const r = currentRequests.find((x) => x.id === id);
+    if (!r || !current) return;
+    // Reason is required (the studio sees it verbatim). Prompt for it
+    // via the modal helper -- falling back to window.prompt when the
+    // modal isn't available.
+    const reason = window.AdminModal && window.AdminModal.prompt
+      ? await window.AdminModal.prompt({
+          title: 'Decline this request',
+          message: 'Tell the studio why we can\'t take this on. They see this verbatim.',
+          placeholder: 'e.g. We don\'t have capacity for a custom website right now -- happy to recommend a partner.',
+          confirmText: 'Send decline',
+        })
+      : window.prompt('Decline reason (the studio sees this verbatim):');
+    if (!reason || !reason.trim()) return;
+    try {
+      const jwt = localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt');
+      const resp = await fetch(window.SUPABASE_CONFIG.url + '/functions/v1/admin-decline-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(jwt ? { Authorization: 'Bearer ' + jwt } : {}) },
+        body: JSON.stringify({ request_id: id, reason: reason.trim() }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        if (window.AdminModal?.alert) {
+          window.AdminModal.alert({ title: 'Decline failed', message: ESC((data && data.error) || `Status ${resp.status}.`) });
+        } else { alert((data && data.error) || `Could not decline (status ${resp.status}).`); }
+        return;
+      }
+      open(current.id);
+    } catch (err) {
+      console.error('decline request failed', err);
+      alert('We could not reach the server. Check your connection and try again.');
+    }
   }
 
   // "Mark as active" surface in the side panel. Different from a plain
