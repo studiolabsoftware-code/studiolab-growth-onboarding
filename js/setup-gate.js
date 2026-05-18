@@ -53,16 +53,39 @@
     return '/' + r + '/' + plan + '/';
   }
 
-  // Decide where a returning studio lands after OTP. The default is the
-  // per-plan setup form, but a Dominate AI studio who has already paid
-  // belongs on /kb.html — the form is behind them at that point. kb.html
-  // itself handles the "KB already finalised" state, so we route there
-  // whether or not kb_completed_at is set.
+  // Decide where a returning studio lands after OTP.
+  //
+  // The rule is "if they've moved past the form, do not throw them back
+  // into the form." Before this fix, a paid + fully submitted studio
+  // who signed in from the home page was routed straight back to the
+  // per-plan wizard, which then refused to save their edits because
+  // save-draft locks post-submit -- a dead-end experience.
+  //
+  // Order matters:
+  //   1. Active / complete -> account.html (their handover landing).
+  //   2. AI + paid, KB not finished -> kb.html (the one place where the
+  //      form-style flow still has work to do post-payment).
+  //   3. Any non-draft status -> account.html (the canonical portal for
+  //      submitted studios, paid or not; renderNotPaidYet handles the
+  //      "still need to pay" case inside the page).
+  //   4. Otherwise -> per-plan form (genuine new draft).
   const PAID_STATUSES = new Set(['paid', 'authorised', 'card_saved']);
+  const POST_SUBMIT_STATUSES = new Set([
+    'submitted', 'in_review', 'changes_requested', 'setup_in_progress',
+    'complete', 'active',
+  ]);
   function routeFor(submission, plan, region) {
-    if (submission && plan === 'ai' && PAID_STATUSES.has(submission.payment_status)) {
+    if (!submission) return destinationUrl(plan, region);
+    const status = submission.status || 'draft';
+    if (status === 'active' || status === 'complete') return '/account.html';
+    if (
+      plan === 'ai'
+      && PAID_STATUSES.has(submission.payment_status)
+      && !submission.kb_completed_at
+    ) {
       return '/kb.html';
     }
+    if (POST_SUBMIT_STATUSES.has(status)) return '/account.html';
     return destinationUrl(plan, region);
   }
 
@@ -229,17 +252,29 @@
     applyPlanAwareCopy();
     bind();
 
-    // If user already has a session and a plan+region in URL, send them
-    // straight to the destination (skip gate).
+    // If the user already has a live session, route them based on what
+    // the server says about their submission -- not on URL params. Prior
+    // behaviour skipped the gate and dumped them straight into the form
+    // even when status was already submitted/paid, which felt like
+    // restarting from scratch. account.html is the canonical surface
+    // for any returning studio; it owns the "pick up where you left off"
+    // copy for unpaid drafts and the full portal for paid/submitted.
     const session = (function () {
       try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); }
       catch (_) { return null; }
     })();
     if (session && session.token && session.expiresAt && new Date(session.expiresAt) > new Date()) {
-      if (ALLOWED_PLANS.has(URL_PLAN) && ALLOWED_REGIONS.has(URL_REGION)) {
-        window.location.href = destinationUrl(URL_PLAN, URL_REGION);
-        return;
-      }
+      (async () => {
+        try {
+          const r = await callFn('get-studio-account', { session_token: session.token });
+          if (r.ok && r.data && r.data.ok && r.data.submission) {
+            window.location.href = routeFor(r.data.submission, r.data.submission.plan, r.data.submission.region);
+            return;
+          }
+        } catch (_) { /* fall through to gate */ }
+        // get-studio-account failed (likely session no longer matches a
+        // submission): leave them on the gate so they can re-OTP.
+      })();
     }
   }
 

@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
         'amount_paid_cents, currency, tax_amount_cents, ' +
         'invoice_hosted_url, invoice_pdf_url, ' +
         'submitted_at, last_saved_at, session_expires_at, activated_at, ' +
+        'kb_completed_at, ' +
         // Self-edit surface — the additional fields below are read back so
         // the studio sees its current values when entering edit mode.
         'first_name, last_name, role, contact_phone, address, website, ' +
@@ -103,6 +104,7 @@ Deno.serve(async (req) => {
         invoice_pdf_url: submission.invoice_pdf_url,
         submitted_at: submission.submitted_at,
         activated_at: submission.activated_at,
+        kb_completed_at: submission.kb_completed_at,
         // Self-edit surface
         role: submission.role,
         contact_phone: submission.contact_phone,
