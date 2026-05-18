@@ -900,3 +900,47 @@ body.role-va .adm-preview-link { display: none !important; }
   line-height: 1.45;
 }
 .cur-lock-hint.vis { display: block; }
+
+/* Click-to-copy discount-code chip. Renders inline in the Discount
+   codes table; the entire pill (code text + icon glyph) is the click
+   target so VAs can drop the code into a customer email without
+   highlighting + cmd-C. */
+.cat-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--g1);
+  border: 1px solid var(--g2);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s;
+}
+.cat-code-copy:hover {
+  background: #fff;
+  border-color: var(--in);
+}
+.cat-code-copy:focus-visible {
+  outline: 2px solid var(--in);
+  outline-offset: 2px;
+}
+.cat-code-copy:disabled {
+  cursor: default;
+  background: var(--gr-l, #D1FAE5);
+  border-color: var(--gr, #047857);
+  color: var(--gr, #047857);
+}
+.cat-code-copy code {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  background: transparent;
+  color: var(--in-d);
+  padding: 0;
+}
+.cat-code-copy-icon {
+  color: var(--g6);
+  font-size: 14px;
+  line-height: 1;
+}
+.cat-code-copy:hover .cat-code-copy-icon { color: var(--in); }

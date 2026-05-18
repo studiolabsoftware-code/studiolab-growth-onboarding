@@ -843,7 +843,12 @@
         : '<span class="bdg bdg-inactive">Inactive</span>';
       return `
         <tr>
-          <td class="studio-cell"><code>${escapeHtml(c.code)}</code></td>
+          <td class="studio-cell">
+            <button type="button" class="cat-code-copy" data-cat-action="copy-code" data-code="${escapeHtml(c.code)}" title="Click to copy">
+              <code>${escapeHtml(c.code)}</code>
+              <span class="cat-code-copy-icon" aria-hidden="true">⧉</span>
+            </button>
+          </td>
           <td>${escapeHtml(discount)}</td>
           <td>${applies}</td>
           <td class="muted">${escapeHtml(window)}</td>
@@ -879,8 +884,43 @@
     if (action === 'toggle-active') return toggleActive(id, btn.dataset.active !== 'true');
     if (action === 'sync') return syncToStripe(id, btn);
     if (action === 'copy-url') return copyUrl(btn);
+    if (action === 'copy-code') return copyToClipboard(btn, btn.dataset.code || '', 'Copied ✓');
     if (action === 'edit-code') return openCodeModal(codes.find((c) => c.id === id));
     if (action === 'toggle-code') return toggleCode(id, btn.dataset.active !== 'true');
+  }
+
+  // Generic clipboard helper. Used by both Copy URL and Copy Code actions.
+  // Briefly flips the button label to a confirmation state so the VA sees
+  // the copy succeeded. Falls back to a hidden textarea + execCommand for
+  // environments where the modern clipboard API is unavailable.
+  async function copyToClipboard(btn, text, successLabel) {
+    if (!text) return;
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      }
+    } catch (e) { console.error('copy failed:', e); }
+    // Save full original HTML (the chip button has an icon + code inside)
+    // so we can restore it after the flash.
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = ok ? `<span style="font-weight:600;">${successLabel}</span>` : '<span>Copy failed</span>';
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.innerHTML = origHtml;
+      btn.disabled = false;
+    }, 1400);
   }
 
   // Copies the sign-up URL to the clipboard and gives the button a brief
@@ -1061,8 +1101,10 @@
       <div class="cat-form">
         <div class="cat-form-row">
           <label>Code</label>
-          <input type="text" id="catCodeCode" value="${escapeHtml(existing?.code || '')}" placeholder="SUMMER25" autocomplete="off" spellcheck="false">
-          <p class="set-hint">2–40 chars. Letters, numbers, hyphen, underscore. Case-insensitive.</p>
+          <input type="text" id="catCodeCode" value="${escapeHtml(existing?.code || '')}" placeholder="SUMMER25" autocomplete="off" spellcheck="false" maxlength="60">
+          <p class="set-hint">1–60 characters. Letters, numbers, and <code>-</code> <code>_</code> <code>.</code> <code>+</code>. Spaces convert to hyphens. Case-insensitive at checkout.</p>
+          <p class="set-hint" id="catCodeLivePreview" style="display:none;color:var(--g6);font-size:11px;margin-top:4px;"></p>
+          <p class="set-hint" id="catCodeLiveError" style="display:none;color:var(--rd);font-size:11px;margin-top:4px;font-weight:600;"></p>
         </div>
         <div class="cat-form-row">
           <label>Discount type</label>
@@ -1130,6 +1172,38 @@
           opt.selected = selectedIds.includes(opt.value);
         });
       }
+
+      // Live preview + validation hint as the admin types the code.
+      // Mirrors normaliseCode in manage-discount-codes/index.ts (trim,
+      // uppercase, collapse whitespace runs to a single hyphen) so the
+      // admin sees exactly what gets stored before they hit Create.
+      const codeInput = $('catCodeCode');
+      const preview = $('catCodeLivePreview');
+      const liveErr = $('catCodeLiveError');
+      const ALLOWED = /^[A-Z0-9_.+\-]{1,60}$/;
+      function previewCode() {
+        const raw = codeInput.value || '';
+        const normalised = raw.trim().toUpperCase().replace(/\s+/g, '-');
+        if (!normalised) {
+          preview.style.display = 'none';
+          liveErr.style.display = 'none';
+          return;
+        }
+        const changed = normalised !== raw;
+        preview.style.display = changed ? 'block' : 'none';
+        if (changed) preview.textContent = `Will be saved as: ${normalised}`;
+        if (!ALLOWED.test(normalised)) {
+          liveErr.style.display = 'block';
+          const bad = (normalised.match(/[^A-Z0-9_.+\-]/g) || []).slice(0, 5).join(' ');
+          liveErr.textContent = bad
+            ? `Not allowed: ${bad} — use only letters, numbers, hyphen, underscore, period, or plus.`
+            : 'Code must be 1–60 characters.';
+        } else {
+          liveErr.style.display = 'none';
+        }
+      }
+      codeInput.addEventListener('input', previewCode);
+      previewCode();
     });
 
     const ok = await open;
@@ -1176,7 +1250,21 @@
   async function callFn(name, body) {
     const client = sb();
     const { data, error } = await client.functions.invoke(name, { body });
-    if (error) return { ok: false, error: error.message || String(error) };
+    if (error) {
+      // supabase-js wraps non-2xx responses as `error` with a generic
+      // "Edge Function returned a non-2xx status code" message and no
+      // body. The actual response body lives on error.context (a Response
+      // object). Pull it out so the UI shows our real error string
+      // instead of the generic one.
+      let realError = error.message || String(error);
+      try {
+        if (error.context && typeof error.context.json === 'function') {
+          const body = await error.context.json();
+          if (body && body.error) realError = String(body.error);
+        }
+      } catch (_) { /* fall through with the generic message */ }
+      return { ok: false, error: realError };
+    }
     if (data && data.ok === false) return { ok: false, error: data.error || 'Failed.', data };
     return { ok: true, data };
   }
