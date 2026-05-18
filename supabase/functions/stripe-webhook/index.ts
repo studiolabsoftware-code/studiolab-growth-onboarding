@@ -363,13 +363,20 @@ async function handleCheckoutCompleted(sb: Sb, session: CheckoutSession, stripeM
   // * stripe_payment_intent_id is the critical one — without this set, the
   //   invoice.finalized handler can't classify the invoice as ours
   // * stripe_invoice_id is similar
-  // * session token is always burned post-checkout
+  //
+  // The session token is NOT burned here. The studio comes back from
+  // Stripe Checkout (a separate domain) within seconds and lands on
+  // payment-confirm.html, which needs the same session_token to fetch
+  // their submission and render the confirmation. Burning the token
+  // here meant the user got bounced to "We need to verify it is you"
+  // immediately after a successful payment. The 90-day TTL set at
+  // verify-otp covers everything the studio needs post-payment
+  // (account.html, KB, project portal). Re-edit protection lives in
+  // save-draft's row-status guard instead.
   const update: Record<string, unknown> = {
     status: 'submitted',
     submitted_at: submission.submitted_at || nowIso,
     payment_mode: submission.payment_mode || paymentMode,
-    session_token_hash: null,
-    session_expires_at: null,
   };
 
   let amountCents = 0;

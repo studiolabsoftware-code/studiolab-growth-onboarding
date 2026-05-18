@@ -66,6 +66,19 @@ Deno.serve(async (req) => {
     if (!row.session_expires_at || new Date(row.session_expires_at) < new Date()) {
       return jsonResponse({ ok: false, error: 'Session expired. Please verify your email again.' }, 401);
     }
+    // Post-submit edit guard. The session_token stays valid after payment
+    // (so the studio can access account.html, KB, project portal without
+    // re-OTP), but save-draft must refuse to mutate a finalised payload.
+    // Without this guard, a recovered session_token could be replayed to
+    // overwrite the submitted snapshot — or worse, re-fire the finalize
+    // emails by passing finalize:true again.
+    if (row.status && row.status !== 'draft') {
+      return jsonResponse({
+        ok: false,
+        error: 'This submission is already finalised. Contact support if you need to change something.',
+        code: 'already_finalised',
+      }, 409);
+    }
 
     const update: Record<string, unknown> = {
       ...pickAllowed(payload || {}),
