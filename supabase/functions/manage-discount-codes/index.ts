@@ -16,7 +16,10 @@ function parseIsoOrNull(v: unknown): string | null {
 }
 
 function normaliseCode(raw: unknown): string {
-  return String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
+  // Trim outer whitespace, uppercase, collapse internal whitespace runs to
+  // a single hyphen (so "EARLY BIRD" becomes "EARLY-BIRD"). Keeps the
+  // stored code URL-safe + easy to type at checkout.
+  return String(raw || '').trim().toUpperCase().replace(/\s+/g, '-');
 }
 
 function validatePayload(body: Record<string, unknown>): { ok: true; patch: Record<string, unknown> } | { ok: false; error: string } {
@@ -25,8 +28,8 @@ function validatePayload(body: Record<string, unknown>): { ok: true; patch: Reco
   if ('code' in body) {
     const code = normaliseCode(body.code);
     if (!code) return { ok: false, error: 'Code cannot be blank.' };
-    if (!/^[A-Z0-9_-]{2,40}$/.test(code)) {
-      return { ok: false, error: 'Codes can be 2–40 characters: letters, numbers, hyphen, underscore.' };
+    if (!/^[A-Z0-9_.+\-]{1,60}$/.test(code)) {
+      return { ok: false, error: 'Codes can be 1–60 characters: letters, numbers, hyphen, underscore, period, plus.' };
     }
     patch.code = code;
   }
