@@ -147,6 +147,52 @@
   .acct-tab-panel { display: none; }
   .acct-tab-panel.active { display: block; }
 
+  /* "Request a change" card. Lives on the Home tab above Messages so
+     it is the first action surface the studio sees post-login. Lists
+     their existing requests with status pills; a primary CTA opens the
+     modal for a new request. Hidden post-activation since the GHL
+     platform owns the relationship from that point. */
+  .acct-req-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; flex-wrap: wrap; }
+  .acct-req-hdr h2 { margin: 0; }
+  .acct-req-hdr-sub { color: var(--g6); font-size: 12px; line-height: 1.55; margin: 4px 0 0; max-width: 460px; }
+  .acct-req-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .acct-req-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: start; padding: 12px 14px; background: var(--g1); border-radius: 10px; }
+  .acct-req-row-title { font-size: 13px; font-weight: 700; color: var(--in-d); }
+  .acct-req-row-meta { font-size: 12px; color: var(--g6); line-height: 1.55; }
+  .acct-req-row-meta a { color: var(--in); font-weight: 600; }
+  .acct-req-row-notes { grid-column: 1 / -1; font-size: 12px; color: var(--g6); padding: 8px 0 0; line-height: 1.55; border-top: 1px dashed var(--g2); margin-top: 8px; white-space: pre-wrap; }
+  .acct-req-row-decline { grid-column: 1 / -1; font-size: 12px; color: var(--st-err-fg); padding: 6px 10px; background: var(--st-err-bg); border-radius: 6px; margin-top: 6px; }
+  .acct-req-empty { color: var(--g6); font-size: 13px; font-style: italic; padding: 10px 0 0; }
+  .acct-req-pill-open      { background: var(--st-info-bg); color: var(--st-info-fg); }
+  .acct-req-pill-quoted    { background: var(--st-info-bg); color: var(--st-info-fg); }
+  .acct-req-pill-paid      { background: var(--st-warn-bg); color: var(--st-warn-fg); }
+  .acct-req-pill-applied   { background: var(--st-ok-bg); color: var(--st-ok-fg); }
+  .acct-req-pill-declined  { background: var(--g2); color: var(--g6); }
+  .acct-req-pill-withdrawn { background: var(--g2); color: var(--g6); }
+
+  /* Modal for the request form. Vanilla overlay -- portal.html and
+     friends use the same idiom of a dimmed backdrop with a centred
+     card. Keyboard escape closes it. */
+  .acct-modal-backdrop { position: fixed; inset: 0; background: rgba(19,16,46,0.45); z-index: 100; display: flex; align-items: flex-start; justify-content: center; padding: 60px 16px 16px; overflow-y: auto; }
+  .acct-modal-card { background: #fff; border-radius: 14px; max-width: 520px; width: 100%; padding: 24px 26px; box-shadow: 0 20px 60px rgba(19,16,46,0.25); }
+  .acct-modal-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+  .acct-modal-hdr h3 { margin: 0; font-size: 18px; font-weight: 800; color: var(--in-d); letter-spacing: -0.3px; }
+  .acct-modal-close { background: transparent; border: 0; font-size: 22px; color: var(--g6); cursor: pointer; line-height: 1; padding: 4px 8px; }
+  .acct-modal-close:hover { color: var(--in-d); }
+  .acct-modal-sub { color: var(--g6); font-size: 13px; line-height: 1.55; margin: 0 0 16px; }
+  .acct-modal-form label { display: block; font-size: 12px; font-weight: 700; color: var(--in-d); margin: 12px 0 6px; }
+  .acct-modal-form select,
+  .acct-modal-form textarea,
+  .acct-modal-form input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid var(--g2); border-radius: 8px; font-family: inherit; font-size: 13px; color: var(--in-d); background: #fff; }
+  .acct-modal-form select:focus,
+  .acct-modal-form textarea:focus,
+  .acct-modal-form input:focus { outline: 2px solid var(--in); outline-offset: 1px; border-color: var(--in); }
+  .acct-modal-form textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+  .acct-modal-current { font-size: 12px; color: var(--g6); margin: 4px 0 0; }
+  .acct-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; align-items: center; flex-wrap: wrap; }
+  .acct-modal-actions .acct-modal-err { flex: 1; font-size: 12px; color: var(--st-err-fg); min-width: 200px; }
+  .acct-modal-actions button { min-width: 100px; }
+
   /* Activation banner. Replaces "Where you're at" + "Messages" stack
      once the admin marks the studio active, since the onboarding portal
      has done its job. Communication and product use move to the GHL
@@ -392,6 +438,7 @@
     acctState.submission = sub;
     acctState.invoices = invoices;
     acctState.quotes = quotes;
+    acctState.requests = data.service_requests || [];
     acctState.conv = conv;
     acctState.fullName = fullName;
     acctState.statusPill = statusPill;
@@ -537,6 +584,7 @@
       ` : `
         <section class="acct-tab-panel ${activeTab === 'home' ? 'active' : ''}" role="tabpanel" data-panel="home" aria-labelledby="home">
           ${whereYouAreCard}
+          ${renderRequestsCard(sub, acctState.requests)}
           <div class="acct-card">
             <h2>Messages with our team</h2>
             ${messagesBlock}
@@ -559,9 +607,10 @@
           : 'Need to reach us? Use the Home tab above, or email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.'}
       </div>`;
 
-    // Bind tab + edit + PDF handlers AFTER innerHTML is set.
+    // Bind tab + edit + request + PDF handlers AFTER innerHTML is set.
     bindTabHandlers();
     bindEditHandlers();
+    bindRequestHandlers();
 
     // Hydrate the inline message thread + composer. Skipped post-
     // activation because the messages card is hidden in that state — the
@@ -759,6 +808,233 @@
           </div>
         </form>
       </div>`;
+  }
+
+  // ------------------------------------------------------------------
+  // Service requests — Home-tab card + new-request modal. Pricing
+  // never appears on the studio surface; admin issues quotes manually
+  // and the quote flows through the existing Billing tab.
+  const REQ_KIND_LABEL = {
+    plan_upgrade: 'Plan upgrade',
+    setup_change: 'Setup type change',
+    custom_addon: 'Custom add-on',
+    other: 'General request',
+  };
+  const REQ_STATUS_LABEL = {
+    open:      { cls: 'acct-req-pill-open',      label: 'Submitted' },
+    quoted:    { cls: 'acct-req-pill-quoted',    label: 'Quote sent' },
+    paid:      { cls: 'acct-req-pill-paid',      label: 'Quote paid — applying' },
+    applied:   { cls: 'acct-req-pill-applied',   label: 'Done' },
+    declined:  { cls: 'acct-req-pill-declined',  label: 'Declined' },
+    withdrawn: { cls: 'acct-req-pill-withdrawn', label: 'Withdrawn' },
+  };
+
+  function describeRequest(r, sub) {
+    if (r.kind === 'plan_upgrade') {
+      const fromLabel = PLAN_LABEL[sub.plan] || sub.plan || '—';
+      const toLabel = PLAN_LABEL[r.target_plan] || r.target_plan || '—';
+      return `Upgrade plan: ${fromLabel} → ${toLabel}`;
+    }
+    if (r.kind === 'setup_change') {
+      const fromLabel = SETUP_LABEL[sub.setup_type] || sub.setup_type || '—';
+      const toLabel = SETUP_LABEL[r.target_setup_type] || r.target_setup_type || '—';
+      return `Setup change: ${fromLabel} → ${toLabel}`;
+    }
+    if (r.kind === 'custom_addon') return 'Custom add-on';
+    return 'General request';
+  }
+
+  function renderRequestsCard(sub, requests) {
+    const rows = (requests || []).map((r) => {
+      const st = REQ_STATUS_LABEL[r.status] || REQ_STATUS_LABEL.open;
+      const created = dateFmt(r.created_at);
+      const headline = describeRequest(r, sub);
+      const billingLink = (r.status === 'quoted' || r.status === 'paid')
+        ? ' · <a href="#billing" data-tab-link="billing">View on Billing tab →</a>'
+        : '';
+      const appliedLine = r.status === 'applied' && r.applied_at
+        ? ' · Applied ' + esc(dateFmt(r.applied_at))
+        : '';
+      const declineLine = r.status === 'declined' && r.declined_reason
+        ? `<div class="acct-req-row-decline"><strong>Reason:</strong> ${esc(r.declined_reason)}</div>`
+        : '';
+      return `
+        <div class="acct-req-row">
+          <div>
+            <div class="acct-req-row-title">${esc(headline)}</div>
+            <div class="acct-req-row-meta">Submitted ${esc(created)}${appliedLine}${billingLink}</div>
+          </div>
+          <span class="acct-pill ${st.cls}">${esc(st.label)}</span>
+          ${r.notes ? `<div class="acct-req-row-notes">${esc(r.notes)}</div>` : ''}
+          ${declineLine}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="acct-card">
+        <div class="acct-req-hdr">
+          <div>
+            <h2>Request a change</h2>
+            <p class="acct-req-hdr-sub">Want to upgrade, switch setup type, or have us build something extra? Raise a request and our team will come back to you with a quote.</p>
+          </div>
+          <button type="button" class="acct-btn" data-req-new>Request a change</button>
+        </div>
+        ${rows
+          ? `<div class="acct-req-list">${rows}</div>`
+          : `<div class="acct-req-empty">No requests yet. When you ask for something, it shows up here so you can track its status.</div>`}
+      </div>`;
+  }
+
+  function bindRequestHandlers() {
+    const newBtn = document.querySelector('[data-req-new]');
+    if (newBtn) newBtn.addEventListener('click', openRequestModal);
+    // Deep-link to Billing tab from the request rows.
+    document.querySelectorAll('[data-tab-link]').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = a.getAttribute('data-tab-link');
+        const tabBtn = document.querySelector('.acct-tab[data-tab="' + target + '"]');
+        if (tabBtn) tabBtn.click();
+      });
+    });
+  }
+
+  function openRequestModal() {
+    const sub = acctState.submission;
+    if (!sub) return;
+    const currentPlan = sub.plan;
+    const currentSetup = sub.setup_type;
+
+    // Available upgrade options — strictly upward from current plan.
+    const planOptions = [
+      { v: 'scale', label: 'Scale', enabled: currentPlan === 'launch' },
+      { v: 'ai',    label: 'Dominate AI', enabled: currentPlan === 'launch' || currentPlan === 'scale' },
+    ].filter((o) => o.enabled);
+
+    const setupTarget = currentSetup === 'guided' ? 'dfy' : 'guided';
+    const setupTargetLabel = SETUP_LABEL[setupTarget];
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'acct-modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="acct-modal-card" role="dialog" aria-modal="true" aria-labelledby="acctReqTitle">
+        <div class="acct-modal-hdr">
+          <h3 id="acctReqTitle">Request a change</h3>
+          <button type="button" class="acct-modal-close" data-req-close aria-label="Close">×</button>
+        </div>
+        <p class="acct-modal-sub">Tell us what you need. We'll review and come back to you with a quote — usually within 1–2 business days. No charge until you accept the quote.</p>
+        <form class="acct-modal-form" id="acctReqForm" novalidate>
+          <label for="acctReqKind">What kind of request?</label>
+          <select id="acctReqKind" name="kind">
+            ${planOptions.length ? '<option value="plan_upgrade">Upgrade my plan</option>' : ''}
+            <option value="setup_change">Switch setup type (${esc(SETUP_LABEL[currentSetup] || currentSetup)} → ${esc(setupTargetLabel)})</option>
+            <option value="custom_addon">Custom add-on (website, integration, etc.)</option>
+            <option value="other">Something else</option>
+          </select>
+
+          <div data-req-target="plan_upgrade" style="display:none;">
+            <label for="acctReqPlan">Upgrade to</label>
+            <select id="acctReqPlan" name="target_plan">
+              ${planOptions.map((o) => `<option value="${esc(o.v)}">${esc(o.label)}</option>`).join('')}
+            </select>
+            <p class="acct-modal-current">You're currently on <strong>${esc(PLAN_LABEL[currentPlan] || currentPlan)}</strong>.</p>
+          </div>
+
+          <input type="hidden" name="target_setup_type" value="${esc(setupTarget)}">
+
+          <label for="acctReqNotes">Tell us more</label>
+          <textarea id="acctReqNotes" name="notes" maxlength="2000" placeholder="What would you like us to do? Any timing, budget, or specifics we should know about?"></textarea>
+
+          <div class="acct-modal-actions">
+            <span class="acct-modal-err" data-req-err></span>
+            <button type="button" class="acct-btn acct-btn-secondary" data-req-close>Cancel</button>
+            <button type="submit" class="acct-btn" data-req-submit>Send request</button>
+          </div>
+        </form>
+      </div>`;
+    document.body.appendChild(backdrop);
+
+    // Kind switch shows/hides the plan picker.
+    const kindEl = backdrop.querySelector('#acctReqKind');
+    const planBlock = backdrop.querySelector('[data-req-target="plan_upgrade"]');
+    function syncKind() {
+      const k = kindEl.value;
+      planBlock.style.display = k === 'plan_upgrade' ? '' : 'none';
+    }
+    kindEl.addEventListener('change', syncKind);
+    syncKind();
+
+    function closeModal() {
+      backdrop.remove();
+      document.removeEventListener('keydown', onKey);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') closeModal();
+    }
+    document.addEventListener('keydown', onKey);
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) closeModal();
+    });
+    backdrop.querySelectorAll('[data-req-close]').forEach((b) => b.addEventListener('click', closeModal));
+
+    backdrop.querySelector('#acctReqForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = backdrop.querySelector('[data-req-err]');
+      const submitBtn = backdrop.querySelector('[data-req-submit]');
+      const cancelBtn = backdrop.querySelector('.acct-btn-secondary');
+      errEl.textContent = '';
+      const fd = new FormData(e.target);
+      const kind = String(fd.get('kind') || '');
+      const notes = String(fd.get('notes') || '').trim();
+      if (!notes) { errEl.textContent = 'Tell us a bit about what you need.'; return; }
+
+      const payload = { kind, notes };
+      if (kind === 'plan_upgrade') payload.target_plan = String(fd.get('target_plan') || '');
+      if (kind === 'setup_change') payload.target_setup_type = String(fd.get('target_setup_type') || '');
+
+      submitBtn.disabled = true;
+      cancelBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+      try {
+        const session = readSession();
+        const resp = await fetch(FN_BASE + 'studio-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_token: session.token, ...payload }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          submitBtn.disabled = false;
+          cancelBtn.disabled = false;
+          submitBtn.textContent = 'Send request';
+          errEl.textContent = (data && data.error) || 'Could not send. Please try again.';
+          return;
+        }
+        // Prepend the new request to state and re-render so the studio
+        // sees the row immediately and the modal closes.
+        acctState.requests = [data.request].concat(acctState.requests || []);
+        closeModal();
+        renderAccount({
+          submission: acctState.submission,
+          invoices: acctState.invoices,
+          quotes: acctState.quotes,
+          conversation: acctState.conv,
+          service_requests: acctState.requests,
+        });
+        // Also nudge the thread so the system message lands instantly
+        // rather than waiting for the 15s poll tick.
+        try { loadThread(true); } catch (_) { /* best effort */ }
+      } catch (err) {
+        console.error('request submit failed', err);
+        submitBtn.disabled = false;
+        cancelBtn.disabled = false;
+        submitBtn.textContent = 'Send request';
+        errEl.textContent = 'We could not reach the server. Check your connection and try again.';
+      }
+    });
+
+    // Focus the first input for keyboard users.
+    setTimeout(() => { const el = backdrop.querySelector('#acctReqKind'); if (el) el.focus(); }, 50);
   }
 
   function bindTabHandlers() {
