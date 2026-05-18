@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#13102E">
+<title>Email preferences — StudioLAB Growth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/form.css?v=20260514a">
+<style>
+  body { background: var(--g1, #F2F3F7); font-family: 'Inter', system-ui, sans-serif; }
+  .uns-wrap { max-width: 520px; margin: 80px auto 40px; padding: 0 16px; }
+  .uns-card { background: #fff; border-radius: 14px; padding: 32px 30px; box-shadow: 0 4px 22px rgba(19,16,46,0.06); }
+  .uns-card h1 { font-size: 24px; font-weight: 800; color: var(--in-d, #13102E); margin: 0 0 6px; letter-spacing: -0.4px; }
+  .uns-card .uns-studio { color: var(--g6, #4A4C65); font-size: 13px; margin: 0 0 18px; }
+  .uns-card p { color: var(--in-d, #13102E); font-size: 14px; line-height: 1.6; margin: 0 0 14px; }
+  .uns-card p.muted { color: var(--g6, #4A4C65); font-size: 12px; }
+  .uns-state { padding: 14px 16px; border-radius: 10px; margin: 18px 0; font-size: 13px; }
+  .uns-state-on  { background: var(--gr-l, #D1FAE5); color: #047857; }
+  .uns-state-off { background: #FEF3C7; color: #B45309; }
+  .uns-btn { display: inline-block; background: var(--in, #4A3F8A); color: #fff; border: 0; border-radius: 999px; padding: 12px 24px; font-weight: 600; font-size: 14px; cursor: pointer; font-family: inherit; }
+  .uns-btn:hover { background: var(--in-d, #13102E); }
+  .uns-btn-secondary { background: transparent; color: var(--in, #4A3F8A); border: 1px solid var(--in, #4A3F8A); }
+  .uns-btn-secondary:hover { background: var(--in, #4A3F8A); color: #fff; }
+  .uns-loading, .uns-error { color: var(--g6, #4A4C65); font-style: italic; padding: 12px 0; }
+  .uns-error { color: #B91C1C; }
+  .uns-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .uns-footer { text-align: center; margin-top: 24px; color: var(--g6, #4A4C65); font-size: 12px; }
+  .uns-footer a { color: var(--in, #4A3F8A); }
+</style>
+<link rel="icon" type="image/png" href="/assets/studiolab-icon.png">
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-inner">
+    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth">
+      <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
+    </a>
+    <div class="hdr-div" aria-hidden="true"></div>
+    <div class="hdr-sub" aria-hidden="true">Email preferences</div>
+  </div>
+</header>
+
+<main>
+  <div class="uns-wrap">
+    <div class="uns-card" id="unsRoot">
+      <div class="uns-loading">Loading your preferences…</div>
+    </div>
+    <div class="uns-footer">
+      Need help? Email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.
+    </div>
+  </div>
+</main>
+
+<script src="js/supabase-config.js?v=20260514a"></script>
+<script>
+(function () {
+  'use strict';
+  const FN_BASE = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) + '/functions/v1/';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  const token = new URLSearchParams(window.location.search).get('t') || '';
+  const root = document.getElementById('unsRoot');
+
+  function renderError(message) {
+    root.innerHTML = `<div class="uns-error">${esc(message)}</div>`;
+  }
+
+  function renderState(data) {
+    const studioLine = data.studio_name
+      ? `<p class="uns-studio">For <strong>${esc(data.studio_name)}</strong> · ${esc(data.contact_email || '')}</p>`
+      : '';
+    const stateBlock = data.enabled
+      ? `<div class="uns-state uns-state-on">
+           You are <strong>subscribed</strong> to optional emails (inbox notifications, reminders, nudges).
+         </div>
+         <p>You will continue to receive essential transactional emails — payment receipts, security codes, and confirmations of changes you request — regardless of this setting.</p>`
+      : `<div class="uns-state uns-state-off">
+           You are <strong>unsubscribed</strong> from optional emails.
+         </div>
+         <p>You will still receive essential transactional emails — payment receipts, security codes, and confirmations of changes you request. We are required to send those.</p>`;
+    const buttons = data.enabled
+      ? `<button type="button" class="uns-btn" data-action="unsubscribe">Unsubscribe me</button>`
+      : `<button type="button" class="uns-btn uns-btn-secondary" data-action="resubscribe">Resubscribe</button>`;
+
+    root.innerHTML = `
+      <h1>Email preferences</h1>
+      ${studioLine}
+      ${stateBlock}
+      <div class="uns-actions">${buttons}</div>
+      <p class="muted" style="margin-top:18px;">Prefer to manage everything from your account? <a href="/account.html">Sign in to your portal</a>.</p>`;
+
+    root.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', () => setOptOut(btn.dataset.action === 'resubscribe'));
+    });
+  }
+
+  async function loadStatus() {
+    if (!token) { renderError('This link is missing its token. Open the unsubscribe link from your most recent email.'); return; }
+    try {
+      const resp = await fetch(FN_BASE + 'unsubscribe?action=status&t=' + encodeURIComponent(token));
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        renderError((data && data.error) || 'This link is no longer valid.');
+        return;
+      }
+      renderState(data);
+    } catch (err) {
+      console.error('unsubscribe status failed', err);
+      renderError('We could not reach the server. Check your connection and refresh the page.');
+    }
+  }
+
+  async function setOptOut(enabled) {
+    root.innerHTML = `<div class="uns-loading">Saving…</div>`;
+    try {
+      const resp = await fetch(FN_BASE + 'unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set', token, enabled }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        renderError((data && data.error) || 'Could not update your preferences. Please try again.');
+        return;
+      }
+      renderState(data);
+    } catch (err) {
+      console.error('unsubscribe set failed', err);
+      renderError('We could not reach the server. Check your connection and try again.');
+    }
+  }
+
+  loadStatus();
+})();
+</script>
+
+</body>
+</html>

@@ -627,6 +627,7 @@ Deno.serve(async (req) => {
                 : reqRow.kind === 'custom_addon' ? 'Custom add-on' : 'Your request';
             const { studioRequestQuoted } = await import('../_shared/email-templates.ts');
             const { createGatedSender } = await import('../_shared/email-gated.ts');
+            const { sendIfAllowed } = await import('../_shared/studio-email.ts');
             const { data: settings } = await sb.from('payment_settings').select('stripe_mode').eq('id', 1).maybeSingle();
             const isLive = (settings?.stripe_mode || 'test') === 'live';
             const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
@@ -638,12 +639,17 @@ Deno.serve(async (req) => {
               summary,
               accountUrl,
             });
-            await sendGated({
-              to: subRow.contact_email,
-              subject: tpl.subject,
-              html: tpl.html,
-              replyTo: 'info@studiolabsoftware.com',
-              intent: 'studio request quoted',
+            await sendIfAllowed({
+              sb,
+              submissionId,
+              sender: sendGated,
+              email: {
+                to: subRow.contact_email,
+                subject: tpl.subject,
+                html: tpl.html,
+                replyTo: 'info@studiolabsoftware.com',
+                intent: 'studio request quoted',
+              },
             });
           }
         }

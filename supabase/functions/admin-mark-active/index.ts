@@ -16,6 +16,7 @@ import { getCallerProfile } from '../_shared/caller.ts';
 import { createGatedSender } from '../_shared/email-gated.ts';
 import { studioActivated } from '../_shared/email-templates.ts';
 import { postSystemMessage } from '../_shared/inbox.ts';
+import { sendIfAllowed } from '../_shared/studio-email.ts';
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
@@ -95,12 +96,17 @@ Deno.serve(async (req) => {
         accountUrl,
       });
       if (saved.contact_email) {
-        await sendGated({
-          to: saved.contact_email,
-          subject: tpl.subject,
-          html: tpl.html,
-          replyTo: 'info@studiolabsoftware.com',
-          intent: 'studio activated',
+        await sendIfAllowed({
+          sb,
+          submissionId: saved.id,
+          sender: sendGated,
+          email: {
+            to: saved.contact_email,
+            subject: tpl.subject,
+            html: tpl.html,
+            replyTo: 'info@studiolabsoftware.com',
+            intent: 'studio activated',
+          },
         });
       }
     } catch (e) { console.error('activation email failed:', e); }

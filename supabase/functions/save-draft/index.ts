@@ -11,6 +11,7 @@ import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { submissionConfirmation, adminNewSubmission } from '../_shared/email-templates.ts';
 import { createGatedSender } from '../_shared/email-gated.ts';
 import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
+import { sendIfAllowed } from '../_shared/studio-email.ts';
 
 const PLAN_LABEL: Record<string, string> = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
 const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guided' };
@@ -120,12 +121,17 @@ Deno.serve(async (req) => {
 
       try {
         const t = submissionConfirmation({ studioName: finalRow.studio_name || 'there', ref });
-        await sendGated({
-          to: row.contact_email,
-          subject: t.subject,
-          html: t.html,
-          replyTo: 'info@studiolabsoftware.com',
-          intent: 'studio submission confirmation',
+        await sendIfAllowed({
+          sb,
+          submissionId: saved.id,
+          sender: sendGated,
+          email: {
+            to: row.contact_email,
+            subject: t.subject,
+            html: t.html,
+            replyTo: 'info@studiolabsoftware.com',
+            intent: 'studio submission confirmation',
+          },
         });
       } catch (e) { console.error('confirmation email failed:', e); }
 

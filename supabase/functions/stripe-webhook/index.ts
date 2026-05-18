@@ -26,6 +26,7 @@ import {
   adminInvoicePaymentFailed,
 } from '../_shared/email-templates.ts';
 import { createGatedSender } from '../_shared/email-gated.ts';
+import { sendIfAllowed } from '../_shared/studio-email.ts';
 import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
 
 const PLAN_LABEL: Record<string, string> = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
@@ -550,23 +551,41 @@ async function sendPaymentReceiptsOnce(
   const publicAppOrigin = Deno.env.get('PUBLIC_APP_ORIGIN') || 'https://app.studiolabgrowth.com';
   const accountUrl = `${publicAppOrigin.replace(/\/$/, '')}/account.html`;
 
-  // Studio receipt — mode-specific template
+  // Studio receipt — mode-specific template. Routed through sendIfAllowed
+  // so the unsubscribe footer is auto-injected for spam-law compliance;
+  // receipts are essential intents so opt-out cannot suppress them.
   try {
     if (args.contactEmail) {
+      let tplResult: { subject: string; html: string } | null = null;
+      let intent = '';
       if (args.paymentMode === 'immediate') {
-        const t = paymentReceiptImmediate({
+        tplResult = paymentReceiptImmediate({
           studioName, ref,
           amountCents: args.amountCents, taxCents: args.taxCents ?? null, currency, includesGst,
           invoiceUrl: args.invoiceHostedUrl,
           accountUrl,
         });
-        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: receiptReplyTo, intent: 'studio receipt (immediate)' });
+        intent = 'studio receipt (immediate)';
       } else if (args.paymentMode === 'hold') {
-        const t = paymentReceiptHold({ studioName, ref, amountCents: args.amountCents, currency, includesGst, accountUrl });
-        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: receiptReplyTo, intent: 'studio receipt (hold)' });
+        tplResult = paymentReceiptHold({ studioName, ref, amountCents: args.amountCents, currency, includesGst, accountUrl });
+        intent = 'studio receipt (hold)';
       } else {
-        const t = paymentReceiptSaveCard({ studioName, ref, amountCents: args.amountCents, currency, includesGst, accountUrl });
-        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: receiptReplyTo, intent: 'studio receipt (save card)' });
+        tplResult = paymentReceiptSaveCard({ studioName, ref, amountCents: args.amountCents, currency, includesGst, accountUrl });
+        intent = 'studio receipt (save card)';
+      }
+      if (tplResult) {
+        await sendIfAllowed({
+          sb,
+          submissionId: args.submissionId,
+          sender: sendGated,
+          email: {
+            to: args.contactEmail,
+            subject: tplResult.subject,
+            html: tplResult.html,
+            replyTo: receiptReplyTo,
+            intent,
+          },
+        });
       }
     }
   } catch (e) { console.error('studio receipt email failed:', e); }

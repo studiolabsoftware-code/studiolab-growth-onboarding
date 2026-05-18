@@ -19,6 +19,7 @@ import { getCallerProfile } from '../_shared/caller.ts';
 import { createGatedSender } from '../_shared/email-gated.ts';
 import { studioRequestApplied } from '../_shared/email-templates.ts';
 import { postSystemMessage } from '../_shared/inbox.ts';
+import { sendIfAllowed } from '../_shared/studio-email.ts';
 
 const PLAN_LABEL: Record<string, string> = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
 const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guided self-setup' };
@@ -128,12 +129,17 @@ Deno.serve(async (req) => {
         accountUrl,
       });
       if (sub.contact_email) {
-        await sendGated({
-          to: sub.contact_email,
-          subject: tpl.subject,
-          html: tpl.html,
-          replyTo: 'info@studiolabsoftware.com',
-          intent: 'studio request applied',
+        await sendIfAllowed({
+          sb,
+          submissionId: sub.id,
+          sender: sendGated,
+          email: {
+            to: sub.contact_email,
+            subject: tpl.subject,
+            html: tpl.html,
+            replyTo: 'info@studiolabsoftware.com',
+            intent: 'studio request applied',
+          },
         });
       }
     } catch (e) { console.error('applied email failed:', e); }

@@ -506,7 +506,7 @@
     // post-activation since GHL becomes the source of truth.
     const editCards = isActive ? '' : EDIT_SECTIONS
       .map((section) => renderEditCard(section, sub, !!acctState.editing[section.id]))
-      .join('');
+      .join('') + renderNotificationsCard(sub);
 
     // Card content broken out per-tab. Each panel sits behind a tab in
      // .acct-tabs; the active panel toggles via .active. Tabs are skipped
@@ -1066,6 +1066,68 @@
     });
   }
 
+  // Notifications card — sits at the bottom of the Setup tab. Single
+  // toggle for the studio email opt-out (migration 039). Hits the
+  // unsubscribe edge function with the studio's stable token rather
+  // than studio-self-edit, so it doesn't fire the admin diff email on
+  // every flip.
+  function renderNotificationsCard(sub) {
+    const on = sub.email_notifications_enabled !== false;
+    return `
+      <div class="acct-card" data-section="notifications">
+        <div class="acct-card-hdr">
+          <h2>Email notifications</h2>
+          <button type="button" class="acct-edit-btn" data-notif-toggle="${on ? 'off' : 'on'}">
+            ${on ? 'Turn off optional emails' : 'Turn on optional emails'}
+          </button>
+        </div>
+        <div class="acct-row" style="border-bottom:0;">
+          <div class="acct-k">Status</div>
+          <div class="acct-v">
+            <span class="acct-pill ${on ? 'acct-pill-status-paid' : 'acct-pill-status-muted'}">${on ? 'Receiving optional emails' : 'Opted out of optional emails'}</span>
+          </div>
+        </div>
+        <p style="margin:12px 0 0;color:var(--g6);font-size:12px;line-height:1.55;">
+          ${on
+            ? 'You currently receive inbox notifications, quote reminders, and other optional updates by email. You\'ll always receive essential transactional emails — payment receipts, security codes, and confirmations of changes you request — regardless of this setting.'
+            : 'You\'re opted out of inbox notifications, quote reminders, and other optional updates. You\'ll still receive essential transactional emails — payment receipts, security codes, and confirmations of changes you request.'}
+        </p>
+      </div>`;
+  }
+
+  async function toggleStudioNotifications(nextEnabled) {
+    const sub = acctState.submission;
+    if (!sub || !sub.unsubscribe_token) {
+      alert('Could not update — please refresh and try again.');
+      return;
+    }
+    try {
+      const resp = await fetch(FN_BASE + 'unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set', token: sub.unsubscribe_token, enabled: nextEnabled }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        alert((data && data.error) || 'Could not update notifications. Please try again.');
+        return;
+      }
+      // Patch local state and re-render so the card reflects the new
+      // setting without a full reload.
+      acctState.submission = { ...sub, email_notifications_enabled: nextEnabled };
+      renderAccount({
+        submission: acctState.submission,
+        invoices: acctState.invoices,
+        quotes: acctState.quotes,
+        conversation: acctState.conv,
+        service_requests: acctState.requests,
+      });
+    } catch (err) {
+      console.error('notification toggle failed', err);
+      alert('We could not reach the server. Check your connection and try again.');
+    }
+  }
+
   function bindEditHandlers() {
     document.querySelectorAll('[data-edit-toggle]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1085,6 +1147,12 @@
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         onSaveSection(form.getAttribute('data-edit-form'), form);
+      });
+    });
+    document.querySelectorAll('[data-notif-toggle]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const next = btn.getAttribute('data-notif-toggle') === 'on';
+        toggleStudioNotifications(next);
       });
     });
   }

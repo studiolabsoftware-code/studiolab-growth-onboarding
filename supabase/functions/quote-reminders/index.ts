@@ -31,6 +31,7 @@ import { adminClient } from '../_shared/supabase.ts';
 import { isServiceRoleCaller } from '../_shared/caller.ts';
 import { getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
+import { loadStudioEmailPrefs, unsubscribeUrl, injectUnsubscribeFooter } from '../_shared/studio-email.ts';
 import {
   quoteReminderNudge,
   quoteExpiryWarning,
@@ -67,21 +68,42 @@ Deno.serve(async (req) => {
     const testRecipient = Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '';
 
     // ---- Helper: route a transactional email through the test/live gate.
-    async function gatedSend(to: string, subject: string, html: string, intent: string): Promise<void> {
+    // When submissionId is provided, also honour the studio's email
+    // opt-out (migration 039) for OPTIONAL intents -- quote reminders
+    // and expiry warnings count as optional under spam law because the
+    // quote itself sits on the studio's Billing tab. Returns true when
+    // the email was sent, false when opt-out suppressed it.
+    async function gatedSend(
+      to: string,
+      subject: string,
+      html: string,
+      intent: string,
+      submissionId?: string | null,
+    ): Promise<boolean> {
+      let finalHtml = html;
+      if (submissionId) {
+        const prefs = await loadStudioEmailPrefs(sb, submissionId);
+        if (prefs && !prefs.enabled) {
+          return false;
+        }
+        const url = unsubscribeUrl(prefs?.token);
+        if (url) finalHtml = injectUnsubscribeFooter(html, url);
+      }
       if (isLive) {
-        await sendEmail({ to, subject, html, replyTo: 'info@studiolabsoftware.com' });
-        return;
+        await sendEmail({ to, subject, html: finalHtml, replyTo: 'info@studiolabsoftware.com' });
+        return true;
       }
       if (testRecipient) {
         await sendEmail({
           to: testRecipient,
           subject: `[TEST · ${intent}] ${subject}`,
-          html,
+          html: finalHtml,
           replyTo: 'info@studiolabsoftware.com',
         });
       } else {
-        await sendEmail({ to, subject, html, replyTo: 'info@studiolabsoftware.com' });
+        await sendEmail({ to, subject, html: finalHtml, replyTo: 'info@studiolabsoftware.com' });
       }
+      return true;
     }
 
     // ---- Helper: resolve recipient name + email for a quote row. Studio
@@ -146,7 +168,7 @@ Deno.serve(async (req) => {
             amountDisplay: formatAmount(q.currency, q.total_cents),
             expiresInDays: daysLeft,
           });
-          await gatedSend(recipient.email, tpl.subject, tpl.html, 'quote nudge (day 7)');
+          await gatedSend(recipient.email, tpl.subject, tpl.html, 'quote nudge (day 7)', q.submission_id);
           await sb.from('quotes').update({ reminder_sent_at: nowIso }).eq('id', q.id);
           try {
             // activity_log has no external_contact_id column — for external
@@ -196,7 +218,7 @@ Deno.serve(async (req) => {
             amountDisplay: formatAmount(q.currency, q.total_cents),
             expiresInDays: daysLeft,
           });
-          await gatedSend(recipient.email, tpl.subject, tpl.html, 'quote expiry warning');
+          await gatedSend(recipient.email, tpl.subject, tpl.html, 'quote expiry warning', q.submission_id);
           await sb.from('quotes').update({ expiry_warning_sent_at: nowIso }).eq('id', q.id);
           try {
             await sb.from('activity_log').insert({

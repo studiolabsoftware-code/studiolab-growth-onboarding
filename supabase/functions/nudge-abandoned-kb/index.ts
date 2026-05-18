@@ -12,6 +12,7 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
+import { loadStudioEmailPrefs, unsubscribeUrl, injectUnsubscribeFooter } from '../_shared/studio-email.ts';
 import { kbAbandonmentNudge } from '../_shared/email-templates.ts';
 
 const PAID_STATUSES = ['paid', 'authorised', 'card_saved'];
@@ -67,12 +68,24 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // KB abandonment nudges are an OPTIONAL intent under the studio
+      // email opt-out (migration 039). A muted studio is by definition
+      // not interested in nudges, so skip cleanly without counting as
+      // a failure.
+      const prefs = await loadStudioEmailPrefs(sb, r.id);
+      if (prefs && !prefs.enabled) {
+        results.push({ id: r.id, email: r.contact_email, ok: true, error: 'opted_out' });
+        continue;
+      }
+
       try {
         const t = kbAbandonmentNudge({ studioName, resumeUrl });
+        const unsubUrl = unsubscribeUrl(prefs?.token);
+        const finalHtml = unsubUrl ? injectUnsubscribeFooter(t.html, unsubUrl) : t.html;
         await sendEmail({
           to: r.contact_email,
           subject: t.subject,
-          html: t.html,
+          html: finalHtml,
           replyTo: 'info@studiolabsoftware.com',
         });
         const stampedAt = new Date().toISOString();

@@ -16,6 +16,7 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
+import { loadStudioEmailPrefs, unsubscribeUrl, injectUnsubscribeFooter } from '../_shared/studio-email.ts';
 import {
   resolveAdminRecipients,
   replyAddress,
@@ -99,6 +100,16 @@ Deno.serve(async (req) => {
         <p style="margin:8px 0 0;"><a href="${portalUrl}" style="display:inline-block;background:#4A3F8A;color:#fff;text-decoration:none;font-weight:600;padding:10px 20px;border-radius:999px;font-size:13px;">Open studio portal</a></p>
         <p style="margin:14px 0 0;color:#6B6E8B;font-size:11px;">The portal link is private to your conversation. Forward it to a colleague if they need to respond on your behalf.</p>`;
 
+      // Inbox notifications are an OPTIONAL intent under the studio
+      // email opt-out (migration 039) -- the conversation itself lives
+      // on account.html so a muted studio can still read and reply
+      // there. Skip if opted out, otherwise inject the unsubscribe
+      // footer per spam law.
+      const prefs = await loadStudioEmailPrefs(sb, conv.submission_id);
+      if (prefs && !prefs.enabled) {
+        return jsonResponse({ ok: true, skipped: 'studio opted out of optional notifications' });
+      }
+
       const t = inboxMessageEmail({
         studioName,
         senderName: msg.sender_name || 'StudioLAB Growth',
@@ -106,10 +117,12 @@ Deno.serve(async (req) => {
         footerHtml: portalNote,
         previewText: stripToPreview(msg.body_text || ''),
       });
+      const unsubUrl = unsubscribeUrl(prefs?.token);
+      const finalHtml = unsubUrl ? injectUnsubscribeFooter(t.html, unsubUrl) : t.html;
       await sendEmail({
         to: sub.contact_email,
         subject: threadSubject(studioName, conv.subject, !!parentMessageId),
-        html: t.html,
+        html: finalHtml,
         replyTo: reply,
         headers,
       });
