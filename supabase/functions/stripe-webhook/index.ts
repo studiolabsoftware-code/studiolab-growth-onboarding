@@ -1503,14 +1503,58 @@ async function handleQuoteUpdate(sb: Sb, quote: QuoteObj, eventType: string): Pr
 }
 
 async function handleChargeRefunded(sb: Sb, charge: ChargeObj, eventId: string, eventPayload: unknown): Promise<void> {
-  if (!charge.payment_intent) return;
-  const submission = await submissionByPaymentIntentId(sb, charge.payment_intent);
-  // Even without a submission, we may still own the invoice via the ledger;
-  // try to locate the ledger row by payment_intent and update it.
-  const { data: ledgerRow } = await sb.from('invoices')
-    .select('id, total_cents, source')
-    .eq('stripe_payment_intent_id', charge.payment_intent)
-    .maybeSingle();
+  // Two lookup paths because the invoices ledger is not guaranteed to
+  // have stripe_payment_intent_id stamped at create time: for invoices
+  // born inside a Checkout Session, the PI is sometimes still null when
+  // invoice.finalized lands, so the row was inserted with NULL PI and
+  // never refreshed. Refunds then silently no-op'd because the PI lookup
+  // returned nothing.
+  //
+  // 1. Try by payment_intent first (the common case for direct PI flows).
+  // 2. Fall back to charge.invoice -> stripe_invoice_id on the ledger.
+  // 3. Whenever we resolve via the invoice path AND the row is missing
+  //    its PI, backfill it so future events on the same row find it.
+  let submission = charge.payment_intent
+    ? await submissionByPaymentIntentId(sb, charge.payment_intent)
+    : null;
+
+  let ledgerRow: { id: string; total_cents: number | null; source: string | null; submission_id: string | null; stripe_payment_intent_id: string | null } | null = null;
+  if (charge.payment_intent) {
+    const { data } = await sb.from('invoices')
+      .select('id, total_cents, source, submission_id, stripe_payment_intent_id')
+      .eq('stripe_payment_intent_id', charge.payment_intent)
+      .maybeSingle();
+    ledgerRow = data;
+  }
+
+  // Fallback path: look up by charge.invoice. Covers historical rows
+  // missing PI and any future case where the PI is attached after the
+  // invoice ledger row was first persisted.
+  const chargeInvoice = (charge as { invoice?: string | null }).invoice;
+  if (!ledgerRow && chargeInvoice) {
+    const { data } = await sb.from('invoices')
+      .select('id, total_cents, source, submission_id, stripe_payment_intent_id')
+      .eq('stripe_invoice_id', chargeInvoice)
+      .maybeSingle();
+    ledgerRow = data;
+    // Backfill PI when we found the row via the invoice path. Best-effort.
+    if (ledgerRow && !ledgerRow.stripe_payment_intent_id && charge.payment_intent) {
+      try {
+        await sb.from('invoices')
+          .update({ stripe_payment_intent_id: charge.payment_intent })
+          .eq('id', ledgerRow.id);
+      } catch (e) { console.error('PI backfill failed:', e); }
+    }
+    // If the submission lookup by PI returned nothing, the ledger row
+    // may still know which submission this belongs to.
+    if (!submission && ledgerRow?.submission_id) {
+      const { data: sub } = await sb.from('submissions')
+        .select('id, payment_status')
+        .eq('id', ledgerRow.submission_id)
+        .maybeSingle();
+      submission = sub;
+    }
+  }
 
   if (!submission && !ledgerRow) {
     console.log(`stripe-webhook: ignoring charge.refunded ${charge.id} — no link to studiolab-growth`);
