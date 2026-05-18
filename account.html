@@ -128,6 +128,25 @@
   .acct-edit-actions .acct-edit-msg.err { color: var(--st-err-fg); }
   .acct-edit-actions .acct-edit-msg.ok { color: var(--st-ok-fg); }
 
+  /* Tab navigation. Three panels: Home (status + messages), Billing
+     (invoices + quotes), Setup (the editable cards). The previous
+     single-stack layout had the editable cards below the fold so the
+     studio had to scroll past status and invoices to find the actions
+     -- which read as "no actions available." Tabs put each surface one
+     click from the top. Tabs are hidden once status='active' since the
+     onboarding portal is done at that point. */
+  .acct-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--g2); margin-bottom: 22px; overflow-x: auto; scrollbar-width: none; }
+  .acct-tabs::-webkit-scrollbar { display: none; }
+  .acct-tab { background: transparent; border: 0; padding: 12px 18px; font-size: 13px; font-weight: 600; color: var(--g6); cursor: pointer; font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; min-height: 44px; transition: color 0.15s, border-color 0.15s; }
+  .acct-tab:hover { color: var(--in-d); }
+  .acct-tab:focus-visible { outline: 2px solid var(--in); outline-offset: -2px; border-radius: 4px; }
+  .acct-tab.active { color: var(--in); border-bottom-color: var(--in); }
+  .acct-tab .acct-tab-badge { background: var(--mg); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; line-height: 1.4; }
+  .acct-tab .acct-tab-count { background: var(--g1); color: var(--g6); font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; line-height: 1.4; }
+  .acct-tab.active .acct-tab-count { background: var(--in-l); color: var(--in); }
+  .acct-tab-panel { display: none; }
+  .acct-tab-panel.active { display: block; }
+
   /* Activation banner. Replaces "Where you're at" + "Messages" stack
      once the admin marks the studio active, since the onboarding portal
      has done its job. Communication and product use move to the GHL
@@ -442,22 +461,11 @@
       .map((section) => renderEditCard(section, sub, !!acctState.editing[section.id]))
       .join('');
 
-    document.getElementById('acctRoot').innerHTML = `
-      <div class="acct-hdr">
-        <div>
-          <h1>${sub.studio_name ? esc(sub.studio_name) : 'Your account'}</h1>
-          <div class="acct-sub">${esc(fullName || sub.contact_email || '')}</div>
-        </div>
-        <div class="acct-pills">
-          <span class="acct-pill acct-pill-plan">${esc(PLAN_LABEL[sub.plan] || sub.plan)}</span>
-          <span class="acct-pill ${statusPill.cls}">${esc(statusPill.label)}</span>
-        </div>
-      </div>
-
-      ${activationBanner}
-      ${whereYouAreCard}
-      ${messagesCard}
-
+    // Card content broken out per-tab. Each panel sits behind a tab in
+     // .acct-tabs; the active panel toggles via .active. Tabs are skipped
+     // entirely when status='active' since the onboarding portal becomes
+     // a one-shot confirmation page at that point.
+    const invoicesCard = `
       <div class="acct-card">
         <h2>Invoices</h2>
         ${invoices.length === 0
@@ -469,8 +477,8 @@
               <tbody>${invoiceRows}</tbody>
             </table>`
         }
-      </div>
-
+      </div>`;
+    const quotesCard = `
       <div class="acct-card">
         <h2>Quotes</h2>
         ${quotes.length === 0
@@ -484,17 +492,75 @@
             <p style="margin:14px 0 0;color:var(--g6);font-size:12px;line-height:1.55;">
               You'll receive your quote by email from Stripe. Use the link in that email to view and accept. Accepting creates an invoice with a Pay link, which will also appear in your Invoices above.
             </p>`}
+      </div>`;
+
+    // Tab counts for the badges. Messages count = unread; billing count
+    // = invoices+quotes total. Setup count omitted — five sections is
+    // not a useful metric and a number next to "Setup" reads as alarms.
+    const unread = (conv && conv.unread) || 0;
+    const billingCount = (invoices.length || 0) + (quotes.length || 0);
+
+    const activeTab = acctState.activeTab || 'home';
+    const tabsNav = isActive ? '' : `
+      <nav class="acct-tabs" role="tablist" aria-label="Account sections">
+        <button type="button" class="acct-tab ${activeTab === 'home' ? 'active' : ''}" role="tab" data-tab="home" aria-selected="${activeTab === 'home'}">
+          Home${unread > 0 ? `<span class="acct-tab-badge" title="${unread} unread message${unread === 1 ? '' : 's'}">${unread} new</span>` : ''}
+        </button>
+        <button type="button" class="acct-tab ${activeTab === 'billing' ? 'active' : ''}" role="tab" data-tab="billing" aria-selected="${activeTab === 'billing'}">
+          Billing${billingCount > 0 ? `<span class="acct-tab-count">${billingCount}</span>` : ''}
+        </button>
+        <button type="button" class="acct-tab ${activeTab === 'setup' ? 'active' : ''}" role="tab" data-tab="setup" aria-selected="${activeTab === 'setup'}">
+          Setup details
+        </button>
+      </nav>`;
+
+    document.getElementById('acctRoot').innerHTML = `
+      <div class="acct-hdr">
+        <div>
+          <h1>${sub.studio_name ? esc(sub.studio_name) : 'Your account'}</h1>
+          <div class="acct-sub">${esc(fullName || sub.contact_email || '')}</div>
+        </div>
+        <div class="acct-pills">
+          <span class="acct-pill acct-pill-plan">${esc(PLAN_LABEL[sub.plan] || sub.plan)}</span>
+          <span class="acct-pill ${statusPill.cls}">${esc(statusPill.label)}</span>
+        </div>
       </div>
 
-      ${editCards}
+      ${activationBanner}
+      ${tabsNav}
+
+      ${isActive ? `
+        <div>
+          ${invoicesCard}
+          ${quotesCard}
+        </div>
+      ` : `
+        <section class="acct-tab-panel ${activeTab === 'home' ? 'active' : ''}" role="tabpanel" data-panel="home" aria-labelledby="home">
+          ${whereYouAreCard}
+          <div class="acct-card">
+            <h2>Messages with our team</h2>
+            ${messagesBlock}
+          </div>
+        </section>
+
+        <section class="acct-tab-panel ${activeTab === 'billing' ? 'active' : ''}" role="tabpanel" data-panel="billing" aria-labelledby="billing">
+          ${invoicesCard}
+          ${quotesCard}
+        </section>
+
+        <section class="acct-tab-panel ${activeTab === 'setup' ? 'active' : ''}" role="tabpanel" data-panel="setup" aria-labelledby="setup">
+          ${editCards}
+        </section>
+      `}
 
       <div class="acct-foot">
         ${isActive
           ? 'Questions during handover? Email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.'
-          : 'Need to reach us? Send a message above, or email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.'}
+          : 'Need to reach us? Use the Home tab above, or email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.'}
       </div>`;
 
-    // Bind edit/save/cancel handlers across all edit cards via delegation.
+    // Bind tab + edit + PDF handlers AFTER innerHTML is set.
+    bindTabHandlers();
     bindEditHandlers();
 
     // Hydrate the inline message thread + composer. Skipped post-
@@ -558,7 +624,12 @@
   // to protect the finalize emails from being replayed). Updates re-
   // render only the affected card and rebroadcast acctState.submission
   // so subsequent renders see the new values.
-  const acctState = { submission: null, editing: {} };
+  // Default landing: Home (status + messages). Persisted across edit
+  // re-renders so saving a field in the Setup tab doesn't bounce the
+  // studio back to Home. Tab switches do NOT re-render — they toggle
+  // CSS classes so the message thread DOM survives the switch and the
+  // poll timer keeps targeting the same node.
+  const acctState = { submission: null, editing: {}, activeTab: 'home' };
 
   // Field type 'select' uses options: [[value, label], ...] inline.
   // Keep labels concise — they appear next to the input, not as form
@@ -688,6 +759,35 @@
           </div>
         </form>
       </div>`;
+  }
+
+  function bindTabHandlers() {
+    document.querySelectorAll('.acct-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-tab');
+        if (!target) return;
+        acctState.activeTab = target;
+        document.querySelectorAll('.acct-tab').forEach((b) => {
+          const isActive = b.getAttribute('data-tab') === target;
+          b.classList.toggle('active', isActive);
+          b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+        document.querySelectorAll('.acct-tab-panel').forEach((p) => {
+          p.classList.toggle('active', p.getAttribute('data-panel') === target);
+        });
+        // If we're switching INTO Home, mark messages read (the user can
+        // now see them). Other tabs preserve unread state.
+        if (target === 'home') {
+          try { markThreadRead(); } catch (_) { /* best effort */ }
+        }
+        // Update URL hash for deep-linking + browser back/forward.
+        try {
+          if (history && history.replaceState) {
+            history.replaceState(null, '', '#' + target);
+          }
+        } catch (_) { /* best effort */ }
+      });
+    });
   }
 
   function bindEditHandlers() {
@@ -1005,6 +1105,14 @@
   }
 
   async function load() {
+    // Honour location.hash for deep-linking — receipt email's
+    // "View your account" link can point at /account.html#billing to
+    // land on Invoices, etc. Only accept values we recognise.
+    const hash = (window.location.hash || '').replace('#', '');
+    if (hash === 'home' || hash === 'billing' || hash === 'setup') {
+      acctState.activeTab = hash;
+    }
+
     const session = readSession();
     if (!session || !session.token) {
       renderError('You will need to verify your email again to see your account. Open your most recent email from us and click the setup link.');
