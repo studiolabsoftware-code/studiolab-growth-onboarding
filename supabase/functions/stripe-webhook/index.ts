@@ -1527,7 +1527,7 @@ async function handleChargeRefunded(sb: Sb, charge: ChargeObj, eventId: string, 
     ledgerRow = data;
   }
 
-  // Fallback path: look up by charge.invoice. Covers historical rows
+  // Fallback path 1: look up by charge.invoice. Covers historical rows
   // missing PI and any future case where the PI is attached after the
   // invoice ledger row was first persisted.
   const chargeInvoice = (charge as { invoice?: string | null }).invoice;
@@ -1553,6 +1553,36 @@ async function handleChargeRefunded(sb: Sb, charge: ChargeObj, eventId: string, 
         .eq('id', ledgerRow.submission_id)
         .maybeSingle();
       submission = sub;
+    }
+  }
+
+  // Fallback path 2: submission-anchored lookup. Hit on 2026-05-18 when a
+  // Stripe Checkout test refund landed with BOTH charge.payment_intent
+  // unmatched on the ledger AND charge.invoice null on the Stripe payload.
+  // The submissions row had the PI (set at checkout.session.completed)
+  // so we found the submission; from there we can resolve the most
+  // recent paid invoice for that submission and treat it as the target
+  // of the refund. Single paid invoice per submission is the common case
+  // for setup payments; if there were multiple, the most recent paid
+  // is the correct match because Stripe Dashboard refunds always target
+  // the most recent charge associated with the customer's latest invoice.
+  if (!ledgerRow && submission) {
+    const { data } = await sb.from('invoices')
+      .select('id, total_cents, source, submission_id, stripe_payment_intent_id')
+      .eq('submission_id', submission.id)
+      .in('status', ['paid'])
+      .order('paid_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    ledgerRow = data;
+    // Backfill PI on whichever ledger row we land on so the next event
+    // (e.g. a subsequent partial refund) hits the primary path.
+    if (ledgerRow && !ledgerRow.stripe_payment_intent_id && charge.payment_intent) {
+      try {
+        await sb.from('invoices')
+          .update({ stripe_payment_intent_id: charge.payment_intent })
+          .eq('id', ledgerRow.id);
+      } catch (e) { console.error('PI backfill (submission path) failed:', e); }
     }
   }
 
