@@ -528,6 +528,20 @@ async function sendPaymentReceiptsOnce(
   // system message), so we don't want one DB lookup per send.
   const sendGated = createGatedSender({ isLive, testRecipient });
 
+  // Ensure the conversation row exists BEFORE we send the receipt so we
+  // can set reply-to to its per-conversation routing address. Studios
+  // replying to the receipt then land in the in-app inbox thread instead
+  // of bouncing to a generic support address that has no routing wired
+  // up. Best-effort: if conversation creation fails for any reason, fall
+  // back to info@studiolabsoftware.com so the email still ships and at
+  // least lands in the support inbox.
+  let receiptReplyTo = 'info@studiolabsoftware.com';
+  try {
+    const { ensureConversationForSubmission, replyAddress } = await import('../_shared/inbox.ts');
+    const convId = await ensureConversationForSubmission(sb, args.submissionId, args.studioName || null);
+    if (convId) receiptReplyTo = replyAddress(convId);
+  } catch (e) { console.error('receipt reply-to conversation lookup failed, falling back to info@:', e); }
+
   // Studio receipt — mode-specific template
   try {
     if (args.contactEmail) {
@@ -537,13 +551,13 @@ async function sendPaymentReceiptsOnce(
           amountCents: args.amountCents, taxCents: args.taxCents ?? null, currency, includesGst,
           invoiceUrl: args.invoiceHostedUrl,
         });
-        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com', intent: 'studio receipt (immediate)' });
+        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: receiptReplyTo, intent: 'studio receipt (immediate)' });
       } else if (args.paymentMode === 'hold') {
         const t = paymentReceiptHold({ studioName, ref, amountCents: args.amountCents, currency, includesGst });
-        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com', intent: 'studio receipt (hold)' });
+        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: receiptReplyTo, intent: 'studio receipt (hold)' });
       } else {
         const t = paymentReceiptSaveCard({ studioName, ref, amountCents: args.amountCents, currency, includesGst });
-        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: 'info@studiolabsoftware.com', intent: 'studio receipt (save card)' });
+        await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: receiptReplyTo, intent: 'studio receipt (save card)' });
       }
     }
   } catch (e) { console.error('studio receipt email failed:', e); }
