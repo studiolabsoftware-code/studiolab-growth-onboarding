@@ -113,6 +113,7 @@ export function paymentReceiptImmediate(opts: {
   currency: string;
   includesGst: boolean;
   invoiceUrl?: string | null;
+  accountUrl?: string | null;     // /account.html link for the studio
 }): { subject: string; html: string } {
   const amountDisplay = formatAmountDisplay(opts);
   const subject = `Payment received: StudioLAB Growth setup for ${opts.studioName}`;
@@ -124,12 +125,16 @@ export function paymentReceiptImmediate(opts: {
     taxCents: opts.taxCents ?? null,
     currency: opts.currency,
   });
+  const accountCta = opts.accountUrl
+    ? cta('View your account', opts.accountUrl)
+    : '';
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Payment received</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
     <p style="margin:0 0 14px;">Thanks for your StudioLAB Growth setup payment. Your onboarding details are locked in and our team will be in touch shortly to begin the work.</p>
     ${breakdown}
     ${invoiceLine}
+    ${accountCta}
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
     <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
     <p style="margin:0;">Speak soon,<br>The StudioLAB team</p>`;
@@ -142,14 +147,19 @@ export function paymentReceiptHold(opts: {
   amountCents: number;
   currency: string;
   includesGst: boolean;
+  accountUrl?: string | null;
 }): { subject: string; html: string } {
   const amountDisplay = formatAmountDisplay(opts);
   const subject = `Card authorised: StudioLAB Growth setup for ${opts.studioName}`;
+  const accountCta = opts.accountUrl
+    ? cta('View your account', opts.accountUrl)
+    : '';
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your card has been authorised</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
     <p style="margin:0 0 14px;">Your card has been authorised for <strong>${escape(amountDisplay)}</strong>. We have not taken the funds yet. We will only complete the charge once your setup begins, and you may see a pending authorisation on your statement until then.</p>
     <p style="margin:0 0 14px;">Your onboarding details are saved and our team will be in touch shortly to schedule the work.</p>
+    ${accountCta}
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
     <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
     <p style="margin:0;">Speak soon,<br>The StudioLAB team</p>`;
@@ -162,14 +172,19 @@ export function paymentReceiptSaveCard(opts: {
   amountCents: number;
   currency: string;
   includesGst: boolean;
+  accountUrl?: string | null;
 }): { subject: string; html: string } {
   const amountDisplay = formatAmountDisplay(opts);
   const subject = `Card saved: StudioLAB Growth setup for ${opts.studioName}`;
+  const accountCta = opts.accountUrl
+    ? cta('View your account', opts.accountUrl)
+    : '';
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Your card has been saved securely</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
     <p style="margin:0 0 14px;">Your card has been saved securely with our payment provider. We will charge <strong>${escape(amountDisplay)}</strong> when we begin your setup, and you will receive a tax invoice at that time. You will not see a pending charge on your statement until then.</p>
     <p style="margin:0 0 14px;">Your onboarding details are saved and our team will be in touch shortly with timing.</p>
+    ${accountCta}
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;">Your reference</p>
     <p style="margin:0 0 18px;font-family:'JetBrains Mono',Menlo,monospace;font-size:14px;color:${COL.in_d};font-weight:700;">${escape(opts.ref)}</p>
     <p style="margin:0;">Speak soon,<br>The StudioLAB team</p>`;

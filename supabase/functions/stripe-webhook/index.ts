@@ -542,6 +542,14 @@ async function sendPaymentReceiptsOnce(
     if (convId) receiptReplyTo = replyAddress(convId);
   } catch (e) { console.error('receipt reply-to conversation lookup failed, falling back to info@:', e); }
 
+  // Studio's account-portal URL. We don't have plaintext session_token here
+  // (only the hash is stored), so we point at /account.html without one.
+  // Same-browser studios (paid from this device) auto-auth via localStorage
+  // session. Different-device opens fall through to the "verify your email"
+  // copy on account.html — known suboptimal but acceptable for v1.
+  const publicAppOrigin = Deno.env.get('PUBLIC_APP_ORIGIN') || 'https://app.studiolabgrowth.com';
+  const accountUrl = `${publicAppOrigin.replace(/\/$/, '')}/account.html`;
+
   // Studio receipt — mode-specific template
   try {
     if (args.contactEmail) {
@@ -550,13 +558,14 @@ async function sendPaymentReceiptsOnce(
           studioName, ref,
           amountCents: args.amountCents, taxCents: args.taxCents ?? null, currency, includesGst,
           invoiceUrl: args.invoiceHostedUrl,
+          accountUrl,
         });
         await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: receiptReplyTo, intent: 'studio receipt (immediate)' });
       } else if (args.paymentMode === 'hold') {
-        const t = paymentReceiptHold({ studioName, ref, amountCents: args.amountCents, currency, includesGst });
+        const t = paymentReceiptHold({ studioName, ref, amountCents: args.amountCents, currency, includesGst, accountUrl });
         await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: receiptReplyTo, intent: 'studio receipt (hold)' });
       } else {
-        const t = paymentReceiptSaveCard({ studioName, ref, amountCents: args.amountCents, currency, includesGst });
+        const t = paymentReceiptSaveCard({ studioName, ref, amountCents: args.amountCents, currency, includesGst, accountUrl });
         await sendGated({ to: args.contactEmail, subject: t.subject, html: t.html, replyTo: receiptReplyTo, intent: 'studio receipt (save card)' });
       }
     }
