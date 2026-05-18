@@ -247,17 +247,42 @@ body.adm-modal-open { overflow: hidden; }
 .logo-download { color: var(--in); font-weight: 600; text-decoration: underline; font-size: 11px; }
 .logo-download:hover { color: var(--mg); }
 
-/* Dashboard stats + groups */
-.adm-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
-@media (max-width: 720px) { .adm-stats { grid-template-columns: repeat(2, 1fr); } }
-.stat-card { background: #fff; border: 1px solid var(--g2); border-radius: 10px; padding: 14px 16px; }
-.stat-card .stat-label { font-size: 11px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
-.stat-card .stat-count { font-size: 24px; font-weight: 800; color: var(--in-d); letter-spacing: -0.5px; line-height: 1; }
-.stat-card.st-submitted { border-left: 4px solid var(--bl); }
-.stat-card.st-in_review { border-left: 4px solid var(--am); }
-.stat-card.st-changes_requested { border-left: 4px solid var(--rd); }
-.stat-card.st-setup_in_progress { border-left: 4px solid var(--in); }
-.stat-card.st-complete { border-left: 4px solid var(--gr); }
+/* Dashboard status filter strip. Single-row chip rail that doubles as
+   stat readout and filter control — replaces the previous 5-tile grid
+   which wrapped awkwardly once a sixth (Active) status landed and which
+   scales poorly past a hundred studios. Each chip carries a colour dot
+   matching the existing bdg-st-* palette so the rail reads consistently
+   with the per-row status pills further down the page. */
+.adm-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; align-items: center; }
+.stat-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid var(--g2);
+  border-radius: 999px; padding: 7px 14px;
+  font-size: 12px; font-weight: 600; color: var(--g8);
+  cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s;
+  min-height: 34px; line-height: 1;
+}
+.stat-chip:hover { border-color: var(--in); }
+.stat-chip:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+.stat-chip .stat-chip-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--g4); flex-shrink: 0; }
+.stat-chip .stat-chip-count {
+  background: var(--g1); color: var(--g6);
+  padding: 1px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; min-width: 22px; text-align: center;
+}
+.stat-chip.active {
+  background: var(--in-d); color: #fff; border-color: var(--in-d);
+}
+.stat-chip.active .stat-chip-count { background: rgba(255,255,255,0.18); color: #fff; }
+.stat-chip.muted { opacity: 0.55; }
+.stat-chip.muted:hover { opacity: 1; }
+.stat-chip.st-all .stat-chip-dot      { background: var(--g6); }
+.stat-chip.st-submitted .stat-chip-dot         { background: var(--bl); }
+.stat-chip.st-in_review .stat-chip-dot         { background: var(--am); }
+.stat-chip.st-changes_requested .stat-chip-dot { background: var(--rd); }
+.stat-chip.st-setup_in_progress .stat-chip-dot { background: var(--in); }
+.stat-chip.st-complete .stat-chip-dot          { background: var(--gr); }
+.stat-chip.st-active .stat-chip-dot            { background: #065F46; }
 
 .group-block { background: #fff; border: 1px solid var(--g2); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
 .group-block .group-hdr { padding: 14px 18px; font-size: 13px; font-weight: 700; color: var(--in-d); border-bottom: 1px solid var(--g2); display: flex; align-items: center; gap: 10px; background: var(--g1); }

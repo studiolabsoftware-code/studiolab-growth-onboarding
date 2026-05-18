@@ -29,7 +29,9 @@
     rows: [],
     plan: 'all',
     search: '',
+    statusFilter: 'all', // 'all' | one of STAT_GROUPS | 'draft'
     showCompleted: false,
+    showActive: false,
     showDrafts: false,
   };
 
@@ -80,6 +82,12 @@
       const draftsToggle = e.target.closest('[data-toggle-drafts]');
       if (draftsToggle) {
         state.showDrafts = !state.showDrafts;
+        render();
+        return;
+      }
+      const activeToggle = e.target.closest('[data-toggle-active]');
+      if (activeToggle) {
+        state.showActive = !state.showActive;
         render();
         return;
       }
@@ -277,6 +285,7 @@
 
   function matchesFilters(r) {
     if (state.plan !== 'all' && r.plan !== state.plan) return false;
+    if (state.statusFilter !== 'all' && r.status !== state.statusFilter) return false;
     if (!state.search) return true;
     const hay = [r.studio_name, r.contact_email, r.first_name, r.last_name, r.assigned_to].filter(Boolean).join(' ').toLowerCase();
     return hay.includes(state.search);
@@ -288,17 +297,54 @@
   }
 
   function renderStats() {
+    // Counts respect the plan + search filters so the chip totals match
+    // what the studio list actually shows below. Status filter itself
+    // does NOT affect counts (the chips are the way to pick a status, so
+    // their totals stay stable as you change selection).
+    const inScope = state.rows.filter((r) => {
+      if (state.plan !== 'all' && r.plan !== state.plan) return false;
+      if (state.search) {
+        const hay = [r.studio_name, r.contact_email, r.first_name, r.last_name].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(state.search)) return false;
+      }
+      return true;
+    });
     const counts = STAT_GROUPS.reduce((m, s) => (m[s] = 0, m), {});
     counts.draft = 0;
-    state.rows.forEach((r) => {
+    inScope.forEach((r) => {
       if (counts[r.status] !== undefined) counts[r.status]++;
     });
-    const html = STAT_GROUPS.map((s) => `
-      <div class="stat-card st-${s}">
-        <div class="stat-label">${escapeHtml(STATUS_LABEL[s])}</div>
-        <div class="stat-count">${counts[s]}</div>
-      </div>`).join('');
-    $('statsRow').innerHTML = html;
+    const total = STAT_GROUPS.reduce((n, s) => n + counts[s], 0);
+
+    // "All" chip + one per known status. The Active chip stays visible
+    // even at zero so admin can navigate there post-handover without
+    // dropping into the manual status dropdown on every detail page.
+    const chip = (id, label, count) => {
+      const isActive = state.statusFilter === id;
+      const muted = !isActive && count === 0 && id !== 'all' ? ' muted' : '';
+      return `
+        <button type="button" class="stat-chip st-${id}${isActive ? ' active' : ''}${muted}" data-status-chip="${id}" aria-pressed="${isActive}">
+          ${id === 'all' ? '' : '<span class="stat-chip-dot" aria-hidden="true"></span>'}
+          <span>${escapeHtml(label)}</span>
+          <span class="stat-chip-count">${count}</span>
+        </button>`;
+    };
+    const parts = [chip('all', 'All', total)];
+    STAT_GROUPS.forEach((s) => parts.push(chip(s, STATUS_LABEL[s], counts[s])));
+
+    $('statsRow').innerHTML = parts.join('');
+    $('statsRow').querySelectorAll('[data-status-chip]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.statusFilter = btn.getAttribute('data-status-chip');
+        // Selecting Complete or Active via the chip rail implicitly
+        // unhides the matching collapsible group below — otherwise the
+        // pill would highlight but the list would stay empty, which is
+        // a confusing state.
+        if (state.statusFilter === 'complete') state.showCompleted = true;
+        if (state.statusFilter === 'draft') state.showDrafts = true;
+        render();
+      });
+    });
   }
 
   function renderGroups() {
@@ -312,31 +358,52 @@
       (byStatus[k] = byStatus[k] || []).push(r);
     });
 
+    // When a specific status is selected via the chip rail, render only
+    // that single group full-bleed — the chip itself does the navigation
+    // job that the previous toggles handled. When filter='all', keep the
+    // historical layout: VISIBLE_GROUPS stacked, plus collapsibles for
+    // complete / active / drafts.
     let html = '';
-    VISIBLE_GROUPS.forEach((s) => {
+    if (state.statusFilter !== 'all') {
+      const s = state.statusFilter;
       html += groupBlock(s, byStatus[s] || []);
-    });
+    } else {
+      VISIBLE_GROUPS.forEach((s) => {
+        html += groupBlock(s, byStatus[s] || []);
+      });
 
-    // Completed group: collapsible
-    const completed = byStatus.complete || [];
-    const completedCount = completed.length;
-    html += `
-      <div class="completed-toggle">
-        <button type="button" data-toggle-completed>${state.showCompleted ? 'Hide' : 'Show'} completed (${completedCount})</button>
-      </div>`;
-    if (state.showCompleted) {
-      html += groupBlock('complete', completed);
-    }
-
-    // Drafts (unsubmitted): always collapsible, hidden by default
-    const drafts = byStatus.draft || [];
-    if (drafts.length) {
+      const completed = byStatus.complete || [];
       html += `
         <div class="completed-toggle">
-          <button type="button" data-toggle-drafts>${state.showDrafts ? 'Hide' : 'Show'} drafts (${drafts.length})</button>
+          <button type="button" data-toggle-completed>${state.showCompleted ? 'Hide' : 'Show'} completed (${completed.length})</button>
         </div>`;
-      if (state.showDrafts) {
-        html += groupBlock('draft', drafts);
+      if (state.showCompleted) {
+        html += groupBlock('complete', completed);
+      }
+
+      // Active is a terminal state too — surface a parallel toggle so
+      // admin can scan the post-handover list without flipping the chip
+      // filter explicitly.
+      const activeRows = byStatus.active || [];
+      if (activeRows.length || state.showActive) {
+        html += `
+          <div class="completed-toggle">
+            <button type="button" data-toggle-active>${state.showActive ? 'Hide' : 'Show'} active (${activeRows.length})</button>
+          </div>`;
+        if (state.showActive) {
+          html += groupBlock('active', activeRows);
+        }
+      }
+
+      const drafts = byStatus.draft || [];
+      if (drafts.length) {
+        html += `
+          <div class="completed-toggle">
+            <button type="button" data-toggle-drafts>${state.showDrafts ? 'Hide' : 'Show'} drafts (${drafts.length})</button>
+          </div>`;
+        if (state.showDrafts) {
+          html += groupBlock('draft', drafts);
+        }
       }
     }
 
