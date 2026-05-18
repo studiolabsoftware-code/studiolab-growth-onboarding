@@ -87,6 +87,56 @@
   .acct-compose-err { color: var(--st-err-fg); font-size: 12px; }
   .acct-compose button { min-width: 96px; }
   .acct-compose button[disabled] { opacity: 0.55; cursor: not-allowed; }
+  /* Attachment chips on the inline composer. Pre-send the file picker
+     stashes File objects in state; chips render here so the studio can
+     remove one before hitting Send. Mirrors portal.js's pattern but
+     compacted for the embedded composer. */
+  .acct-compose-files { display: flex; flex-wrap: wrap; gap: 6px; }
+  .acct-file-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 10px; background: var(--g1); border-radius: 999px; font-size: 12px; color: var(--in-d); }
+  .acct-file-chip.oversize { background: var(--st-err-bg); color: var(--st-err-fg); }
+  .acct-file-chip button { background: transparent; border: 0; color: var(--g6); font-size: 14px; cursor: pointer; padding: 0 2px; line-height: 1; }
+  .acct-file-chip button:hover { color: var(--st-crit-fg); }
+  .acct-attach-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--g2); border-radius: 999px; font-size: 12px; color: var(--in-d); cursor: pointer; background: #fff; font-weight: 600; }
+  .acct-attach-btn:hover { border-color: var(--in); color: var(--in); }
+  .acct-attach-btn input { display: none; }
+
+  /* Inline editing. Each editable card gets a pencil button in its
+     header; clicking swaps the static rows for an inline form with
+     Save / Cancel. Locked fields stay rendered as static rows even
+     in edit mode so the studio sees what they can't touch. */
+  .acct-card-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; }
+  .acct-card-hdr h2 { margin: 0; }
+  .acct-edit-btn { background: transparent; border: 0; color: var(--in); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 10px; border-radius: 6px; min-height: 32px; }
+  .acct-edit-btn:hover { background: var(--in-l); }
+  .acct-edit-btn:focus-visible { outline: 2px solid var(--in); outline-offset: 1px; }
+  .acct-edit-grid { display: grid; grid-template-columns: 160px 1fr; gap: 10px 14px; align-items: start; }
+  .acct-edit-grid label { color: var(--g6); font-size: 13px; padding: 10px 0 0; }
+  .acct-edit-grid .acct-edit-locked { color: var(--in-d); font-size: 13px; padding: 10px 0 0; }
+  .acct-edit-grid input[type="text"],
+  .acct-edit-grid input[type="url"],
+  .acct-edit-grid input[type="tel"],
+  .acct-edit-grid input[type="email"],
+  .acct-edit-grid select,
+  .acct-edit-grid textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--g2); border-radius: 8px; font-family: inherit; font-size: 13px; color: var(--in-d); background: #fff; }
+  .acct-edit-grid input:focus,
+  .acct-edit-grid select:focus,
+  .acct-edit-grid textarea:focus { outline: 2px solid var(--in); outline-offset: 1px; border-color: var(--in); }
+  .acct-edit-grid textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+  .acct-edit-grid input[type="color"] { width: 50px; height: 36px; padding: 2px; border: 1px solid var(--g2); border-radius: 8px; }
+  .acct-edit-actions { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; padding-top: 6px; }
+  .acct-edit-actions .acct-edit-msg { flex: 1; font-size: 12px; color: var(--g6); }
+  .acct-edit-actions .acct-edit-msg.err { color: var(--st-err-fg); }
+  .acct-edit-actions .acct-edit-msg.ok { color: var(--st-ok-fg); }
+
+  /* Activation banner. Replaces "Where you're at" + "Messages" stack
+     once the admin marks the studio active, since the onboarding portal
+     has done its job. Communication and product use move to the GHL
+     platform; this surface becomes a confirmation page. */
+  .acct-active-banner { background: linear-gradient(135deg, #047857 0%, #065F46 100%); color: #fff; border-radius: 14px; padding: 28px 30px; margin-bottom: 18px; box-shadow: 0 6px 22px rgba(4,120,87,0.18); }
+  .acct-active-banner h2 { margin: 0 0 8px; font-size: 22px; font-weight: 800; letter-spacing: -0.3px; color: #fff; text-transform: none; }
+  .acct-active-banner p { margin: 0 0 12px; font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.92); }
+  .acct-active-banner p:last-child { margin-bottom: 0; }
+  .acct-active-banner .acct-active-meta { font-size: 12px; color: rgba(255,255,255,0.78); margin-top: 12px; }
 
   .acct-inv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .acct-inv-table th { text-align: left; font-weight: 600; color: var(--g6); padding: 8px 8px 8px 0; border-bottom: 1px solid var(--g2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
@@ -317,23 +367,80 @@
       </tr>
     `).join('');
 
-    // Inline thread + composer. The DOM is rendered now; loadThread()
-    // hydrates it after the page paints so the rest of the account view
-    // stays interactive while messages are fetching.
+    // Stash the latest server view of the submission so onSaveSection
+    // can build patch payloads and rerender locked-row recap without
+    // refetching. Replaced on every successful save.
+    acctState.submission = sub;
+    acctState.invoices = invoices;
+    acctState.quotes = quotes;
+    acctState.conv = conv;
+    acctState.fullName = fullName;
+    acctState.statusPill = statusPill;
+    acctState.stages = stages;
+    acctState.editing = acctState.editing || {};
+
+    const isActive = sub.status === 'active';
+
+    // Inline thread + composer. Hidden once status='active' since the
+    // studio's primary surface is the GHL platform from that point on.
+    // Attachment chips render under the textarea — selected files are
+    // uploaded immediately after the message is sent, mirroring
+    // portal.html's two-step pattern.
     const messagesBlock = `
       <div class="acct-thread" id="acctThread">
         <div class="acct-thread-loading">Loading your conversation…</div>
       </div>
       <form class="acct-compose" id="acctCompose" novalidate>
         <textarea id="acctMsgBody" rows="3" placeholder="Type a message to our team… (Cmd/Ctrl-Enter to send)" maxlength="10000"></textarea>
+        <div class="acct-compose-files" id="acctMsgFiles"></div>
         <div class="acct-compose-bar">
-          <span class="acct-compose-hint">
-            Cmd/Ctrl-Enter to send. Need to share a file? Mention it here and we will reply with an upload link.
-          </span>
+          <label class="acct-attach-btn" title="Attach up to 5 files, 25 MB each.">
+            📎 Attach
+            <input type="file" id="acctMsgFileInput" multiple>
+          </label>
+          <span class="acct-compose-hint" style="flex:1;min-width:120px;">Cmd/Ctrl-Enter to send.</span>
           <span class="acct-compose-err" id="acctMsgErr" role="alert"></span>
           <button type="submit" class="acct-btn" id="acctMsgSend">Send</button>
         </div>
       </form>`;
+
+    const activationBanner = isActive
+      ? `<div class="acct-active-banner">
+           <h2>You're live</h2>
+           <p>Your StudioLAB Growth account is active${sub.activated_at ? ' since <strong>' + esc(dateFmt(sub.activated_at)) + '</strong>' : ''}. From here on, everything happens inside your platform — bookings, leads, automations, the lot.</p>
+           <p>You'll receive a separate welcome email with your platform login if you haven't already. You can safely close this tab; this onboarding portal is no longer needed.</p>
+           <p class="acct-active-meta">If you can't find the platform welcome email or have any questions during handover, email <a href="mailto:info@studiolabsoftware.com" style="color:#fff;font-weight:700;text-decoration:underline;">info@studiolabsoftware.com</a>.</p>
+         </div>`
+      : '';
+
+    const whereYouAreCard = isActive ? '' : `
+      <div class="acct-card">
+        <h2>Where you're at</h2>
+        <div class="acct-stages">
+          ${stages.map((s, i) => `
+            <div class="acct-stage">
+              <div class="acct-stage-icon" aria-hidden="true">${i + 1}</div>
+              <div>
+                <div class="acct-stage-label">${esc(s.label)}</div>
+                <div class="acct-stage-body">${esc(s.body)}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+
+    const messagesCard = isActive ? '' : `
+      <div class="acct-card">
+        <h2>Messages with our team</h2>
+        ${messagesBlock}
+      </div>`;
+
+    // Editable sections — five logical groupings of safe fields. Each
+    // card is independently editable (state.editing[sectionId]) so the
+    // studio can update one block without affecting the others. Hidden
+    // post-activation since GHL becomes the source of truth.
+    const editCards = isActive ? '' : EDIT_SECTIONS
+      .map((section) => renderEditCard(section, sub, !!acctState.editing[section.id]))
+      .join('');
 
     document.getElementById('acctRoot').innerHTML = `
       <div class="acct-hdr">
@@ -347,24 +454,9 @@
         </div>
       </div>
 
-      <div class="acct-card">
-        <h2>Where you're at</h2>
-        <div class="acct-stages">
-          ${stages.map((s, i) => `
-            <div class="acct-stage">
-              <div class="acct-stage-icon" aria-hidden="true">${i + 1}</div>
-              <div>
-                <div class="acct-stage-label">${esc(s.label)}</div>
-                <div class="acct-stage-body">${esc(s.body)}</div>
-              </div>
-            </div>`).join('')}
-        </div>
-      </div>
-
-      <div class="acct-card">
-        <h2>Messages with our team</h2>
-        ${messagesBlock}
-      </div>
+      ${activationBanner}
+      ${whereYouAreCard}
+      ${messagesCard}
 
       <div class="acct-card">
         <h2>Invoices</h2>
@@ -394,28 +486,27 @@
             </p>`}
       </div>
 
-      <div class="acct-card">
-        <h2>Your submission</h2>
-        <div class="acct-row"><div class="acct-k">Plan</div><div class="acct-v">${esc(PLAN_LABEL[sub.plan] || sub.plan)} · ${esc(SETUP_LABEL[sub.setup_type] || sub.setup_type)}</div></div>
-        <div class="acct-row"><div class="acct-k">Studio name</div><div class="acct-v">${esc(sub.studio_name || '—')}</div></div>
-        <div class="acct-row"><div class="acct-k">Primary contact</div><div class="acct-v">${esc(fullName || '—')}${sub.contact_email ? ' · <a href="mailto:' + esc(sub.contact_email) + '">' + esc(sub.contact_email) + '</a>' : ''}</div></div>
-        <div class="acct-row"><div class="acct-k">Country / timezone</div><div class="acct-v">${esc(sub.country || '—')}${sub.timezone ? ' · ' + esc(sub.timezone) : ''}</div></div>
-        <div class="acct-row"><div class="acct-k">Submitted</div><div class="acct-v">${esc(dateTimeFmt(sub.submitted_at))}</div></div>
-        <div class="acct-row"><div class="acct-k">Need to update something?</div><div class="acct-v">Send us a message above and tell us what to change — we'll update your record on our side.</div></div>
-      </div>
+      ${editCards}
 
       <div class="acct-foot">
-        Need to reach us? Send a message above, or email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.
+        ${isActive
+          ? 'Questions during handover? Email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.'
+          : 'Need to reach us? Send a message above, or email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a>.'}
       </div>`;
 
-    // Hydrate the inline message thread + composer. Kicked off after the
-    // main render so the rest of the page is usable while messages load.
-    // Stash sender name/email globally so onMsgSend can stamp messages
-    // without re-resolving from state — the inline composer is a sibling
-    // of renderAccount's closure, not a child of it.
-    window.__acctSenderName = fullName || sub.studio_name || null;
-    window.__acctSenderEmail = sub.contact_email || null;
-    initMessages(conv);
+    // Bind edit/save/cancel handlers across all edit cards via delegation.
+    bindEditHandlers();
+
+    // Hydrate the inline message thread + composer. Skipped post-
+    // activation because the messages card is hidden in that state — the
+    // platform's own inbox takes over. We stash sender attribution
+    // globally so onMsgSend can stamp messages without re-resolving
+    // closure state.
+    if (!isActive) {
+      window.__acctSenderName = fullName || sub.studio_name || null;
+      window.__acctSenderEmail = sub.contact_email || null;
+      initMessages(conv);
+    }
 
     // PDF download handler — POSTs the session_token in the request body
     // to keep it off the URL bar and server logs. Streams the PDF back as
@@ -460,6 +551,219 @@
   }
 
   // ------------------------------------------------------------------
+  // Self-service edit. Each card declares (locked, fields). View mode
+  // renders k/v rows; edit mode swaps in a form. Save POSTs the patch
+  // payload to studio-self-edit, which mirrors save-draft's auth model
+  // but runs against post-submit rows (save-draft refuses after submit
+  // to protect the finalize emails from being replayed). Updates re-
+  // render only the affected card and rebroadcast acctState.submission
+  // so subsequent renders see the new values.
+  const acctState = { submission: null, editing: {} };
+
+  // Field type 'select' uses options: [[value, label], ...] inline.
+  // Keep labels concise — they appear next to the input, not as form
+  // help text. Anything that needs a description belongs in a separate
+  // explainer surface (the message thread).
+  const EDIT_SECTIONS = [
+    {
+      id: 'contact',
+      title: 'Primary contact',
+      locked: (s) => ([
+        { k: 'Account email', v: (s.contact_email || '—') + ' (locked)' },
+      ]),
+      fields: [
+        { name: 'first_name',    label: 'First name',    type: 'text' },
+        { name: 'last_name',     label: 'Last name',     type: 'text' },
+        { name: 'role',          label: 'Your role',     type: 'text', placeholder: 'e.g. Owner, Director' },
+        { name: 'contact_phone', label: 'Contact phone', type: 'tel' },
+      ],
+    },
+    {
+      id: 'studio',
+      title: 'Studio details',
+      locked: (s) => ([
+        { k: 'Plan',         v: (PLAN_LABEL[s.plan] || s.plan || '—') + ' · ' + (SETUP_LABEL[s.setup_type] || s.setup_type || '') + ' (locked)' },
+      ]),
+      fields: [
+        { name: 'studio_name',        label: 'Studio name',        type: 'text' },
+        { name: 'country',            label: 'Country',            type: 'text' },
+        { name: 'timezone',           label: 'Timezone',           type: 'text', placeholder: 'e.g. Australia/Sydney' },
+        { name: 'address',            label: 'Studio address',     type: 'text' },
+        { name: 'website',            label: 'Website URL',        type: 'url',  placeholder: 'https://' },
+        { name: 'support_url',        label: 'Support URL',        type: 'url',  placeholder: 'https://' },
+        { name: 'studio_description', label: 'Studio description', type: 'textarea' },
+      ],
+    },
+    {
+      id: 'branding',
+      title: 'Branding & outbound email',
+      fields: [
+        { name: 'primary_colour',   label: 'Primary colour',   type: 'color' },
+        { name: 'secondary_colour', label: 'Secondary colour', type: 'color' },
+        { name: 'sign_off',         label: 'Email sign-off',   type: 'text', placeholder: 'e.g. The Team at Studio X' },
+        { name: 'email_tone',       label: 'Email tone',       type: 'text', placeholder: 'e.g. Warm, professional' },
+        { name: 'footer_notes',     label: 'Email footer notes', type: 'textarea' },
+        { name: 'from_name',        label: 'From name',        type: 'text' },
+        { name: 'reply_email',      label: 'Reply-to email',   type: 'email' },
+        { name: 'custom_domain',    label: 'Custom domain',    type: 'text', placeholder: 'e.g. mail.yourstudio.com' },
+      ],
+    },
+    {
+      id: 'links',
+      title: 'Social & booking links',
+      fields: [
+        { name: 'instagram_handle',    label: 'Instagram handle',    type: 'text', placeholder: '@yourhandle' },
+        { name: 'facebook_url',        label: 'Facebook URL',        type: 'url',  placeholder: 'https://' },
+        { name: 'google_business_url', label: 'Google Business URL', type: 'url',  placeholder: 'https://' },
+        { name: 'tiktok_handle',       label: 'TikTok handle',       type: 'text', placeholder: '@yourhandle' },
+        { name: 'youtube_url',         label: 'YouTube URL',         type: 'url',  placeholder: 'https://' },
+        { name: 'booking_url',         label: 'Booking URL',         type: 'url',  placeholder: 'https://' },
+      ],
+    },
+    {
+      id: 'notes',
+      title: 'Notes for our team',
+      fields: [
+        { name: 'extra_notes', label: 'Anything else', type: 'textarea', placeholder: 'Anything you want us to know that did not fit on the form.' },
+      ],
+    },
+  ];
+
+  function renderEditCard(section, sub, editing) {
+    const locked = typeof section.locked === 'function' ? section.locked(sub) : [];
+    const lockedRows = locked.map((row) => `
+      <div class="acct-row">
+        <div class="acct-k">${esc(row.k)}</div>
+        <div class="acct-v">${esc(row.v)}</div>
+      </div>`).join('');
+
+    if (!editing) {
+      const valueRows = section.fields.map((f) => {
+        const v = sub[f.name];
+        const display = v == null || v === '' ? '—' : String(v);
+        return `<div class="acct-row">
+          <div class="acct-k">${esc(f.label)}</div>
+          <div class="acct-v">${esc(display)}</div>
+        </div>`;
+      }).join('');
+      return `
+        <div class="acct-card" data-section="${section.id}">
+          <div class="acct-card-hdr">
+            <h2>${esc(section.title)}</h2>
+            <button type="button" class="acct-edit-btn" data-edit-toggle="${section.id}">✎ Edit</button>
+          </div>
+          ${lockedRows}
+          ${valueRows}
+        </div>`;
+    }
+
+    const inputs = section.fields.map((f) => {
+      const v = sub[f.name] == null ? '' : String(sub[f.name]);
+      const placeholder = f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : '';
+      let input;
+      if (f.type === 'textarea') {
+        input = `<textarea name="${esc(f.name)}" rows="3"${placeholder}>${esc(v)}</textarea>`;
+      } else if (f.type === 'color') {
+        // Defensive fallback: input[type=color] needs a 7-char hex.
+        const hex = /^#[0-9a-fA-F]{6}$/.test(v) ? v : '#000000';
+        input = `<input type="color" name="${esc(f.name)}" value="${esc(hex)}">`;
+      } else {
+        input = `<input type="${esc(f.type)}" name="${esc(f.name)}" value="${esc(v)}"${placeholder}>`;
+      }
+      return `<label>${esc(f.label)}</label>${input}`;
+    }).join('');
+
+    return `
+      <div class="acct-card" data-section="${section.id}">
+        <div class="acct-card-hdr">
+          <h2>${esc(section.title)}</h2>
+        </div>
+        ${lockedRows}
+        <form class="acct-edit-grid" data-edit-form="${section.id}">
+          ${inputs}
+          <div class="acct-edit-actions">
+            <span class="acct-edit-msg" data-edit-msg></span>
+            <button type="button" class="acct-btn acct-btn-secondary" data-edit-cancel="${section.id}">Cancel</button>
+            <button type="submit" class="acct-btn" data-edit-save="${section.id}">Save changes</button>
+          </div>
+        </form>
+      </div>`;
+  }
+
+  function bindEditHandlers() {
+    document.querySelectorAll('[data-edit-toggle]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-edit-toggle');
+        acctState.editing[id] = true;
+        renderAccount({ submission: acctState.submission, invoices: acctState.invoices, quotes: acctState.quotes, conversation: acctState.conv });
+      });
+    });
+    document.querySelectorAll('[data-edit-cancel]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-edit-cancel');
+        acctState.editing[id] = false;
+        renderAccount({ submission: acctState.submission, invoices: acctState.invoices, quotes: acctState.quotes, conversation: acctState.conv });
+      });
+    });
+    document.querySelectorAll('[data-edit-form]').forEach((form) => {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        onSaveSection(form.getAttribute('data-edit-form'), form);
+      });
+    });
+  }
+
+  async function onSaveSection(sectionId, form) {
+    const section = EDIT_SECTIONS.find((s) => s.id === sectionId);
+    if (!section) return;
+    const session = readSession();
+    if (!session || !session.token) {
+      alert('Your session has expired. Please verify your email again.');
+      return;
+    }
+    const fd = new FormData(form);
+    const patch = {};
+    section.fields.forEach((f) => {
+      const v = fd.get(f.name);
+      patch[f.name] = v == null ? '' : String(v).trim();
+    });
+    const msgEl = form.querySelector('[data-edit-msg]');
+    const saveBtn = form.querySelector('[data-edit-save]');
+    const cancelBtn = form.querySelector('[data-edit-cancel]');
+    msgEl.className = 'acct-edit-msg';
+    msgEl.textContent = 'Saving…';
+    saveBtn.disabled = true;
+    cancelBtn.disabled = true;
+    try {
+      const resp = await fetch(FN_BASE + 'studio-self-edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_token: session.token, payload: patch }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        msgEl.className = 'acct-edit-msg err';
+        msgEl.textContent = (data && data.error) || 'Could not save. Please try again.';
+        saveBtn.disabled = false;
+        cancelBtn.disabled = false;
+        return;
+      }
+      // Merge the server's authoritative values back into acctState
+      // so the recap render reflects the saved state precisely.
+      const merged = Object.assign({}, acctState.submission, data.submission || patch);
+      acctState.submission = merged;
+      acctState.editing[sectionId] = false;
+      renderAccount({ submission: merged, invoices: acctState.invoices, quotes: acctState.quotes, conversation: acctState.conv });
+    } catch (err) {
+      console.error('section save failed', err);
+      msgEl.className = 'acct-edit-msg err';
+      msgEl.textContent = 'We could not reach the server. Check your connection and try again.';
+      saveBtn.disabled = false;
+      cancelBtn.disabled = false;
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Inline messages — thread + composer hydration. Auths against
   // portal-conversation using the conversation_id + studio_token returned
   // by get-studio-account (both always exist now; the loader mints them
@@ -467,7 +771,9 @@
   // admin replies render without a manual refresh. We can't use Supabase
   // realtime here because messages has admin-only RLS and the studio has
   // no JWT — polling matches the existing portal.html pattern.
-  const msgState = { convId: null, token: null, sending: false, pollTimer: null };
+  const MAX_MSG_FILES = 5;
+  const MAX_MSG_BYTES = 25 * 1024 * 1024;
+  const msgState = { convId: null, token: null, sending: false, pollTimer: null, pendingFiles: [] };
 
   function initMessages(conv) {
     if (!conv || !conv.id || !conv.token) {
@@ -477,9 +783,12 @@
     }
     msgState.convId = conv.id;
     msgState.token = conv.token;
+    msgState.pendingFiles = [];
 
     const form = document.getElementById('acctCompose');
     const body = document.getElementById('acctMsgBody');
+    const fileInput = document.getElementById('acctMsgFileInput');
+    const filesHost = document.getElementById('acctMsgFiles');
     if (form) form.addEventListener('submit', onMsgSend);
     if (body) {
       body.addEventListener('keydown', (e) => {
@@ -489,9 +798,89 @@
         }
       });
     }
+    if (fileInput) {
+      fileInput.addEventListener('change', () => {
+        addPendingMsgFiles(fileInput.files);
+        fileInput.value = '';
+      });
+    }
+    if (filesHost) {
+      filesHost.addEventListener('click', (e) => {
+        const rm = e.target.closest('[data-msg-rm]');
+        if (!rm) return;
+        msgState.pendingFiles.splice(Number(rm.getAttribute('data-msg-rm')), 1);
+        renderMsgFileChips();
+      });
+    }
 
     loadThread(true).then(() => markThreadRead());
     startMsgPolling();
+  }
+
+  function addPendingMsgFiles(fileList) {
+    const errEl = document.getElementById('acctMsgErr');
+    if (errEl) errEl.textContent = '';
+    const cap = MAX_MSG_FILES - msgState.pendingFiles.length;
+    if (cap <= 0) {
+      if (errEl) errEl.textContent = `You've hit the ${MAX_MSG_FILES}-file limit.`;
+      return;
+    }
+    let firstError = '';
+    let added = 0;
+    for (const f of Array.from(fileList)) {
+      if (added >= cap) {
+        firstError = firstError || `Only ${cap} more file${cap === 1 ? '' : 's'} fit before the ${MAX_MSG_FILES}-file limit.`;
+        break;
+      }
+      if (f.size <= 0) { firstError = firstError || `${f.name} is empty.`; continue; }
+      if (f.size > MAX_MSG_BYTES) {
+        firstError = firstError || `${f.name} is over the ${MAX_MSG_BYTES / 1024 / 1024} MB limit.`;
+        continue;
+      }
+      msgState.pendingFiles.push(f);
+      added++;
+    }
+    if (errEl && firstError) errEl.textContent = firstError;
+    renderMsgFileChips();
+  }
+
+  function renderMsgFileChips() {
+    const host = document.getElementById('acctMsgFiles');
+    if (!host) return;
+    if (!msgState.pendingFiles.length) { host.innerHTML = ''; return; }
+    host.innerHTML = msgState.pendingFiles.map((f, i) => {
+      const over = f.size > MAX_MSG_BYTES;
+      return `<span class="acct-file-chip${over ? ' oversize' : ''}">
+        📎 ${esc(f.name)} <span style="color:var(--g6);font-size:11px;">${esc(formatBytesAcct(f.size))}</span>
+        <button type="button" data-msg-rm="${i}" aria-label="Remove">×</button>
+      </span>`;
+    }).join('');
+  }
+
+  function formatBytesAcct(n) {
+    if (!n) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  async function uploadMsgAttachments(messageId, files) {
+    const failures = [];
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('conversation_id', msgState.convId);
+      fd.append('token', msgState.token);
+      fd.append('message_id', messageId);
+      fd.append('file', file);
+      try {
+        const resp = await fetch(FN_BASE + 'upload-submission-attachment', { method: 'POST', body: fd });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data?.ok === false) {
+          failures.push(`${file.name}${data?.error ? ` (${data.error})` : ''}`);
+        }
+      } catch (_) { failures.push(file.name); }
+    }
+    return failures.length ? failures.join(', ') : null;
   }
 
   async function msgApi(action, extra) {
@@ -566,21 +955,36 @@
     const bodyEl = document.getElementById('acctMsgBody');
     errEl.textContent = '';
     const text = (bodyEl.value || '').trim();
-    if (!text) { errEl.textContent = 'Type a message first.'; return; }
+    // Empty body is allowed if there are attachments — let people send
+    // a file with no message body.
+    if (!text && !msgState.pendingFiles.length) {
+      errEl.textContent = 'Type a message or attach a file.';
+      return;
+    }
     if (text.length > 10000) { errEl.textContent = 'Message is too long (max 10,000 characters).'; return; }
 
     msgState.sending = true;
     sendBtn.disabled = true;
     const senderName = window.__acctSenderName || null;
     const senderEmail = window.__acctSenderEmail || null;
-    const res = await msgApi('send', { body_text: text, sender_name: senderName, sender_email: senderEmail });
-    msgState.sending = false;
-    sendBtn.disabled = false;
+    const res = await msgApi('send', { body_text: text || '(attachment)', sender_name: senderName, sender_email: senderEmail });
     if (!res.ok) {
+      msgState.sending = false;
+      sendBtn.disabled = false;
       errEl.textContent = (res.data && res.data.error) || 'Could not send. Please try again.';
       return;
     }
+    const messageId = res.data?.message_id;
+    let attErr = null;
+    if (msgState.pendingFiles.length && messageId) {
+      attErr = await uploadMsgAttachments(messageId, msgState.pendingFiles);
+    }
+    msgState.sending = false;
+    sendBtn.disabled = false;
     bodyEl.value = '';
+    msgState.pendingFiles = [];
+    renderMsgFileChips();
+    if (attErr) errEl.textContent = 'Message sent, but some attachments failed: ' + attErr;
     await loadThread(true);
   }
 

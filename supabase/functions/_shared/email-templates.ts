@@ -845,6 +845,29 @@ export function adminInvoicePaymentFailed(opts: {
   return { subject, html: layout({ previewText: `Stripe reported payment_failed on ${invoiceLabel} for ${opts.recipientLabel}.`, body }) };
 }
 
+// Sent to the studio when admin marks them as active. Onboarding is over,
+// the GHL platform takes over. We deliberately do not embed a platform
+// login URL here — GHL sends its own welcome email with credentials, and
+// platform branding is out of scope for this surface. The CTA is just a
+// link back to the onboarding portal so they can confirm the status flip,
+// then close the tab.
+export function studioActivated(opts: {
+  studioName: string;
+  accountUrl?: string | null;
+}): { subject: string; html: string } {
+  const subject = `Your StudioLAB Growth account is now active`;
+  const accountCta = opts.accountUrl ? cta('View confirmation', opts.accountUrl) : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">You're live</h1>
+    <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
+    <p style="margin:0 0 14px;">Your StudioLAB Growth account is now active. Welcome aboard.</p>
+    <p style="margin:0 0 14px;">You'll receive a separate welcome email shortly with your platform login details. From this point on, everything happens inside your platform — bookings, leads, automations, the lot. You no longer need the onboarding portal.</p>
+    ${accountCta}
+    <p style="margin:0 0 14px;">If you have any questions during the handover, reply to this email and we'll help out.</p>
+    <p style="margin:0;">All the best,<br>The StudioLAB team</p>`;
+  return { subject, html: layout({ previewText: 'Your StudioLAB Growth account is now active.', body }) };
+}
+
 function escape(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
 }

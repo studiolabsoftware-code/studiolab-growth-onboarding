@@ -25,7 +25,14 @@ Deno.serve(async (req) => {
         'payment_status, paid_at, captured_at, card_saved_at, ' +
         'amount_paid_cents, currency, tax_amount_cents, ' +
         'invoice_hosted_url, invoice_pdf_url, ' +
-        'submitted_at, last_saved_at, session_expires_at',
+        'submitted_at, last_saved_at, session_expires_at, activated_at, ' +
+        // Self-edit surface — the additional fields below are read back so
+        // the studio sees its current values when entering edit mode.
+        'first_name, last_name, role, contact_phone, address, website, ' +
+        'support_url, studio_description, primary_colour, secondary_colour, ' +
+        'sign_off, email_tone, footer_notes, from_name, reply_email, ' +
+        'custom_domain, instagram_handle, facebook_url, google_business_url, ' +
+        'tiktok_handle, youtube_url, booking_url, brand_reference_url, extra_notes',
       )
       .eq('session_token_hash', sessionHash)
       .maybeSingle();
@@ -95,6 +102,30 @@ Deno.serve(async (req) => {
         invoice_hosted_url: submission.invoice_hosted_url,
         invoice_pdf_url: submission.invoice_pdf_url,
         submitted_at: submission.submitted_at,
+        activated_at: submission.activated_at,
+        // Self-edit surface
+        role: submission.role,
+        contact_phone: submission.contact_phone,
+        address: submission.address,
+        website: submission.website,
+        support_url: submission.support_url,
+        studio_description: submission.studio_description,
+        primary_colour: submission.primary_colour,
+        secondary_colour: submission.secondary_colour,
+        sign_off: submission.sign_off,
+        email_tone: submission.email_tone,
+        footer_notes: submission.footer_notes,
+        from_name: submission.from_name,
+        reply_email: submission.reply_email,
+        custom_domain: submission.custom_domain,
+        instagram_handle: submission.instagram_handle,
+        facebook_url: submission.facebook_url,
+        google_business_url: submission.google_business_url,
+        tiktok_handle: submission.tiktok_handle,
+        youtube_url: submission.youtube_url,
+        booking_url: submission.booking_url,
+        brand_reference_url: submission.brand_reference_url,
+        extra_notes: submission.extra_notes,
       },
       invoices: invoices || [],
       quotes: quotes || [],

@@ -79,6 +79,7 @@
 .bdg-st-changes_requested{ background: var(--am-l); color: var(--am); }
 .bdg-st-setup_in_progress{ background: var(--mg-l); color: var(--mg-d); }
 .bdg-st-complete         { background: var(--gr-l); color: var(--gr); }
+.bdg-st-active           { background: #065F46; color: #fff; }
 /* Quote-lifecycle terminal states. Differentiated so admin can tell at a
    glance whether a dead quote was withdrawn by us (cancelled, red),
    declined by the recipient (declined, red), expired without action

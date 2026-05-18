@@ -223,10 +223,11 @@
               <div class="det-field">
                 <label for="detStatus">Status</label>
                 <select id="detStatus">
-                  ${['submitted','in_review','changes_requested','setup_in_progress','complete'].map((s) =>
+                  ${['submitted','in_review','changes_requested','setup_in_progress','complete','active'].map((s) =>
                     `<option value="${s}"${s === sub.status ? ' selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}
                 </select>
               </div>
+              ${markActiveBlock(sub)}
               ${assignmentBlock()}
               ${sheetSyncRow(sub)}
             </div>
@@ -250,6 +251,8 @@
     if (delBtn) delBtn.addEventListener('click', handleDelete);
     const syncOne = document.getElementById('detSheetSync');
     if (syncOne) syncOne.addEventListener('click', syncThisToSheet);
+    const markActiveBtn = document.getElementById('detMarkActive');
+    if (markActiveBtn) markActiveBtn.addEventListener('click', markActive);
 
     // Tab bar wiring (delegation for keyboard + click).
     const tabBar = screen.querySelector('.det-tabs');
@@ -1192,6 +1195,88 @@
     tabHydrated = { overview: false, messages: false, invoices: false, quotes: false, activity: false };
     render(current);
     activateTab(savedTab);
+  }
+
+  // "Mark as active" surface in the side panel. Different from a plain
+  // status-dropdown flip because activation has side effects (email to
+  // studio, system message into the inbox, activated_at stamp, account
+  // page swaps to its banner mode). The button calls admin-mark-active
+  // which is idempotent — clicking twice is a no-op.
+  function markActiveBlock(sub) {
+    if (sub.status === 'active') {
+      const when = sub.activated_at
+        ? new Date(sub.activated_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
+        : 'an unknown time';
+      return `
+        <div class="det-field" style="margin-top:14px;padding:12px 14px;background:#D1FAE5;border-radius:8px;border:1px solid #6EE7B7;">
+          <div style="font-size:12px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">Active</div>
+          <div style="font-size:13px;color:#065F46;">Marked active on ${ESC(when)}.</div>
+        </div>`;
+    }
+    if (sub.status === 'draft') return '';
+    return `
+      <div class="det-field" style="margin-top:14px;padding:12px 14px;background:#F0FDF4;border-radius:8px;border:1px dashed #86EFAC;">
+        <div style="font-size:12px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Handover</div>
+        <p style="margin:0 0 10px;font-size:12px;color:#065F46;line-height:1.5;">
+          Flip this studio to <strong>Active</strong> once their GHL platform account is live. They'll get the activation email and their onboarding portal switches to the "you're live" confirmation view.
+        </p>
+        <button type="button" id="detMarkActive" class="btn btn-p" style="background:#047857;border-color:#047857;">Mark as active</button>
+      </div>`;
+  }
+
+  async function markActive() {
+    if (!current) return;
+    const confirmed = await (window.AdminModal && window.AdminModal.confirm
+      ? window.AdminModal.confirm({
+          title: 'Mark studio as active?',
+          message: `<p>This will:</p>
+            <ul style="margin:0 0 12px 18px;line-height:1.6;font-size:13px;">
+              <li>Set status to <strong>Active</strong> and stamp the activation time.</li>
+              <li>Email the studio that their account is now live.</li>
+              <li>Post a system event into their inbox thread.</li>
+              <li>Swap their onboarding portal to the "you're live" confirmation view (no more self-edit).</li>
+            </ul>
+            <p style="margin:0;">Only do this once their GHL platform account is set up and ready for them to log into.</p>`,
+          confirmText: 'Mark as active',
+          confirmStyle: 'primary',
+        })
+      : Promise.resolve(confirm('Mark studio as active? This sends them the activation email.')));
+    if (!confirmed) return;
+
+    const btn = document.getElementById('detMarkActive');
+    if (btn) { btn.disabled = true; btn.textContent = 'Marking active…'; }
+    try {
+      const jwt = (function () {
+        try { return localStorage.getItem(window.ADMIN_JWT_KEY || 'sl-admin-jwt'); }
+        catch (_) { return null; }
+      })();
+      const resp = await fetch(window.SUPABASE_CONFIG.url + '/functions/v1/admin-mark-active', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(jwt ? { Authorization: 'Bearer ' + jwt } : {}),
+        },
+        body: JSON.stringify({ submission_id: current.id }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Mark as active'; }
+        const msg = (data && data.error) || `Could not mark active (status ${resp.status}).`;
+        if (window.AdminModal && window.AdminModal.alert) {
+          window.AdminModal.alert({ title: 'Activation failed', message: ESC(msg) });
+        } else {
+          alert(msg);
+        }
+        return;
+      }
+      // Reload the detail screen so the side panel reflects the new state
+      // and the status dropdown shows Active.
+      open(current.id);
+    } catch (err) {
+      console.error('mark active failed', err);
+      if (btn) { btn.disabled = false; btn.textContent = 'Mark as active'; }
+      alert('We could not reach the server. Check your connection and try again.');
+    }
   }
 
   function sheetSyncRow(sub) {

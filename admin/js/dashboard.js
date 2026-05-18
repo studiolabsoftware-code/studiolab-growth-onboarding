@@ -12,14 +12,18 @@
     changes_requested: 'Changes requested',
     setup_in_progress: 'Setup in progress',
     complete: 'Complete',
+    active: 'Active',
     draft: 'Draft (not submitted)',
   };
   const PLAN_LABEL = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
   const SETUP_LABEL = { dfy: 'Done-For-You', guided: 'Guided' };
 
-  // Visible groups in order. 'complete' is hidden by default behind a toggle.
+  // Visible groups in order. 'complete' and 'active' are hidden by default
+  // behind a toggle — once a studio is past setup their row stops being
+  // actionable from the dashboard list, but we still want a way to see
+  // them when toggled on.
   const VISIBLE_GROUPS = ['submitted', 'in_review', 'changes_requested', 'setup_in_progress'];
-  const STAT_GROUPS = ['submitted', 'in_review', 'changes_requested', 'setup_in_progress', 'complete'];
+  const STAT_GROUPS = ['submitted', 'in_review', 'changes_requested', 'setup_in_progress', 'complete', 'active'];
 
   const state = {
     rows: [],
