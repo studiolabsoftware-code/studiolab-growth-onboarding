@@ -29,7 +29,13 @@ export async function resolveAdminRecipients(
   excludeAdminId: string | null,
 ): Promise<AdminRecipient[]> {
   const [{ data: admins }, { data: assignments }, { data: overrides }] = await Promise.all([
-    sb.from('admin_users').select('id, email, name, role').eq('is_active', true),
+    // Migration 038: email_notifications_enabled is the global opt-out
+    // toggle. We filter it here so the inbox-message fanout respects
+    // the same preference as the rest of the system.
+    sb.from('admin_users')
+      .select('id, email, name, role')
+      .eq('is_active', true)
+      .eq('email_notifications_enabled', true),
     sb.from('submission_assignments')
       .select('admin_user_id')
       .eq('submission_id', submissionId)

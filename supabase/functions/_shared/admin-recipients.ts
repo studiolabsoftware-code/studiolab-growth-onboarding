@@ -25,7 +25,15 @@ export async function resolveAdminNotificationRecipients(
   sb: Sb,
   isLive: boolean,
 ): Promise<string[]> {
-  const q = sb.from('admin_users').select('email, role').eq('is_active', true);
+  // Two filters always: active AND opted in to email notifications.
+  // Migration 038 introduced email_notifications_enabled with a default
+  // of true, so existing rows keep receiving emails. An admin who has
+  // explicitly toggled off (via the Users page) drops out of every
+  // notification path that reads through this helper.
+  const q = sb.from('admin_users')
+    .select('email, role')
+    .eq('is_active', true)
+    .eq('email_notifications_enabled', true);
   // In test mode, restrict to owners. The role check happens server-side
   // (RLS-safe; we use the service-role client). If a project has zero
   // owners (shouldn't happen — migration 001 seeds the founder as owner),

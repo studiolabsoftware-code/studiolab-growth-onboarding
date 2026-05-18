@@ -37,7 +37,7 @@
     const client = sb(); if (!client) return;
     const { data, error } = await client
       .from('admin_users')
-      .select('id, email, name, role, is_active, last_login_at, created_at')
+      .select('id, email, name, role, is_active, email_notifications_enabled, last_login_at, created_at')
       .order('created_at', { ascending: true });
     if (error) {
       $('usersTbody').innerHTML = `<tr><td colspan="6" class="adm-empty">Could not load users: ${escapeHtml(error.message)}</td></tr>`;
@@ -63,6 +63,14 @@
       const statusBdg = r.is_active
         ? '<span class="bdg bdg-active">Active</span>'
         : '<span class="bdg bdg-inactive">Inactive</span>';
+      // Notifications toggle. Owners can flip anyone's; non-owners can
+      // only flip their own. The button is rendered enabled / disabled
+      // accordingly so the affordance matches the permission.
+      const notifOn = r.email_notifications_enabled !== false;
+      const canToggleNotif = canManage || isSelf;
+      const notifBdg = canToggleNotif
+        ? `<button class="bdg ${notifOn ? 'bdg-notif-on' : 'bdg-notif-off'} bdg-clickable" data-user-action="toggle_notif" data-id="${r.id}" data-enabled="${notifOn}" title="${notifOn ? 'Receiving emails — click to mute' : 'Muted — click to resume'}">${notifOn ? 'On' : 'Off'}</button>`
+        : `<span class="bdg ${notifOn ? 'bdg-notif-on' : 'bdg-notif-off'}">${notifOn ? 'On' : 'Off'}</span>`;
       const actions = canManage ? renderActions(r, isSelf) : (isSelf ? `<button class="btn-link" data-user-action="edit" data-id="${r.id}">Edit my profile</button>` : '');
       return `
         <tr>
@@ -70,6 +78,7 @@
           <td>${escapeHtml(r.email)}</td>
           <td><span class="bdg bdg-role-${r.role}">${ROLE_LABEL[r.role] || r.role}</span></td>
           <td>${statusBdg}</td>
+          <td>${notifBdg}</td>
           <td class="muted">${escapeHtml(lastLogin)}</td>
           <td class="user-actions">${actions}</td>
         </tr>`;
@@ -98,6 +107,29 @@
     if (!row) return;
 
     if (action === 'edit') { await openEdit(row); return; }
+
+    if (action === 'toggle_notif') {
+      // Optimistic: flip the pill immediately, server-call rolls it
+      // back if the request fails. Owners can toggle anyone; non-owners
+      // can only toggle themselves (server-enforced too).
+      const wasEnabled = btn.getAttribute('data-enabled') === 'true';
+      const nextEnabled = !wasEnabled;
+      btn.disabled = true;
+      const r = await callFn('manage-admin-users', { action: 'set_notifications', id, enabled: nextEnabled });
+      btn.disabled = false;
+      if (!r.ok) {
+        await window.AdminModal.alert({
+          title: 'Could not update notifications',
+          message: escapeHtml(r.error || 'Unknown error.'),
+        });
+        return;
+      }
+      // Patch local state then re-render so the pill class + tooltip
+      // refresh without a full server round-trip.
+      row.email_notifications_enabled = nextEnabled;
+      render();
+      return;
+    }
 
     if (action === 'resend') {
       btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Sending...';

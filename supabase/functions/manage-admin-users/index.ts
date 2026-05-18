@@ -106,6 +106,25 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, id: userId, reactivated: wasReactivated, created: !existing });
     }
 
+    if (action === 'set_notifications') {
+      // Permission: owner can toggle anyone; non-owner can only toggle
+      // themselves. This deliberately diverges from set_active/set_role
+      // (where self-change is forbidden) because an admin opting
+      // themselves out of email is a routine, low-risk self-service
+      // action, not a privilege change.
+      const id = String(body.id || '');
+      const enabled = !!body.enabled;
+      if (!id) return jsonResponse({ ok: false, error: 'Missing user id.' }, 400);
+      if (id !== caller.id && caller.role !== 'owner') {
+        return jsonResponse({ ok: false, error: 'Only owners can change another user\'s notifications.' }, 403);
+      }
+      const { error } = await sb.from('admin_users')
+        .update({ email_notifications_enabled: enabled })
+        .eq('id', id);
+      if (error) throw error;
+      return jsonResponse({ ok: true, enabled });
+    }
+
     if (action === 'set_active' || action === 'set_role') {
       const id = String(body.id || '');
       if (!id) return jsonResponse({ ok: false, error: 'Missing user id.' }, 400);
