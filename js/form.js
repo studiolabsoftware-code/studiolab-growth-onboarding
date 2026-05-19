@@ -203,7 +203,11 @@
   // outside our supported list can still finish setup.
   function getCountryValue() {
     const cSel = document.getElementById('country');
-    if (!cSel) return '';
+    // Country field was removed from the live form (region is implied by
+    // the URL path and the studio's account on the GHL side already has
+    // it). Fall back to the URL region so the data the form posts stays
+    // consistent with what previous code expected.
+    if (!cSel) return REGION_DEFAULT_COUNTRY[REGION] || REGION || 'AU';
     if (cSel.value === 'OTHER') {
       const other = document.getElementById('countryOther');
       return other ? (other.value || '').trim() : '';
@@ -256,7 +260,9 @@
   }
 
   function applyRegionDefaults() {
-    // Pre-select the country dropdown to the URL's region default.
+    // Pre-select the country dropdown to the URL's region default
+    // (country field was removed from the live form but the helper
+    // stays defensive in case a future variant brings it back).
     const cSel = document.getElementById('country');
     if (cSel && !cSel.value) {
       const def = REGION_DEFAULT_COUNTRY[REGION] || 'AU';
@@ -265,6 +271,46 @@
     applyCountryToTimezone();
     applyCountryOtherVisibility();
     applyRegionalCopy();
+    applySmartDefaults();
+  }
+
+  // Smart defaults for fields where the URL region or the verified
+  // session already implies an obvious starting value. Studios can
+  // change anything; this just removes the "fill in something I
+  // already know about you" tax.
+  function applySmartDefaults() {
+    // Pre-fill contact email from the OTP-verified session. Editable
+    // (no readOnly lock) so the studio can route comms to a different
+    // address from the auth anchor.
+    try {
+      const session = loadSession();
+      const email = (session && session.email) || '';
+      const ce = document.getElementById('contactEmail');
+      if (ce && email && !ce.value) ce.value = email;
+    } catch (_) { /* ignore */ }
+
+    // Default role to Studio Owner — most studios coming through this
+    // form are owner-led signups. Studio Director / Manager / Admin
+    // stay in the dropdown for the cases where someone else fills it in.
+    const role = document.getElementById('contactRole');
+    if (role && !role.value) {
+      const opts = Array.from(role.options);
+      const owner = opts.find((o) => (o.value || o.textContent || '').toLowerCase() === 'studio owner');
+      if (owner) role.value = owner.value || owner.textContent;
+    }
+
+    // Pre-select timezone from region. AU defaults to Sydney/Melbourne;
+    // US defaults to New York. Studios in other timezones can change
+    // it but the typical case lands right on first paint.
+    const tSel = document.getElementById('timezone');
+    if (tSel && !tSel.value) {
+      const tzByRegion = { AU: 'Australia/Sydney', US: 'America/New_York' };
+      const wanted = tzByRegion[REGION];
+      if (wanted) {
+        const match = Array.from(tSel.options).find((o) => o.value === wanted);
+        if (match) tSel.value = wanted;
+      }
+    }
   }
 
   // ── Regional copy ─────────────────────────────────────────────────────────
@@ -276,7 +322,11 @@
 
     // Phone placeholder
     const phone = document.getElementById('contactPhone');
-    if (phone) phone.placeholder = isAU ? '+61 4XX XXX XXX' : '+1 (555) 555-0123';
+    // Phone is collected as the raw local number; the country (and
+     // therefore the dial code) is already known from the URL region
+     // and persisted on the submission, so we don't ask for it. Placeholders
+     // show the local-format example for each region.
+    if (phone) phone.placeholder = isAU ? '04XX XXX XXX' : '(555) 555-0123';
 
     // Studio name placeholder
     const studioName = document.getElementById('studioName');
@@ -2043,12 +2093,14 @@
       setVal('signOffLine1', lines[0] || '');
       setVal('signOffLine2', lines.slice(1).join(' ').trim());
     }
-    // Lock the contact email display if it exists in the form (it does in Step 2)
+    // Pre-fill the contact email from the existing submission. Editable
+    // (no readOnly lock) so the studio can route operations email
+    // somewhere different from the email they OTP-verified with. The
+    // verified email stays the auth anchor on the server side; this is
+    // just the display/communication address.
     const ce = document.getElementById('contactEmail');
     if (ce && sub.contact_email) {
       ce.value = sub.contact_email;
-      ce.readOnly = true;
-      ce.style.background = 'var(--g1)';
     }
     // Hydrating a draft programmatically doesn't fire input events, so trigger
     // the autofill chain manually to populate from-name / sign-off / reply-to
@@ -2119,6 +2171,11 @@
     // Hide gate, reveal form
     showAuthGate(false);
     if (submission) hydrateFromSubmission(submission);
+    // Re-apply smart defaults now that the session is in localStorage.
+    // First-time signups arrive here without a session being set at
+    // init() time, so the contactEmail / role / timezone defaults
+    // wouldn't have taken on that earlier pass.
+    applySmartDefaults();
     if (isReturning) {
       const banner = document.getElementById('restoredBanner');
       if (banner) banner.classList.add('vis');

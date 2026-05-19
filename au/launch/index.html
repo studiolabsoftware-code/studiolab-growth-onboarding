@@ -129,14 +129,7 @@
           </select>
         </div>
       </div>
-      <div class="fr">
-        <div class="f">
-          <label for="country">Country <span class="req">*</span></label>
-          <select id="country" data-required>
-            <option value="AU" selected>Australia</option>
-          </select>
-          <span class="field-err">Please select your country.</span>
-        </div>
+      <div class="fr x1">
         <div class="f">
           <label for="timezone">Time zone <span class="req">*</span></label>
           <select id="timezone" data-required>
@@ -192,7 +185,7 @@
         </div>
         <div class="fr">
           <div class="f">
-            <label for="contactPhone">Phone <span class="req">*</span> <span class="hint">with country code</span></label>
+            <label for="contactPhone">Phone <span class="req">*</span></label>
             <input type="tel" id="contactPhone" data-required placeholder="+61 4XX XXX XXX">
             <span class="field-err">Please enter your phone number.</span>
           </div>
@@ -233,6 +226,7 @@
         <span class="future-proof-toggle" aria-hidden="true"></span>
       </summary>
       <p class="future-proof-hint">Add your online listings now and lead-source and review automations can switch on the moment you upgrade. Skip if you'd rather come back to it later.</p>
+      <p class="future-proof-hint" style="margin-top:6px;">URLs only — no passwords. When you upgrade, you'll connect each platform via OAuth from Settings → Integrations inside StudioLAB Growth (about 2 minutes per platform).</p>
       <div class="fr">
         <div class="f">
           <label for="googleBusinessUrl">Google Business profile URL</label>
