@@ -93,9 +93,16 @@ Deno.serve(async (req) => {
     if (finalize === true) {
       update.status = 'submitted';
       update.submitted_at = new Date().toISOString();
-      // Invalidate the session so the studio can't keep editing after submit.
-      update.session_token_hash = null;
-      update.session_expires_at = null;
+      // The session token deliberately stays valid after finalize so the
+      // studio can keep using account.html, KB, and the project portal
+      // without re-OTP. Edit/replay attacks are blocked by the guard
+      // above which 409s any mutation against a non-draft row.
+      //
+      // (A prior version of this function nulled session_token_hash +
+      // session_expires_at here as a belt-and-braces measure -- but
+      // that also locked studios out of their own portal until they
+      // re-OTP'd, which was reported as a UX bug after hard-refresh
+      // post-idle. The 409 guard is sufficient on its own.)
     }
 
     const { data: saved, error: updErr } = await sb.from('submissions')
