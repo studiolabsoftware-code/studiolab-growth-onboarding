@@ -89,11 +89,14 @@ Deno.serve(async (req) => {
     const portalUrl = `/portal.html?conv=${conversationId}&t=${encodeURIComponent(studioToken)}`;
 
     // Setup Checklist tiles. Only relevant for paid studios — we don't show
-    // access-delegation tiles to studios who haven't completed payment yet,
-    // because the post-payment portal is where they live. The surfaces list
-    // is the same for every plan in Slice A; future slices may branch by
-    // plan or region.
-    const SETUP_SURFACES = ['gbp', 'ga4', 'gsc', 'gtm', 'google_ads', 'meta', 'tiktok'];
+    // access-delegation tiles to studios who haven't completed payment yet.
+    // Surfaces are plan-aware: every plan gets the Google/social pack;
+    // Scale adds SMS A2P compliance (because Scale unlocks SMS automations);
+    // Dominate AI further adds WhatsApp Business (AI voice/chat channel).
+    const SURFACES_BASE = ['gbp', 'ga4', 'gsc', 'gtm', 'google_ads', 'meta', 'tiktok'];
+    let SETUP_SURFACES = SURFACES_BASE;
+    if (submission.plan === 'scale') SETUP_SURFACES = [...SURFACES_BASE, 'sms_a2p'];
+    if (submission.plan === 'ai')    SETUP_SURFACES = [...SURFACES_BASE, 'sms_a2p', 'whatsapp'];
     const PAID_STATUSES = new Set(['paid', 'authorised', 'card_saved']);
     let setupTasks: Array<{
       id: string;

@@ -18,9 +18,12 @@ import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { postSystemMessage } from '../_shared/inbox.ts';
 
-type SurfaceKey = 'gbp' | 'ga4' | 'gsc' | 'gtm' | 'google_ads' | 'meta' | 'tiktok';
+type SurfaceKey =
+  | 'gbp' | 'ga4' | 'gsc' | 'gtm' | 'google_ads' | 'meta' | 'tiktok'
+  | 'sms_a2p' | 'whatsapp';
 const VALID_SURFACES = new Set<SurfaceKey>([
   'gbp', 'ga4', 'gsc', 'gtm', 'google_ads', 'meta', 'tiktok',
+  'sms_a2p', 'whatsapp',
 ]);
 
 // Per-surface allowed keys in the `data` jsonb. Any other key in the
@@ -36,6 +39,12 @@ const SURFACE_FIELDS: Record<SurfaceKey, string[]> = {
                'ad_account_id', 'pixel_id', 'notes'],
   tiktok:     ['business_center_id', 'ad_account_id', 'handle',
                'handle_is_business', 'notes'],
+  sms_a2p:    ['privacy_policy_url', 'terms_url', 'industry_vertical',
+               'business_description', 'opt_in_method', 'opt_in_description',
+               'opt_in_screenshot_url', 'sample_sms_1', 'sample_sms_2',
+               'estimated_monthly_volume', 'sender_id', 'notes'],
+  whatsapp:   ['enabled', 'display_name', 'business_category',
+               'verification_doc_url', 'notes'],
 };
 
 const SURFACE_LABEL: Record<SurfaceKey, string> = {
@@ -46,6 +55,8 @@ const SURFACE_LABEL: Record<SurfaceKey, string> = {
   google_ads: 'Google Ads',
   meta:       'Meta Business Manager',
   tiktok:     'TikTok Business Center',
+  sms_a2p:    'SMS compliance & A2P registration',
+  whatsapp:   'WhatsApp Business',
 };
 
 type StatusKey = 'pending' | 'submitted' | 'no_account';

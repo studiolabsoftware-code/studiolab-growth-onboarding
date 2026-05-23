@@ -146,10 +146,11 @@
     const inboxScreen = document.getElementById('inboxScreen');
     const projectsScreen = document.getElementById('projectsScreen');
     const projectDetailScreen = document.getElementById('projectDetailScreen');
+    const setupQueueScreen = document.getElementById('setupQueueScreen');
     const hide = (el) => { if (el) el.style.display = 'none'; };
     hide(list); hide(detail); hide(users); hide(settings); hide(catalog);
     hide(invoicesScreen); hide(quotesScreen); hide(inboxScreen);
-    hide(projectsScreen); hide(projectDetailScreen);
+    hide(projectsScreen); hide(projectDetailScreen); hide(setupQueueScreen);
     if (name === 'users') {
       if (users) users.style.display = '';
       if (window.AdminUsers && window.AdminUsers.show) window.AdminUsers.show();
@@ -167,6 +168,8 @@
       if (window.AdminQuote && window.AdminQuote.openListScreen) window.AdminQuote.openListScreen();
     } else if (name === 'projects') {
       if (window.AdminProjects && window.AdminProjects.openListScreen) window.AdminProjects.openListScreen();
+    } else if (name === 'setup_queue') {
+      if (window.AdminSetupQueue && window.AdminSetupQueue.openListScreen) window.AdminSetupQueue.openListScreen();
     } else {
       if (list) list.style.display = '';
     }

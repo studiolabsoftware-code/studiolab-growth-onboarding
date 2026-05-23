@@ -648,6 +648,35 @@ export function quoteExpiryWarning(opts: {
   return { subject, html: layout({ previewText: `Quote ${opts.quoteNumber} expires ${dayWord}.`, body }) };
 }
 
+// Nudge for studios with outstanding Setup Checklist tiles (Phase 2). Sent
+// periodically by the nudge-setup-tasks cron — list of open surfaces and a
+// link back to the account page where they can complete them. Cadence is
+// enforced in the function (5 days between sends; opted-out studios skip).
+export function setupChecklistNudge(opts: {
+  studioName: string;
+  openSurfaces: string[];
+  accountUrl: string;
+  isFirstNudge: boolean;
+}): { subject: string; html: string } {
+  const count = opts.openSurfaces.length;
+  const subject = opts.isFirstNudge
+    ? `${opts.studioName}: ${count} setup ${count === 1 ? 'tile' : 'tiles'} still need a quick action`
+    : `Friendly reminder, ${opts.studioName} — ${count} setup ${count === 1 ? 'tile' : 'tiles'} outstanding`;
+  const intro = opts.isFirstNudge
+    ? `Hi ${escape(opts.studioName)}, your setup is moving but a few tiles still need a quick action from you before we can finish wiring everything up.`
+    : `Hi ${escape(opts.studioName)}, just a polite nudge — the tiles below are still waiting on something from your end before we can take it from there.`;
+  const list = opts.openSurfaces.map((s) => `<li style="margin:0 0 6px;">${escape(s)}</li>`).join('');
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">A few setup tiles still open</h1>
+    <p style="margin:0 0 14px;">${intro}</p>
+    <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;">Outstanding</p>
+    <ul style="margin:0 0 18px;padding-left:18px;color:${COL.in_d};">${list}</ul>
+    <p style="margin:0 0 14px;">Each tile takes a couple of minutes — open your account page and tap any tile to see exactly what we need.</p>
+    ${cta('Open my setup checklist', opts.accountUrl)}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">If a tile doesn't apply to you (e.g. you don't have a TikTok account), just tick "I don't have this yet" inside the tile and we'll take it from there.</p>`;
+  return { subject, html: layout({ previewText: `${count} setup ${count === 1 ? 'tile' : 'tiles'} on your StudioLAB Growth account still need a quick action.`, body }) };
+}
+
 export function kbAbandonmentNudge(opts: { studioName: string; resumeUrl: string }): { subject: string; html: string } {
   const subject = `Your AI is almost ready, ${opts.studioName}`;
   const body = `

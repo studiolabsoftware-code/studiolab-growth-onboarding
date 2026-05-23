@@ -664,6 +664,105 @@
       ],
       noAccountLabel: 'I don\'t have a TikTok Business Center yet — please set one up for me.',
     },
+    sms_a2p: {
+      key: 'sms_a2p',
+      icon: '💬',
+      name: 'SMS compliance & registration',
+      tagline: 'Required to send SMS to families.',
+      whatWeDo: 'We\'ll register your business with the US 10DLC carrier registry (or AU SMS sender ID system) so we can send SMS automations on your behalf. This needs business identity info, sample messages, and a couple of policy URLs — it\'s the most regulated part of the setup.',
+      whatYouNeedForGuided: 'Your privacy policy and terms of service on your website (with SMS handling and STOP/HELP language mentioned), one or two sample messages, and a brief description of how you collect customer consent to text them.',
+      stepsDfy: [
+        'Make sure your website has a Privacy Policy and Terms of Service. They must mention how you handle SMS data and include STOP/HELP language. <em>If you don\'t have these, leave the URLs blank — we\'ll send you compliant templates after submission.</em>',
+        'Pick an industry vertical that matches your studio (Education is the closest fit for most dance/music schools).',
+        'Tell us how families opt in to receive SMS from you (web form at enrolment, paper form, verbal, etc).',
+        'Review the two pre-filled sample SMS messages below — edit the wording if you like, but keep the brand name and STOP language.',
+        'Submit and we\'ll handle the registration. It usually takes 3-7 business days for the carriers to approve.',
+      ],
+      stepsGuided: [
+        'Publish a Privacy Policy and Terms of Service on your website. Both must mention SMS data handling and STOP/HELP. Free templates: termsfeed.com or the StudioLAB resources hub.',
+        'Inside StudioLAB Growth (post-handover), go to Settings → Phone Numbers → A2P Registration and submit your business identity (we send you a guide once you reach this step).',
+        'Use compliant sample messages — our pre-fill below shows the safe pattern.',
+        'After carriers approve (3-7 days), your sending limits unlock.',
+      ],
+      copyTokens: [],
+      fields: [
+        { key: 'privacy_policy_url', label: 'Privacy Policy URL', type: 'url', placeholder: 'https://yourstudio.com/privacy', hint: 'Must mention SMS data handling. Leave blank if you don\'t have one yet — we\'ll provide a template.' },
+        { key: 'terms_url', label: 'Terms of Service URL', type: 'url', placeholder: 'https://yourstudio.com/terms', hint: 'Must mention message frequency + STOP/HELP. Leave blank if missing.' },
+        { key: 'industry_vertical', label: 'Industry vertical', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'education', label: 'Education (most dance/music studios)' },
+          { value: 'professional_services', label: 'Professional Services' },
+          { value: 'recreation', label: 'Recreation & Entertainment' },
+          { value: 'fitness', label: 'Fitness & Wellness' },
+          { value: 'retail', label: 'Retail' },
+          { value: 'other', label: 'Other' },
+        ] },
+        { key: 'business_description', label: 'One-sentence business description', type: 'textarea', placeholder: 'e.g. Dance studio in Melbourne running term-based classes and casual workshops for ages 4 to adult.', hint: '1-2 sentences. Used for A2P registration and WhatsApp Business setup.' },
+        { key: 'opt_in_method', label: 'How do families opt in to your SMS?', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'web_form', label: 'Web form / online enrolment' },
+          { value: 'paper', label: 'Paper form at enrolment' },
+          { value: 'verbal', label: 'Verbal consent at front desk' },
+          { value: 'multiple', label: 'Multiple methods' },
+        ] },
+        { key: 'opt_in_description', label: 'Describe your opt-in in plain English', type: 'textarea', placeholder: 'e.g. Families tick a "Receive class reminders" checkbox on our online enrolment form. The checkbox is unchecked by default.', hint: 'The carriers want a clear plain-English description of how consent is captured.' },
+        { key: 'sample_sms_1', label: 'Sample SMS 1 (pre-filled — edit as needed)', type: 'textarea', placeholder: '', hint: 'Must include your studio name and "Reply STOP to opt out".', defaultTemplate: (studioName) => `${studioName}: Hi {first_name}, this is a reminder about your class on {date} at {time}. Reply STOP to opt out, HELP for support.` },
+        { key: 'sample_sms_2', label: 'Sample SMS 2 (pre-filled — edit as needed)', type: 'textarea', placeholder: '', hint: 'Different use case so the carriers see your message variety.', defaultTemplate: (studioName) => `${studioName}: Term enrolments open today! Browse classes and book your spot: {link}. Reply STOP to opt out.` },
+        { key: 'estimated_monthly_volume', label: 'Estimated monthly SMS volume', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'lt_1k', label: 'Under 1,000' },
+          { value: '1k_10k', label: '1,000 – 10,000' },
+          { value: '10k_100k', label: '10,000 – 100,000' },
+          { value: '100k_plus', label: 'Over 100,000' },
+        ] },
+        { key: 'sender_id', label: 'Preferred SMS Sender ID (AU only)', type: 'text', placeholder: 'YOURSTUDIO', hint: 'AU only. Max 11 characters, no spaces. Leave blank to use a long-code number.' },
+        { key: 'opt_in_screenshot_url', label: 'Opt-in screenshot URL (optional)', type: 'url', placeholder: 'https://...', hint: 'Helpful for Toll-Free verification. Upload a screenshot of your enrolment opt-in checkbox somewhere and paste the link, or send it via Messages.' },
+        { key: 'notes', label: 'Anything else? (optional)', type: 'textarea', placeholder: 'e.g. We already had Twilio set up by a previous developer.' },
+      ],
+      noAccountLabel: 'I don\'t have a Privacy Policy or Terms yet — please help me set them up.',
+    },
+    whatsapp: {
+      key: 'whatsapp',
+      icon: '🟢',
+      name: 'WhatsApp Business',
+      tagline: 'Optional — AI chat over WhatsApp.',
+      whatWeDo: 'If you want your AI agent to also answer WhatsApp messages, we\'ll set up WhatsApp Business on the Meta Business Manager you gave us access to, register your display name, and connect it to your AI chat.',
+      whatYouNeedForGuided: 'Your Meta Business Manager already connected to us (the Meta tile), a verified business address on your Business Manager, and a digital copy of your business registration (incorporation cert / ASIC extract / utility bill in the business name).',
+      stepsDfy: [
+        'Make sure the Meta Business Manager tile above is complete first — WhatsApp setup runs through the same Business Manager.',
+        'Decide if you want WhatsApp enabled. It costs extra per conversation (Meta\'s pricing, passed through) but lets families chat with your AI on WhatsApp.',
+        'Pick a display name (this is what families see in WhatsApp — it must match your business name closely).',
+        'Upload your business verification document somewhere accessible and paste the link below (or attach it via Messages).',
+        'We\'ll handle the rest — verification typically takes 2-5 business days.',
+      ],
+      stepsGuided: [
+        'Go to business.facebook.com → WhatsApp Accounts → Add.',
+        'Follow Meta\'s guided setup — they\'ll ask for a phone number that\'s not currently on WhatsApp (or one you can deactivate from WhatsApp), and your business verification document.',
+        'Set a display name that matches your business closely (Meta enforces this).',
+        'Once verified, connect WhatsApp to the studio AI inside StudioLAB Growth (Settings → Channels → WhatsApp).',
+      ],
+      copyTokens: [],
+      fields: [
+        { key: 'enabled', label: 'Do you want WhatsApp enabled?', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'yes', label: 'Yes, please set this up' },
+          { value: 'maybe', label: 'Maybe later — skip for now' },
+          { value: 'no', label: 'No, not needed' },
+        ] },
+        { key: 'display_name', label: 'WhatsApp display name', type: 'text', placeholder: 'e.g. Dance Academy Melbourne', hint: 'Must match your business name closely. Meta will reject names that look generic or unrelated.' },
+        { key: 'business_category', label: 'Business category', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'education', label: 'Education' },
+          { value: 'professional_services', label: 'Professional Services' },
+          { value: 'beauty_spa_salon', label: 'Beauty, Spa & Salon' },
+          { value: 'health_medical', label: 'Health & Medical' },
+          { value: 'other', label: 'Other' },
+        ] },
+        { key: 'verification_doc_url', label: 'Business verification document URL', type: 'url', placeholder: 'https://...', hint: 'Incorporation cert, ASIC extract, or a utility bill in the business name. Upload somewhere accessible (Google Drive shareable link works) and paste the link.' },
+        { key: 'notes', label: 'Anything else? (optional)', type: 'textarea', placeholder: 'e.g. Our current WhatsApp number is the owner\'s personal one — happy to use a fresh number.' },
+      ],
+      noAccountLabel: 'I don\'t want WhatsApp — please skip this for now.',
+    },
   };
 
   const TILE_STATUS_LABEL = {
@@ -748,15 +847,23 @@
         <ol>${steps.map((s) => `<li>${s}</li>`).join('')}</ol>
       </div>`;
 
+    const studioNameForTemplate = sub.studio_name || 'Your Studio';
     const fieldsHtml = meta.fields.map((f) => {
-      const val = data[f.key] != null ? String(data[f.key]) : '';
+      const stored = data[f.key] != null ? String(data[f.key]) : '';
+      // Pre-fill compliant SMS samples (and any other field with a
+      // defaultTemplate) on first open. The studio can edit freely; once
+      // they save anything, stored wins on subsequent opens.
+      const val = (!stored && typeof f.defaultTemplate === 'function')
+        ? f.defaultTemplate(studioNameForTemplate)
+        : stored;
       const hint = f.hint ? `<span class="f-hint">${esc(f.hint)}</span>` : '';
       if (f.type === 'select') {
         const opts = (f.options || []).map((o) => `<option value="${esc(o.value)}"${val === o.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
         return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><select id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}">${opts}</select>${hint}</div>`;
       }
       if (f.type === 'textarea') {
-        return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><textarea id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}" rows="2" placeholder="${esc(f.placeholder || '')}">${esc(val)}</textarea>${hint}</div>`;
+        const rows = f.defaultTemplate ? 3 : 2;
+        return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><textarea id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}" rows="${rows}" placeholder="${esc(f.placeholder || '')}">${esc(val)}</textarea>${hint}</div>`;
       }
       return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><input type="${esc(f.type)}" id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}" placeholder="${esc(f.placeholder || '')}" value="${esc(val)}">${hint}</div>`;
     }).join('');
