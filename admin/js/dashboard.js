@@ -483,7 +483,7 @@
           <div class="adm-modal-body">
             <p style="margin:0 0 14px;font-size:13px;color:var(--g6);line-height:1.55;">Open any of the six studio onboarding forms with the gate bypassed. You can cycle through every step without filling in your email. Nothing you do here is saved.</p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-              ${['au','us'].flatMap((r) => ['launch','scale','ai'].map((p) => {
+              ${['launch','scale','ai'].flatMap((p) => ['au','us'].map((r) => {
                 const label = (r === 'au' ? 'AU' : 'US') + ' · ' + PLAN_LABEL[p];
                 return `<a class="picker-card" target="_blank" rel="noopener" href="/${r}/${p}/?preview=1"><span><strong>${label}</strong></span></a>`;
               })).join('')}
