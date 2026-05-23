@@ -88,6 +88,52 @@ Deno.serve(async (req) => {
 
     const portalUrl = `/portal.html?conv=${conversationId}&t=${encodeURIComponent(studioToken)}`;
 
+    // Setup Checklist tiles. Only relevant for paid studios — we don't show
+    // access-delegation tiles to studios who haven't completed payment yet,
+    // because the post-payment portal is where they live. The surfaces list
+    // is the same for every plan in Slice A; future slices may branch by
+    // plan or region.
+    const SETUP_SURFACES = ['gbp', 'ga4', 'gsc', 'gtm', 'google_ads', 'meta', 'tiktok'];
+    const PAID_STATUSES = new Set(['paid', 'authorised', 'card_saved']);
+    let setupTasks: Array<{
+      id: string;
+      surface: string;
+      status: string;
+      data: Record<string, unknown>;
+      studio_submitted_at: string | null;
+      admin_started_at: string | null;
+      completed_at: string | null;
+      updated_at: string;
+    }> = [];
+    if (PAID_STATUSES.has(String(submission.payment_status))) {
+      // Idempotent seed: insert any missing (submission, surface) rows so
+      // the UI always renders the full set of tiles even on first paint.
+      // ON CONFLICT DO NOTHING via the upsert + ignoreDuplicates flag.
+      const seedRows = SETUP_SURFACES.map((surface) => ({
+        submission_id: submission.id,
+        surface,
+        status: 'pending',
+      }));
+      await sb.from('setup_tasks').upsert(seedRows, {
+        onConflict: 'submission_id,surface',
+        ignoreDuplicates: true,
+      });
+      const { data: tasks } = await sb.from('setup_tasks')
+        .select('id, surface, status, data, studio_submitted_at, admin_started_at, completed_at, updated_at')
+        .eq('submission_id', submission.id)
+        .in('surface', SETUP_SURFACES);
+      setupTasks = (tasks || []).map((t) => ({
+        id: t.id,
+        surface: t.surface,
+        status: t.status,
+        data: (t.data && typeof t.data === 'object') ? t.data : {},
+        studio_submitted_at: t.studio_submitted_at,
+        admin_started_at: t.admin_started_at,
+        completed_at: t.completed_at,
+        updated_at: t.updated_at,
+      }));
+    }
+
     return jsonResponse({
       ok: true,
       submission: {
@@ -143,6 +189,7 @@ Deno.serve(async (req) => {
       invoices: invoices || [],
       quotes: quotes || [],
       service_requests: serviceRequests || [],
+      setup_tasks: setupTasks,
       conversation: {
         id: conversationId,
         token: studioToken,

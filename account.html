@@ -229,6 +229,68 @@
   .acct-error { background: var(--st-err-bg); border: 1px solid var(--st-err-bd); color: var(--st-err-fg); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; font-size: 13px; }
   .acct-foot { text-align: center; margin-top: 28px; color: var(--g6); font-size: 12px; line-height: 1.6; }
   .acct-foot a { color: var(--in); font-weight: 600; }
+
+  /* Setup mode banner. DFY vs Guided framing sits above the tabs so the
+     studio always understands which mode they're in. DFY = green-on-green,
+     "we'll handle setup, just complete the items"; Guided = warm amber,
+     "set up yourself, we're here if you get stuck." Hidden post-activation. */
+  .acct-setup-banner { display: flex; gap: 14px; align-items: flex-start; padding: 16px 20px; border-radius: 12px; margin-bottom: 18px; font-size: 13px; line-height: 1.55; }
+  .acct-setup-banner-dfy { background: var(--st-ok-bg); color: var(--st-ok-fg); border: 1px solid #A7F3D0; }
+  .acct-setup-banner-guided { background: var(--st-warn-bg); color: var(--st-warn-fg); border: 1px solid #FDE68A; }
+  .acct-setup-banner-icon { font-size: 22px; line-height: 1; flex-shrink: 0; padding-top: 2px; }
+  .acct-setup-banner-body strong { display: block; font-size: 14px; margin: 0 0 4px; letter-spacing: -0.1px; }
+
+  /* Setup Checklist card. Lives at the top of the Home tab between
+     "Where you're at" and "Request a change" so it's the first action
+     surface. Tile grid is 1-up on mobile, 3-up on wide screens. */
+  .acct-checklist-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 8px; flex-wrap: wrap; }
+  .acct-checklist-hdr h2 { margin: 0; }
+  .acct-checklist-progress { font-size: 12px; color: var(--g6); font-weight: 600; }
+  .acct-checklist-sub { color: var(--g6); font-size: 12px; line-height: 1.55; margin: 0 0 16px; max-width: 540px; }
+  .acct-checklist-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  @media (min-width: 640px) { .acct-checklist-grid { grid-template-columns: repeat(3, 1fr); } }
+  .acct-tile { display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--g1); border: 1px solid var(--g2); border-radius: 12px; text-align: left; font-family: inherit; cursor: pointer; min-height: 130px; transition: border-color 0.15s, background 0.15s; }
+  .acct-tile:hover { border-color: var(--in); background: #fff; }
+  .acct-tile:focus-visible { outline: 2px solid var(--in); outline-offset: 2px; }
+  .acct-tile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .acct-tile-icon { font-size: 22px; line-height: 1; }
+  .acct-tile-name { font-size: 13px; font-weight: 700; color: var(--in-d); margin: 0; line-height: 1.35; }
+  .acct-tile-sub { font-size: 12px; color: var(--g6); line-height: 1.5; margin: 0; }
+  .acct-tile-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.3px; text-transform: uppercase; align-self: flex-start; }
+  .acct-tile-pill-pending { background: var(--g2); color: var(--g6); }
+  .acct-tile-pill-submitted { background: var(--st-info-bg); color: var(--st-info-fg); }
+  .acct-tile-pill-no_account { background: var(--st-info-bg); color: var(--st-info-fg); }
+  .acct-tile-pill-in_progress { background: var(--st-warn-bg); color: var(--st-warn-fg); }
+  .acct-tile-pill-complete { background: var(--st-ok-bg); color: var(--st-ok-fg); }
+
+  /* Setup tile modal. Bigger than the request modal because it carries
+     three logical sections (what we'll do / what we need / I don't have it
+     yet) plus a form. Copy-buttons sit beside any identifier the studio
+     needs to paste into Google/Meta/etc. */
+  .acct-tile-modal-card { background: #fff; border-radius: 14px; max-width: 640px; width: 100%; padding: 24px 26px; box-shadow: 0 20px 60px rgba(19,16,46,0.25); }
+  .acct-tile-section { background: var(--g1); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  .acct-tile-section h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; color: var(--g6); text-transform: uppercase; letter-spacing: 0.5px; }
+  .acct-tile-section p { margin: 0 0 8px; font-size: 13px; color: var(--in-d); line-height: 1.6; }
+  .acct-tile-section p:last-child { margin-bottom: 0; }
+  .acct-tile-section ol { margin: 8px 0 0; padding-left: 20px; color: var(--in-d); font-size: 13px; line-height: 1.65; }
+  .acct-tile-section ol li { margin-bottom: 4px; }
+  .acct-tile-copy-row { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; background: #fff; border: 1px solid var(--g2); border-radius: 8px; font-size: 12px; color: var(--in-d); margin: 4px 4px 0 0; }
+  .acct-tile-copy-row code { font-family: inherit; font-weight: 700; }
+  .acct-tile-copy-btn { background: var(--in); color: #fff; border: 0; border-radius: 6px; padding: 4px 8px; font-size: 10px; font-weight: 700; cursor: pointer; min-height: 26px; letter-spacing: 0.3px; }
+  .acct-tile-copy-btn:hover { background: var(--in-d); }
+  .acct-tile-form { display: grid; gap: 12px; }
+  .acct-tile-form .f { display: flex; flex-direction: column; gap: 5px; }
+  .acct-tile-form label { font-size: 12px; font-weight: 700; color: var(--in-d); }
+  .acct-tile-form input[type="text"],
+  .acct-tile-form input[type="url"],
+  .acct-tile-form select,
+  .acct-tile-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--g2); border-radius: 8px; font-family: inherit; font-size: 13px; color: var(--in-d); background: #fff; }
+  .acct-tile-form input:focus,
+  .acct-tile-form select:focus,
+  .acct-tile-form textarea:focus { outline: 2px solid var(--in); outline-offset: 1px; border-color: var(--in); }
+  .acct-tile-form .f-hint { font-size: 11px; color: var(--g6); }
+  .acct-tile-noaccount { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--st-info-bg); color: var(--st-info-fg); border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; margin-top: 8px; }
+  .acct-tile-noaccount input { margin: 0; cursor: pointer; }
 </style>
 <link rel="icon" type="image/png" href="/assets/studiolab-icon.png">
 <link rel="apple-touch-icon" href="/assets/studiolab-icon.png">
@@ -344,6 +406,484 @@
       </div>`;
   }
 
+  // ─── Setup Checklist (Phase 2 Slice A: GBP / GA4 / GSC) ────────────────
+  //
+  // Per-surface metadata for the tile modal. Title, icon, what we'll do
+  // for the studio, the studio-side instruction steps, the identifier we
+  // need them to paste in our access info into, and the form fields we
+  // want them to send back to us.
+  //
+  // Copy switches by setup_type (DFY vs Guided) at render time, so the
+  // same data drives both modes — DFY framing is "you invite us in",
+  // Guided framing is "here's how you do it yourself".
+  const OUR_ACCESS_EMAIL = 'studiolabsoftware@gmail.com';
+  const SETUP_SURFACES_META = {
+    gbp: {
+      key: 'gbp',
+      icon: '🗺️',
+      name: 'Google Business Profile',
+      tagline: 'Maps listing, reviews, and posts.',
+      whatWeDo: 'We\'ll keep your Google Business listing up to date — verify hours, respond to reviews, and post updates so families always find the right info when they search for your studio.',
+      whatYouNeedForGuided: 'Your studio claimed on Google Business Profile and verified (postcard or video). If you don\'t have a listing yet, we\'ll create one for you.',
+      stepsDfy: [
+        'Sign in to business.google.com and select your business.',
+        'Open Menu → Business Profile settings → People and access.',
+        `Click Add, paste in our email <strong>${OUR_ACCESS_EMAIL}</strong>, set the role to <strong>Manager</strong>, and click Invite.`,
+        'Paste the link to your Maps listing below so we can confirm we landed on the right business.',
+      ],
+      stepsGuided: [
+        'Go to business.google.com and search for your studio.',
+        'If you find it: claim it and complete verification (postcard or video).',
+        'If you don\'t: tap "Add your business to Google" and follow the setup steps.',
+        'Once verified, paste the Maps link below so we can confirm everything\'s wired up.',
+      ],
+      copyTokens: [{ label: 'Our email', value: OUR_ACCESS_EMAIL }],
+      fields: [
+        { key: 'maps_url', label: 'Your Google Maps URL', type: 'url', placeholder: 'https://maps.app.goo.gl/...', hint: 'Open your listing on Google Maps, click Share, copy the link.' },
+        { key: 'verification_status', label: 'Is your listing verified?', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'verified', label: 'Yes, verified' },
+          { value: 'pending', label: 'Verification in progress' },
+          { value: 'not_claimed', label: 'Not claimed yet' },
+        ] },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have two locations — only the Sydney one is listed.' },
+      ],
+      noAccountLabel: 'I don\'t have a Google Business Profile yet — please create one for me.',
+    },
+    ga4: {
+      key: 'ga4',
+      icon: '📊',
+      name: 'Google Analytics 4',
+      tagline: 'Website + conversion tracking.',
+      whatWeDo: 'We\'ll install and maintain your conversion tracking, link Google Ads and Search Console, and make sure the right enquiry events show up in your reports.',
+      whatYouNeedForGuided: 'A GA4 property already set up on your website with at least the standard page_view event firing. If you don\'t have GA4, we\'ll create the property and install the tag for you.',
+      stepsDfy: [
+        'Go to analytics.google.com.',
+        'Click the gear icon (bottom left) → Property column → Property access management.',
+        `Click the blue + → Add users → enter <strong>${OUR_ACCESS_EMAIL}</strong>.`,
+        'Tick <strong>Administrator</strong> under Direct roles, then click Add.',
+        'Paste your GA4 Measurement ID and Property ID below.',
+      ],
+      stepsGuided: [
+        'Go to analytics.google.com and sign in with your Google account.',
+        'Click Admin (gear, bottom left) → Create Property and follow the setup.',
+        'Set up a Web data stream pointing at your studio website — copy the Measurement ID it gives you (it looks like G-XXXXXXXXXX).',
+        'Install the GA4 tag on your website (Shopify, WordPress, Wix and Squarespace all have a built-in option).',
+        'Paste the Measurement ID and Property ID below.',
+      ],
+      copyTokens: [{ label: 'Our email', value: OUR_ACCESS_EMAIL }],
+      fields: [
+        { key: 'measurement_id', label: 'GA4 Measurement ID', type: 'text', placeholder: 'G-XXXXXXXXXX', hint: 'In GA4 → Admin → Data Streams → click your stream → top right of the panel.' },
+        { key: 'property_id', label: 'GA4 Property ID (numeric)', type: 'text', placeholder: '123456789', hint: 'In GA4 → Admin → Property settings → top of the page.' },
+        { key: 'account_name', label: 'GA4 Account name (optional)', type: 'text', placeholder: 'e.g. Dance Academy Melbourne' },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have GA4 set up by a previous agency — happy for you to take over.' },
+      ],
+      noAccountLabel: 'I don\'t have GA4 set up yet — please create it for me.',
+    },
+    gsc: {
+      key: 'gsc',
+      icon: '🔎',
+      name: 'Google Search Console',
+      tagline: 'Search performance + indexing.',
+      whatWeDo: 'We\'ll monitor your search performance, submit your sitemap, and fix any indexing issues so the right pages show up when families search for you.',
+      whatYouNeedForGuided: 'A verified Search Console property for your studio domain. If you don\'t have one, we\'ll set it up — you\'ll just need to add a small verification record to your domain.',
+      stepsDfy: [
+        'Go to search.google.com/search-console.',
+        'Select your property at the top.',
+        'Click the gear (Settings) → Users and permissions.',
+        `Click Add user → enter <strong>${OUR_ACCESS_EMAIL}</strong> → set Permission to <strong>Owner</strong> → click Add.`,
+        'Paste the property URL below — exactly as it shows in Search Console (with or without www, https vs http).',
+      ],
+      stepsGuided: [
+        'Go to search.google.com/search-console.',
+        'Click Add Property → choose Domain (preferred) or URL prefix.',
+        'Follow the verification steps Google shows — usually a DNS TXT record or a meta tag on your home page.',
+        'Once verified, submit your XML sitemap (most website builders generate one automatically at /sitemap.xml).',
+        'Paste the verified property URL below.',
+      ],
+      copyTokens: [{ label: 'Our email', value: OUR_ACCESS_EMAIL }],
+      fields: [
+        { key: 'property_url', label: 'Verified property URL', type: 'url', placeholder: 'https://www.yourstudio.com', hint: 'Exact format matters — match what Search Console shows.' },
+        { key: 'property_type', label: 'Property type', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'domain', label: 'Domain (preferred)' },
+          { value: 'url_prefix', label: 'URL prefix' },
+        ] },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We changed domains last year — old one still has some traffic.' },
+      ],
+      noAccountLabel: 'I don\'t have Search Console set up yet — please create it for me.',
+    },
+    gtm: {
+      key: 'gtm',
+      icon: '🏷️',
+      name: 'Google Tag Manager',
+      tagline: 'Tracking pixels and conversion tags.',
+      whatWeDo: 'We\'ll install your GTM container on your site (or check the one already there), then add and maintain every tracking tag — GA4, Meta Pixel, TikTok Pixel, conversion events — without you ever having to touch code.',
+      whatYouNeedForGuided: 'A GTM container installed on your site. If you don\'t have one, GTM is free — we\'ll point you at the right setup steps for your website platform (Shopify, WordPress, Wix, Squarespace, or custom).',
+      stepsDfy: [
+        'Go to tagmanager.google.com → click Admin (top tab).',
+        'In the Account column, click User Management → click the blue +.',
+        `Choose Add new users → enter <strong>${OUR_ACCESS_EMAIL}</strong>.`,
+        'Account permission: User. Container permissions: tick <strong>Publish</strong> → click Invite.',
+        'Paste your GTM Container ID below.',
+      ],
+      stepsGuided: [
+        'Go to tagmanager.google.com and sign in.',
+        'Create Account → Create Container → set Target platform to Web.',
+        'Copy the GTM snippet shown and paste it into your website\'s <head> (most platforms have a built-in field for this).',
+        'Confirm install by reloading your homepage — GTM Preview should detect the container.',
+        'Paste the Container ID below.',
+      ],
+      copyTokens: [{ label: 'Our email', value: OUR_ACCESS_EMAIL }],
+      fields: [
+        { key: 'container_id', label: 'GTM Container ID', type: 'text', placeholder: 'GTM-XXXXXXX', hint: 'Top right of any GTM workspace screen.' },
+        { key: 'account_id', label: 'GTM Account ID (optional)', type: 'text', placeholder: '123456789' },
+        { key: 'site_platform', label: 'Your website platform', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'shopify', label: 'Shopify' },
+          { value: 'wordpress', label: 'WordPress' },
+          { value: 'wix', label: 'Wix' },
+          { value: 'squarespace', label: 'Squarespace' },
+          { value: 'custom', label: 'Custom / other' },
+        ] },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have an existing developer who manages GTM — happy for you to coordinate.' },
+      ],
+      noAccountLabel: 'I don\'t have GTM set up — please install it for me.',
+    },
+    google_ads: {
+      key: 'google_ads',
+      icon: '💰',
+      name: 'Google Ads',
+      tagline: 'Search and Performance Max campaigns.',
+      whatWeDo: 'We\'ll build, launch and optimise your Google Ads campaigns. Billing stays with you — we link our manager account so we can manage without ever touching your card.',
+      whatYouNeedForGuided: 'A Google Ads account with billing set up. Account currency and timezone are permanent — set them carefully when you create the account.',
+      stepsDfy: [
+        'Sign in to ads.google.com.',
+        'Tell us your Customer ID below (format: XXX-XXX-XXXX, top right of the Ads dashboard).',
+        'We\'ll send you a Manager Account link request from <strong>StudioLAB</strong> within one business day.',
+        'You\'ll see a notification (bell icon, top right). Open it and click <strong>Accept</strong>.',
+        'That\'s it — billing stays with you, we manage the rest.',
+      ],
+      stepsGuided: [
+        'Go to ads.google.com and sign in.',
+        'Click "Start now" and follow the new-account setup. Pick your currency and timezone carefully — they\'re permanent.',
+        'Add billing details (your card stays with you).',
+        'Once your account exists, paste the Customer ID below so we have it on file for support.',
+      ],
+      copyTokens: [],
+      fields: [
+        { key: 'customer_id', label: 'Google Ads Customer ID', type: 'text', placeholder: '123-456-7890', hint: 'Top right of the Ads dashboard, next to your account email.' },
+        { key: 'account_currency', label: 'Account currency', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'AUD', label: 'AUD' },
+          { value: 'USD', label: 'USD' },
+          { value: 'GBP', label: 'GBP' },
+          { value: 'CAD', label: 'CAD' },
+          { value: 'NZD', label: 'NZD' },
+        ] },
+        { key: 'account_timezone', label: 'Account timezone', type: 'text', placeholder: 'e.g. Australia/Sydney' },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have a monthly ad budget of around $X.' },
+      ],
+      noAccountLabel: 'I don\'t have a Google Ads account yet — please create one for me.',
+    },
+    meta: {
+      key: 'meta',
+      icon: '📘',
+      name: 'Meta Business Manager',
+      tagline: 'Facebook + Instagram ads and Pixel.',
+      whatWeDo: 'We\'ll get partner access to your Facebook Page, Instagram, Ad Account and Meta Pixel — so we can build and run your Meta ads, install the Pixel correctly, and track conversions back to families enrolling.',
+      whatYouNeedForGuided: 'A Meta Business Manager set up. Your Instagram must be a Professional account (Business or Creator) and linked to your Facebook Page — without that, ads and analytics can\'t connect properly.',
+      stepsDfy: [
+        'Go to business.facebook.com → Settings (gear, bottom left).',
+        'Under Users, click <strong>Partners</strong> → click <strong>Add</strong> → choose "Give a partner access to your assets".',
+        'Enter our Business Manager ID below this list and click Next.',
+        'Select your Page, Ad Account, Instagram and Pixel. Tick Manage Page, Manage Ad Account, Manage Instagram → click Save.',
+        'Paste your Page URL, IG handle, and Ad Account ID below so we can confirm the right assets.',
+      ],
+      stepsGuided: [
+        'Go to business.facebook.com → click Create Account if you don\'t have a Business Manager.',
+        'Add your Facebook Page, then add your Instagram (Settings → Instagram accounts → Add).',
+        'In Instagram itself, switch your account to Professional (Business or Creator) and connect it to your Facebook Page.',
+        'Create an Ad Account (Settings → Ad accounts → Add) — pick your currency carefully, it\'s permanent.',
+        'Install Meta Pixel on your website (most platforms have a built-in field).',
+        'Paste the IDs below so we can support you.',
+      ],
+      copyTokens: [{ label: 'Our BM ID', value: 'BM-CONTACT-ADMIN' }],
+      fields: [
+        { key: 'business_manager_id', label: 'Your Meta Business Manager ID', type: 'text', placeholder: '123456789012345', hint: 'business.facebook.com → Settings → Business Info → top of page.' },
+        { key: 'page_url', label: 'Your Facebook Page URL', type: 'url', placeholder: 'https://facebook.com/yourstudio' },
+        { key: 'instagram_username', label: 'Your Instagram username', type: 'text', placeholder: '@yourstudio' },
+        { key: 'instagram_is_professional', label: 'Is your Instagram a Professional account?', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'yes', label: 'Yes' },
+          { value: 'no', label: 'No / not sure' },
+        ] },
+        { key: 'instagram_linked_to_page', label: 'Is your Instagram linked to your Facebook Page?', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'yes', label: 'Yes' },
+          { value: 'no', label: 'No / not sure' },
+        ] },
+        { key: 'ad_account_id', label: 'Ad Account ID (optional)', type: 'text', placeholder: 'act_1234567890', hint: 'Ads Manager → top of the page.' },
+        { key: 'pixel_id', label: 'Meta Pixel / Dataset ID (optional)', type: 'text', placeholder: '1234567890' },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We had a previous agency — Pixel might already be installed but not configured.' },
+      ],
+      noAccountLabel: 'I don\'t have a Business Manager yet — please set one up for me.',
+    },
+    tiktok: {
+      key: 'tiktok',
+      icon: '🎵',
+      name: 'TikTok Business Center',
+      tagline: 'TikTok ads and creator content.',
+      whatWeDo: 'We\'ll get partner access to your TikTok Business Center so we can run your TikTok ads, install your TikTok Pixel for conversion tracking, and help boost the content that works best.',
+      whatYouNeedForGuided: 'A TikTok Business Center with at least one Ad Account inside it. Your TikTok handle should be switched to a Business account so analytics, ads and Pixel all work.',
+      stepsDfy: [
+        'Sign in to business.tiktok.com.',
+        'Click <strong>Partners</strong> in the left sidebar → click <strong>Add Partner</strong>.',
+        'Enter our Business Center ID below and click Confirm.',
+        'Assign your Ad Account, Business Account and Pixel → set our role to <strong>Admin</strong> → click Confirm.',
+        'Paste your Business Center ID and Ad Account ID below.',
+      ],
+      stepsGuided: [
+        'Go to business.tiktok.com and sign in (create a Business Center if you don\'t have one).',
+        'Add an Ad Account inside your Business Center.',
+        'In the TikTok app, switch your account to Business: Settings → Account → Switch to Business Account.',
+        'Install the TikTok Pixel on your website (Pixel section in Business Center walks you through it).',
+        'Paste your Business Center ID below.',
+      ],
+      copyTokens: [{ label: 'Our BCID', value: 'BC-CONTACT-ADMIN' }],
+      fields: [
+        { key: 'business_center_id', label: 'TikTok Business Center ID', type: 'text', placeholder: '7321234567890123456' },
+        { key: 'ad_account_id', label: 'TikTok Ad Account ID (optional)', type: 'text', placeholder: '7321234567890123456' },
+        { key: 'handle', label: 'TikTok handle', type: 'text', placeholder: '@yourstudio' },
+        { key: 'handle_is_business', label: 'Is your handle a Business account?', type: 'select', options: [
+          { value: '', label: 'Select…' },
+          { value: 'yes', label: 'Yes' },
+          { value: 'no', label: 'No / not sure' },
+        ] },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We post mostly organic content right now.' },
+      ],
+      noAccountLabel: 'I don\'t have a TikTok Business Center yet — please set one up for me.',
+    },
+  };
+
+  const TILE_STATUS_LABEL = {
+    pending: 'Not started',
+    submitted: 'Submitted — we\'re on it',
+    no_account: 'We\'ll create it',
+    in_progress: 'In progress',
+    complete: 'Complete',
+  };
+
+  function renderSetupChecklistCard(sub, tasks) {
+    if (!tasks || tasks.length === 0) return '';
+    const completeCount = tasks.filter((t) => t.status === 'complete').length;
+    const isGuided = sub.setup_type === 'guided';
+    const sub_copy = isGuided
+      ? 'Each tile walks you through one piece of your tech stack. Tap a tile to see what to do, plus what to paste back to us when you\'re done.'
+      : 'Each tile lets you invite us into one of your accounts so we can set everything up for you. Tap a tile to see what we need.';
+    return `
+      <div class="acct-card">
+        <div class="acct-checklist-hdr">
+          <h2>Set up your accounts</h2>
+          <div class="acct-checklist-progress">${completeCount} of ${tasks.length} complete</div>
+        </div>
+        <p class="acct-checklist-sub">${esc(sub_copy)}</p>
+        <div class="acct-checklist-grid">
+          ${tasks.map((t) => renderSetupTile(t)).join('')}
+        </div>
+      </div>`;
+  }
+
+  function renderSetupTile(task) {
+    const meta = SETUP_SURFACES_META[task.surface];
+    if (!meta) return '';
+    const statusLabel = TILE_STATUS_LABEL[task.status] || 'Not started';
+    return `
+      <button type="button" class="acct-tile" data-setup-tile="${esc(task.surface)}" aria-label="Open ${esc(meta.name)} setup">
+        <div class="acct-tile-top">
+          <span class="acct-tile-icon" aria-hidden="true">${meta.icon}</span>
+          <span class="acct-tile-pill acct-tile-pill-${esc(task.status)}">${esc(statusLabel)}</span>
+        </div>
+        <p class="acct-tile-name">${esc(meta.name)}</p>
+        <p class="acct-tile-sub">${esc(meta.tagline)}</p>
+      </button>`;
+  }
+
+  function openSetupTileModal(surface) {
+    const task = (acctState.setupTasks || []).find((t) => t.surface === surface);
+    const meta = SETUP_SURFACES_META[surface];
+    if (!task || !meta) return;
+    const sub = acctState.submission;
+    const isGuided = sub.setup_type === 'guided';
+    const isComplete = task.status === 'complete';
+    const data = task.data || {};
+
+    const copyTokensHtml = (meta.copyTokens || []).map((tk) => `
+      <span class="acct-tile-copy-row">
+        <span class="acct-tile-copy-label" style="color:var(--g6);">${esc(tk.label)}:</span>
+        <code>${esc(tk.value)}</code>
+        <button type="button" class="acct-tile-copy-btn" data-copy-value="${esc(tk.value)}">COPY</button>
+      </span>`).join('');
+
+    const steps = (isGuided ? meta.stepsGuided : meta.stepsDfy) || [];
+    const whatWeDoHtml = isGuided
+      ? `<div class="acct-tile-section">
+           <h4>What this is for</h4>
+           <p>${esc(meta.whatWeDo)}</p>
+         </div>
+         <div class="acct-tile-section">
+           <h4>What you'll need before you start</h4>
+           <p>${esc(meta.whatYouNeedForGuided || '')}</p>
+         </div>`
+      : `<div class="acct-tile-section">
+           <h4>What we'll do for you</h4>
+           <p>${esc(meta.whatWeDo)}</p>
+         </div>`;
+
+    const stepsTitle = isGuided ? 'How to set it up' : 'What we need from you';
+    const stepsHtml = `
+      <div class="acct-tile-section">
+        <h4>${esc(stepsTitle)}</h4>
+        ${copyTokensHtml ? `<div style="margin: 4px 0 10px;">${copyTokensHtml}</div>` : ''}
+        <ol>${steps.map((s) => `<li>${s}</li>`).join('')}</ol>
+      </div>`;
+
+    const fieldsHtml = meta.fields.map((f) => {
+      const val = data[f.key] != null ? String(data[f.key]) : '';
+      const hint = f.hint ? `<span class="f-hint">${esc(f.hint)}</span>` : '';
+      if (f.type === 'select') {
+        const opts = (f.options || []).map((o) => `<option value="${esc(o.value)}"${val === o.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
+        return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><select id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}">${opts}</select>${hint}</div>`;
+      }
+      if (f.type === 'textarea') {
+        return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><textarea id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}" rows="2" placeholder="${esc(f.placeholder || '')}">${esc(val)}</textarea>${hint}</div>`;
+      }
+      return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><input type="${esc(f.type)}" id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}" placeholder="${esc(f.placeholder || '')}" value="${esc(val)}">${hint}</div>`;
+    }).join('');
+
+    const noAccountChecked = task.status === 'no_account';
+
+    const card = document.createElement('div');
+    card.className = 'acct-modal-backdrop';
+    card.id = 'setupTileModal';
+    card.innerHTML = `
+      <div class="acct-tile-modal-card" role="dialog" aria-modal="true" aria-labelledby="tileTitle">
+        <div class="acct-modal-hdr">
+          <h3 id="tileTitle">${meta.icon} ${esc(meta.name)}</h3>
+          <button type="button" class="acct-modal-close" data-close-tile aria-label="Close">&times;</button>
+        </div>
+        ${isComplete
+          ? `<p class="acct-modal-sub" style="color:var(--st-ok-fg);background:var(--st-ok-bg);padding:10px 14px;border-radius:8px;font-weight:600;">✓ This tile is complete. Nothing more to do here.</p>`
+          : `<p class="acct-modal-sub">${esc(meta.tagline)}</p>`}
+        ${whatWeDoHtml}
+        ${stepsHtml}
+        <div class="acct-tile-form" id="tileForm">
+          ${fieldsHtml}
+          <label class="acct-tile-noaccount">
+            <input type="checkbox" id="tile-noaccount"${noAccountChecked ? ' checked' : ''}>
+            ${esc(meta.noAccountLabel)}
+          </label>
+        </div>
+        <div class="acct-modal-actions">
+          <span class="acct-modal-err" id="tileErr"></span>
+          <button type="button" class="acct-btn-secondary acct-btn" data-close-tile>Close</button>
+          <button type="button" class="acct-btn" id="tileSaveBtn">Save and notify our team</button>
+        </div>
+      </div>`;
+    document.body.appendChild(card);
+
+    // Close handlers — backdrop click, close button, Esc key.
+    function closeIt() {
+      const m = document.getElementById('setupTileModal');
+      if (m) m.remove();
+      document.removeEventListener('keydown', onEsc);
+    }
+    function onEsc(e) { if (e.key === 'Escape') closeIt(); }
+    card.addEventListener('click', (e) => {
+      if (e.target === card) closeIt();
+      if (e.target.closest('[data-close-tile]')) closeIt();
+      const copyBtn = e.target.closest('[data-copy-value]');
+      if (copyBtn) {
+        const val = copyBtn.getAttribute('data-copy-value') || '';
+        navigator.clipboard.writeText(val).then(() => {
+          const orig = copyBtn.textContent;
+          copyBtn.textContent = 'COPIED ✓';
+          setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+        }).catch(() => { copyBtn.textContent = 'COPY FAILED'; });
+      }
+    });
+    document.addEventListener('keydown', onEsc);
+
+    // Save handler.
+    document.getElementById('tileSaveBtn').addEventListener('click', async () => {
+      const session = readSession();
+      if (!session || !session.token) {
+        document.getElementById('tileErr').textContent = 'Your session expired. Refresh the page and try again.';
+        return;
+      }
+      const form = document.getElementById('tileForm');
+      const noAccountFlag = !!form.querySelector('#tile-noaccount').checked;
+      const status = noAccountFlag ? 'no_account' : 'submitted';
+      const dataOut = {};
+      if (!noAccountFlag) {
+        form.querySelectorAll('[data-field]').forEach((el) => {
+          dataOut[el.getAttribute('data-field')] = el.value || '';
+        });
+        // Require at least one identifier field. Notes alone isn't enough.
+        const idKeys = meta.fields.filter((f) => f.key !== 'notes').map((f) => f.key);
+        const anyId = idKeys.some((k) => String(dataOut[k] || '').trim().length > 0);
+        if (!anyId) {
+          document.getElementById('tileErr').textContent = 'Add at least one identifier above, or tick "I don\'t have this yet".';
+          return;
+        }
+      }
+      const btn = document.getElementById('tileSaveBtn');
+      const origText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      document.getElementById('tileErr').textContent = '';
+      try {
+        const r = await fetch(FN_BASE + 'studio-save-setup-task', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_token: session.token, surface, status, data: dataOut }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) {
+          document.getElementById('tileErr').textContent = j.error || 'Something went wrong. Try again.';
+          btn.disabled = false;
+          btn.textContent = origText;
+          return;
+        }
+        // Patch local state, re-render, close.
+        const list = acctState.setupTasks || [];
+        const idx = list.findIndex((t) => t.surface === surface);
+        if (idx >= 0) list[idx] = j.task;
+        else list.push(j.task);
+        acctState.setupTasks = list;
+        closeIt();
+        renderAccount({
+          submission: acctState.submission,
+          invoices: acctState.invoices,
+          quotes: acctState.quotes,
+          service_requests: acctState.requests,
+          setup_tasks: acctState.setupTasks,
+          conversation: acctState.conv,
+        });
+      } catch (err) {
+        document.getElementById('tileErr').textContent = 'Network error. Try again in a moment.';
+        btn.disabled = false;
+        btn.textContent = origText;
+      }
+    });
+  }
+
+  function bindSetupTileHandlers() {
+    document.querySelectorAll('[data-setup-tile]').forEach((el) => {
+      el.addEventListener('click', () => openSetupTileModal(el.getAttribute('data-setup-tile')));
+    });
+  }
+
   function renderAccount(data) {
     const sub = data.submission;
     const invoices = data.invoices || [];
@@ -439,6 +979,7 @@
     acctState.invoices = invoices;
     acctState.quotes = quotes;
     acctState.requests = data.service_requests || [];
+    acctState.setupTasks = data.setup_tasks || acctState.setupTasks || [];
     acctState.conv = conv;
     acctState.fullName = fullName;
     acctState.statusPill = statusPill;
@@ -478,6 +1019,27 @@
            <p class="acct-active-meta">If you can't find the platform welcome email or have any questions during handover, email <a href="mailto:info@studiolabsoftware.com" style="color:#fff;font-weight:700;text-decoration:underline;">info@studiolabsoftware.com</a>.</p>
          </div>`
       : '';
+
+    // DFY vs Guided framing banner. Sits above the tabs so the studio
+    // always knows which mode they're in. Hidden post-activation (handled
+    // by the isActive branch which doesn't render this).
+    const setupTypeBanner = (isActive || !sub.setup_type) ? '' : (sub.setup_type === 'dfy'
+      ? `<div class="acct-setup-banner acct-setup-banner-dfy" role="status">
+           <div class="acct-setup-banner-icon" aria-hidden="true">✓</div>
+           <div class="acct-setup-banner-body">
+             <strong>You chose Done-For-You.</strong>
+             We'll handle the setup. Work through the tiles below at your pace — each one is a different account you invite us into. Nothing is urgent and nothing blocks anything else.
+           </div>
+         </div>`
+      : `<div class="acct-setup-banner acct-setup-banner-guided" role="status">
+           <div class="acct-setup-banner-icon" aria-hidden="true">★</div>
+           <div class="acct-setup-banner-body">
+             <strong>You chose Guided self-setup.</strong>
+             You're doing the setup yourself — the tiles below walk you through what to do for each account, and we're here in the messages thread if you get stuck.
+           </div>
+         </div>`);
+
+    const setupChecklistCard = isActive ? '' : renderSetupChecklistCard(sub, acctState.setupTasks);
 
     const whereYouAreCard = isActive ? '' : `
       <div class="acct-card">
@@ -574,6 +1136,7 @@
       </div>
 
       ${activationBanner}
+      ${setupTypeBanner}
       ${tabsNav}
 
       ${isActive ? `
@@ -583,6 +1146,7 @@
         </div>
       ` : `
         <section class="acct-tab-panel ${activeTab === 'home' ? 'active' : ''}" role="tabpanel" data-panel="home" aria-labelledby="home">
+          ${setupChecklistCard}
           ${whereYouAreCard}
           ${renderRequestsCard(sub, acctState.requests)}
           <div class="acct-card">
@@ -611,6 +1175,7 @@
     bindTabHandlers();
     bindEditHandlers();
     bindRequestHandlers();
+    bindSetupTileHandlers();
 
     // Hydrate the inline message thread + composer. Skipped post-
     // activation because the messages card is hidden in that state — the

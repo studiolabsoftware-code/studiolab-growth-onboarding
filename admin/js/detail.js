@@ -14,6 +14,19 @@
   const fmtVal = (v) => (v === null || v === undefined || v === '') ? empty : ESC(v);
   const fmtBool = (v) => v === true ? 'Yes' : v === false ? 'No' : empty;
   const fmtList = (v) => Array.isArray(v) && v.length ? ESC(v.join(', ')) : empty;
+  // Business-type label map (Phase 1 — onboarding access & compliance).
+  // Keep aligned with the form's BUSINESS_TYPE_LABEL.
+  const BIZ_TYPES = { sole_prop: 'Sole Proprietor', llc: 'LLC', corp: 'Corporation', partnership: 'Partnership', nonprofit: 'Non-profit', pty_ltd: 'Pty Ltd', other_au: 'Other Australian entity', other: 'Other' };
+  const businessTypeLabel = (v) => v ? (BIZ_TYPES[v] || v) : '';
+  // Mask sensitive tax IDs in admin display. Reveal only the last 4 of an EIN
+  // (so admins can confirm what's on file) and a copy-to-clipboard affordance
+  // lets the full value be retrieved when actually needed for a registration.
+  const maskTaxId = (v) => {
+    if (!v) return empty;
+    const s = String(v);
+    const tail = s.slice(-4);
+    return '<span class="masked-id" title="Click row to reveal/copy">••••' + ESC(tail) + '</span>';
+  };
   const fmtDate = (v) => v ? new Date(v).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : empty;
   // Raw helpers: what should land in the clipboard for each value type.
   const rawVal  = (v) => (v === null || v === undefined || v === '') ? '' : String(v);
@@ -33,7 +46,7 @@
   // we don't pay for inbox/invoice/quote fetches until the user actually
   // visits the tab. Overview is always rendered eagerly because it's
   // template-only and the default landing tab.
-  const DETAIL_TABS = ['overview', 'messages', 'invoices', 'quotes', 'activity'];
+  const DETAIL_TABS = ['overview', 'messages', 'setup', 'invoices', 'quotes', 'activity'];
   let currentTab = 'overview';
   let tabHydrated = { overview: false, messages: false, invoices: false, quotes: false, activity: false };
   let pendingCounts = { invoices: 0, quotes: 0, messages: 0 };
@@ -101,13 +114,22 @@
     currentAssignees = (assignees || []).filter((a) => a.role !== 'owner' || a.is_active);
     pendingNotes = notes || [];
     pendingLog = log || [];
+    // Count of setup_tasks that need admin attention (submitted, no_account,
+    // in_progress). Drives the badge on the Setup tab so admins see which
+    // submissions have outstanding tiles without opening every one.
+    const { count: setupOpenCount } = await client.from('setup_tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('submission_id', id)
+      .in('status', ['submitted', 'no_account', 'in_progress']);
+
     pendingCounts = {
       invoices: invoiceCountRes?.count || 0,
       quotes: quoteCountRes?.count || 0,
       messages: (window.AdminInbox?.getUnreadForSubmission?.(sub.id) || {}).count || 0,
+      setup: setupOpenCount || 0,
     };
     currentTab = requestedTab;
-    tabHydrated = { overview: false, messages: false, invoices: false, quotes: false, activity: false };
+    tabHydrated = { overview: false, messages: false, setup: false, invoices: false, quotes: false, activity: false };
 
     render(sub);
     activateTab(currentTab);
@@ -170,6 +192,7 @@
       <div class="det-tabs" role="tablist" aria-label="Submission sections">
         ${renderTabButton('overview',  '📋', 'Overview',  null)}
         ${renderTabButton('messages',  '📬', 'Messages',  pendingCounts.messages || null, 'unread')}
+        ${renderTabButton('setup',     '🧩', 'Setup',     pendingCounts.setup || null, 'unread')}
         ${renderTabButton('invoices',  '🧾', 'Invoices',  pendingCounts.invoices || null)}
         ${renderTabButton('quotes',    '📄', 'Quotes',    pendingCounts.quotes   || null)}
         ${renderTabButton('activity',  '📊', 'Activity',  null)}
@@ -179,6 +202,16 @@
         <div class="det-main">
           <div class="det-tab-panel" data-panel="overview" role="tabpanel" hidden>
             ${renderOverviewHtml(sub)}
+          </div>
+          <div class="det-tab-panel" data-panel="setup" role="tabpanel" hidden>
+            <section class="det-section det-tab-section">
+              <div class="det-section-hdr">
+                <h2 class="det-section-title">🧩 Setup Checklist</h2>
+              </div>
+              <div class="det-section-body" id="detSetupTasksHost">
+                <div class="adm-empty" style="padding:24px 0;">Loading tiles…</div>
+              </div>
+            </section>
           </div>
           <div class="det-tab-panel" data-panel="messages" role="tabpanel" hidden>
             <section class="det-section det-tab-section">
@@ -335,10 +368,142 @@
     switch (tab) {
       case 'overview':  return hydrateOverviewTab(current);
       case 'messages':  return hydrateMessagesTab(current);
+      case 'setup':     return hydrateSetupTasksTab(current);
       case 'invoices':  return hydrateInvoicesTab(current);
       case 'quotes':    return hydrateQuotesTab(current);
       case 'activity':  return hydrateActivityTab(current);
     }
+  }
+
+  // -- Setup Checklist (Phase 2) --------------------------------------------
+  //
+  // Reads setup_tasks for the current submission and renders one row per
+  // tile with surface name, current status, and the studio's submitted
+  // data. Admins can change status (drives the trigger-based stamping of
+  // admin_started_at / completed_at) and append a private admin note.
+  //
+  // Reads/writes go through supabase-js directly (RLS policy added in
+  // migration 042 grants authenticated full select+update on setup_tasks).
+  const SETUP_SURFACE_LABEL = {
+    gbp: { icon: '🗺️', name: 'Google Business Profile' },
+    ga4: { icon: '📊', name: 'Google Analytics 4' },
+    gsc: { icon: '🔎', name: 'Google Search Console' },
+    gtm: { icon: '🏷️', name: 'Google Tag Manager' },
+    google_ads: { icon: '💰', name: 'Google Ads' },
+    meta: { icon: '📘', name: 'Meta Business Manager' },
+    tiktok: { icon: '🎵', name: 'TikTok Business Center' },
+    sms_a2p: { icon: '💬', name: 'SMS A2P compliance' },
+    whatsapp: { icon: '🟢', name: 'WhatsApp Business' },
+  };
+  const SETUP_STATUS_LABEL = {
+    pending: 'Not started',
+    submitted: 'Submitted',
+    no_account: 'Needs us to create',
+    in_progress: 'In progress',
+    complete: 'Complete',
+  };
+  // Inline pill styles. Re-uses the same palette as the .bdg-st-* classes
+  // but without depending on labels that don't have matching admin CSS
+  // (admin badges are keyed on submission status enum, not setup status).
+  const SETUP_STATUS_STYLE = {
+    pending:     'background:var(--g2);color:var(--g6);',
+    submitted:   'background:var(--bl-l);color:var(--bl-d);',
+    no_account:  'background:var(--bl-l);color:var(--bl-d);',
+    in_progress: 'background:var(--am-l);color:var(--am);',
+    complete:    'background:var(--gr-l);color:var(--gr);',
+  };
+
+  async function hydrateSetupTasksTab(sub) {
+    const host = document.getElementById('detSetupTasksHost');
+    if (!host) return;
+    const client = sb();
+    if (!client) {
+      host.innerHTML = '<div class="adm-empty">No Supabase client; refresh the page.</div>';
+      return;
+    }
+    const { data: tasks, error } = await client
+      .from('setup_tasks')
+      .select('id, surface, status, data, admin_notes, studio_submitted_at, admin_started_at, completed_at, updated_at')
+      .eq('submission_id', sub.id)
+      .order('surface', { ascending: true });
+    if (error) {
+      host.innerHTML = `<div class="adm-empty" style="color:var(--rd);">Could not load tiles: ${ESC(String(error.message || error))}</div>`;
+      return;
+    }
+    if (!tasks || !tasks.length) {
+      host.innerHTML = `<div class="adm-empty">No tiles yet. They are seeded automatically when the studio first loads /account.html after payment.</div>`;
+      return;
+    }
+    host.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${tasks.map(renderSetupTaskRow).join('')}
+      </div>
+      <p style="margin:14px 0 0;font-size:11px;color:var(--g5);">Status changes save instantly. Notes save on blur. Studio sees nothing here — admin-internal view.</p>`;
+    host.querySelectorAll('[data-task-status]').forEach((sel) => {
+      sel.addEventListener('change', async (e) => {
+        const taskId = e.target.getAttribute('data-task-status');
+        const newStatus = e.target.value;
+        await updateSetupTask(taskId, { status: newStatus });
+        // Re-fetch and re-render so timestamps refresh.
+        tabHydrated.setup = false;
+        hydrateSetupTasksTab(sub);
+      });
+    });
+    host.querySelectorAll('[data-task-notes]').forEach((ta) => {
+      ta.addEventListener('blur', async (e) => {
+        const taskId = e.target.getAttribute('data-task-notes');
+        const newNotes = e.target.value.trim();
+        await updateSetupTask(taskId, { admin_notes: newNotes || null });
+      });
+    });
+  }
+
+  async function updateSetupTask(taskId, patch) {
+    const client = sb();
+    if (!client) return;
+    const { error } = await client.from('setup_tasks').update(patch).eq('id', taskId);
+    if (error) {
+      window.AdminModal && window.AdminModal.alert
+        ? window.AdminModal.alert('Could not save: ' + (error.message || error))
+        : alert('Could not save: ' + (error.message || error));
+    }
+  }
+
+  function renderSetupTaskRow(task) {
+    const meta = SETUP_SURFACE_LABEL[task.surface] || { icon: '•', name: task.surface };
+    const data = task.data || {};
+    const dataRows = Object.entries(data)
+      .filter(([_, v]) => v != null && String(v).length > 0)
+      .map(([k, v]) => `<div><span style="color:var(--g6);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;">${ESC(k)}:</span> <span style="font-size:13px;color:var(--in-d);word-break:break-word;">${ESC(String(v))}</span></div>`)
+      .join('');
+    const ts = (label, iso) => iso
+      ? `<span style="color:var(--g5);">${label}: ${ESC(new Date(iso).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }))}</span>`
+      : '';
+    const tsLine = [
+      ts('Studio submitted', task.studio_submitted_at),
+      ts('Admin started', task.admin_started_at),
+      ts('Completed', task.completed_at),
+    ].filter(Boolean).join(' · ');
+    const statusOptions = ['pending', 'submitted', 'no_account', 'in_progress', 'complete']
+      .map((s) => `<option value="${s}"${s === task.status ? ' selected' : ''}>${SETUP_STATUS_LABEL[s]}</option>`)
+      .join('');
+    const pillStyle = SETUP_STATUS_STYLE[task.status] || SETUP_STATUS_STYLE.pending;
+    return `
+      <div class="det-card" style="border:1px solid var(--g2);border-radius:10px;padding:14px 16px;background:#fff;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:var(--in-d);font-size:14px;">
+            <span style="font-size:18px;line-height:1;">${meta.icon}</span>
+            ${ESC(meta.name)}
+            <span class="bdg" style="margin-left:6px;${pillStyle}">${ESC(SETUP_STATUS_LABEL[task.status] || task.status)}</span>
+          </div>
+          <select data-task-status="${ESC(task.id)}" style="padding:6px 10px;border:1px solid var(--g2);border-radius:6px;font-size:12px;font-family:inherit;background:#fff;">
+            ${statusOptions}
+          </select>
+        </div>
+        ${dataRows ? `<div style="display:grid;gap:4px;padding:8px 10px;background:var(--g1);border-radius:8px;margin-bottom:10px;">${dataRows}</div>` : '<div style="font-size:12px;color:var(--g5);font-style:italic;margin-bottom:10px;">No data submitted yet.</div>'}
+        <textarea data-task-notes="${ESC(task.id)}" placeholder="Admin-only notes (saved on blur)..." rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--g2);border-radius:6px;font-size:12px;font-family:inherit;color:var(--in-d);resize:vertical;">${ESC(task.admin_notes || '')}</textarea>
+        ${tsLine ? `<div style="font-size:11px;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;">${tsLine}</div>` : ''}
+      </div>`;
   }
 
   // -- Per-tab hydration ----------------------------------------------------
@@ -417,13 +582,32 @@
 
       ${section('🏫 Studio details', [
         ['Studio name', fmtVal(sub.studio_name), undefined, 'studio_name'],
-        ['Legal business name', fmtVal(sub.legal_name), undefined, 'legal_name'],
         ['Country', fmtVal(sub.country), undefined, 'country'],
         ['Time zone', fmtVal(sub.timezone), undefined, 'timezone'],
         ['Studio type', fmtVal(sub.studio_type), undefined, 'studio_type'],
-        ['Address', fmtVal(sub.address), undefined, 'address'],
         ['Website', sub.website ? `<a href="${ESC(sub.website)}" target="_blank" rel="noopener">${ESC(sub.website)}</a>` : empty, sub.website || '', 'website'],
         ['Support URL', sub.support_url ? `<a href="${ESC(sub.support_url)}" target="_blank" rel="noopener">${ESC(sub.support_url)}</a>` : empty, sub.support_url || '', 'support_url'],
+      ])}
+
+      ${section('🏛️ Business details', [
+        ['Legal business name', fmtVal(sub.legal_business_name || sub.legal_name), undefined, 'legal_business_name'],
+        ['Trading name / DBA', fmtVal(sub.trading_name), undefined, 'trading_name'],
+        ['Business type', fmtVal(businessTypeLabel(sub.business_type)), undefined, 'business_type'],
+        ['EIN', maskTaxId(sub.ein, 'ein'), undefined, 'ein'],
+        ['SSN (last 4)', sub.ssn_last4 ? '••••' + ESC(sub.ssn_last4) : empty, undefined, 'ssn_last4'],
+        ['ABN', fmtVal(sub.abn), undefined, 'abn'],
+        ['ACN', fmtVal(sub.acn), undefined, 'acn'],
+        ['Business email',
+          sub.business_email
+            ? `<a href="mailto:${ESC(sub.business_email)}">${ESC(sub.business_email)}</a>${sub.business_email_is_personal_domain ? ' <span class="warn-pill" title="Personal email domain — A2P and Meta registration require a business-domain email.">personal</span>' : ''}`
+            : empty,
+          sub.business_email || '',
+          'business_email'],
+        ['Street address', fmtVal(sub.address_street), undefined, 'address_street'],
+        ['City / suburb', fmtVal(sub.address_city), undefined, 'address_city'],
+        ['State / region', fmtVal(sub.address_region), undefined, 'address_region'],
+        ['Postcode / ZIP', fmtVal(sub.address_postcode), undefined, 'address_postcode'],
+        ['Single-line address', fmtVal(sub.address), undefined, 'address'],
       ])}
 
       ${section('👤 Primary contact', [
@@ -846,7 +1030,11 @@
     if (!dd || !valEl) return;
     const raw = current[field];
     const initial = raw === null || raw === undefined ? '' : String(raw);
-    const useTextarea = initial.length > 60 || /(notes|address|description|policies|profile|classes|pricing|events|restricted|tone|escalate|hours)/i.test(field);
+    // Structured-address fields (address_street/city/region/postcode) are
+    // short single-line inputs; only the legacy free-text 'address' column
+    // benefits from the textarea, and that's already handled by the
+    // length-based check below.
+    const useTextarea = initial.length > 60 || /(notes|description|policies|profile|classes|pricing|events|restricted|tone|escalate|hours)/i.test(field) || field === 'address';
     rowEl.classList.add('editing');
     rowEl.dataset.originalValue = initial;
     const inputHtml = useTextarea
