@@ -34,6 +34,13 @@ const ALLOWED_FIELDS = new Set([
   'brand_reference_url',
   // Optional Twilio account connection (Scale and AI).
   'has_twilio', 'twilio_number',
+  // Business identity & structured address (migration 040 — Phase 1 of
+  // onboarding access & compliance plan). EIN and ssn_last4 are stored
+  // plain text; admin UI masks on display. Do not log these fields.
+  'legal_business_name','trading_name','business_type',
+  'ein','ssn_last4','abn','acn',
+  'business_email','business_email_is_personal_domain',
+  'address_street','address_city','address_region','address_postcode',
 ]);
 
 function pickAllowed(payload: Record<string, unknown>): Record<string, unknown> {

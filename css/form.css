@@ -164,6 +164,7 @@ select {
 }
 
 .field-note { font-size: 11px; color: var(--g4); margin-top: 3px; line-height: 1.4; }
+.field-note.field-warn { color: #92400e; background: #fef3c7; border-radius: 4px; padding: 6px 8px; }
 .field-err  { font-size: 11px; color: var(--rd); margin-top: 3px; line-height: 1.4; display: none; }
 .f.has-error input,
 .f.has-error select,

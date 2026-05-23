@@ -1045,6 +1045,100 @@
   const PLAN_LABEL = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
   const SETUP_LABEL = { dfy: 'Done-For-You', guided: 'Guided (self-setup)' };
 
+  // Business identity labels and helpers (Phase 1 of onboarding access plan).
+  const BUSINESS_TYPE_LABEL = {
+    sole_prop: 'Sole Proprietor',
+    llc: 'LLC',
+    corp: 'Corporation',
+    partnership: 'Partnership',
+    nonprofit: 'Non-profit',
+    pty_ltd: 'Pty Ltd',
+    other_au: 'Other Australian entity',
+    other: 'Other',
+  };
+
+  const PERSONAL_EMAIL_DOMAINS = new Set([
+    'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.co.uk',
+    'outlook.com', 'live.com', 'msn.com', 'yahoo.com', 'yahoo.co.uk',
+    'yahoo.com.au', 'ymail.com', 'icloud.com', 'me.com', 'mac.com',
+    'aol.com', 'proton.me', 'protonmail.com',
+  ]);
+
+  function isPersonalEmailDomain(email) {
+    if (!email) return false;
+    const at = String(email).toLowerCase().indexOf('@');
+    if (at < 0) return false;
+    return PERSONAL_EMAIL_DOMAINS.has(email.slice(at + 1).trim());
+  }
+
+  function composeAddress() {
+    // Join the structured fields into a single comma-separated line for
+    // backward compatibility with existing email templates and admin views
+    // that still read submissions.address.
+    const parts = [
+      val('addressStreet'),
+      val('addressCity'),
+      val('addressRegion'),
+      val('addressPostcode'),
+    ].map((s) => (s || '').trim()).filter(Boolean);
+    return parts.join(', ');
+  }
+
+  function businessTaxIdSummary() {
+    // Review-step display: pick the relevant ID per business type. Mask
+    // SSN entirely (only ever show that we have it); show full EIN/ABN/ACN
+    // since the studio entered them and is reviewing their own data.
+    const bt = val('businessType');
+    if (bt === 'sole_prop' && val('ssnLast4')) return 'SSN on file (••••' + val('ssnLast4') + ')';
+    const ein = val('ein'); if (ein) return 'EIN ' + ein;
+    const abn = val('abn'); if (abn) return 'ABN ' + abn + (val('acn') ? ' · ACN ' + val('acn') : '');
+    return '';
+  }
+
+  function applyBusinessTypeConditionals() {
+    // Show EIN / SSN / ABN / ACN fields based on country (from Step 1) and
+    // business type. Required flags toggle with visibility so validation
+    // only fires on the currently-shown field.
+    const country = (getCountryValue() || REGION_DEFAULT_COUNTRY[REGION] || '').toUpperCase();
+    const bt = val('businessType');
+    const isAU = country === 'AU';
+    const isUS = country === 'US';
+    const isPtyLtd = bt === 'pty_ltd';
+    const isSoleProp = bt === 'sole_prop';
+
+    const show = (id, on) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.hidden = !on;
+      const input = el.querySelector('input, select');
+      if (!input) return;
+      if (on) input.setAttribute('data-required', '');
+      else { input.removeAttribute('data-required'); /* keep value so it round-trips if studio re-toggles */ }
+    };
+
+    // EIN: shown for US non-Sole-Prop business types (and as a soft default
+    // until a type is picked, to keep the field visible for studios who
+    // skim ahead). Hidden for AU.
+    show('einField', isUS && bt && !isSoleProp);
+    show('ssnField', isUS && isSoleProp);
+    show('abnField', isAU);
+    show('acnField', isAU && isPtyLtd);
+  }
+
+  function applyBusinessEmailWarning() {
+    const input = document.getElementById('businessEmail');
+    const note = document.getElementById('businessEmailNote');
+    if (!input || !note) return;
+    const v = (input.value || '').trim();
+    if (v && isPersonalEmailDomain(v)) {
+      note.textContent = 'Heads up — Google, Meta, and US SMS regulators require a business-domain email (e.g. you@yourstudio.com) to register your account. You can fix this later in your portal, but expect to be asked for it.';
+      note.classList.add('field-warn');
+    } else {
+      note.textContent = 'Used on your business profile, invoices, and SMS sender registration.';
+      note.classList.remove('field-warn');
+    }
+  }
+
   function setSum(id, v) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1058,6 +1152,12 @@
     if (svSetup) svSetup.innerHTML = setupFeeSummaryHtml();
     setSum('sv-studio', val('studioName'));
     setSum('sv-country', getCountryValue());
+    // Business details (Phase 1 — onboarding access & compliance plan)
+    setSum('sv-legal', val('legalName'));
+    setSum('sv-biztype', BUSINESS_TYPE_LABEL[val('businessType')] || (val('businessType') || ''));
+    setSum('sv-taxid', businessTaxIdSummary());
+    setSum('sv-bizemail', val('businessEmail'));
+    setSum('sv-address', composeAddress() || '');
     const fn = val('firstName'), ln = val('lastName');
     setSum('sv-contact', (fn + ' ' + ln).trim() || 'Not provided');
     setSum('sv-email', val('contactEmail'));
@@ -1095,15 +1195,36 @@
     const isScalePlus = state.plan === 'scale' || state.plan === 'ai';
     const isAi = state.plan === 'ai';
 
+    const businessEmail = valOrNull('businessEmail');
+    const composedAddress = composeAddress();
+
     return {
       plan: state.plan,
       setup_type: state.setup,
       studio_name: val('studioName'),
+      // legal_name stays writable for now so older drafts hydrate cleanly;
+      // the new canonical column is legal_business_name. Both get the same
+      // value at submit-time. (Migration 040.)
       legal_name: valOrNull('legalName'),
+      legal_business_name: valOrNull('legalName'),
+      trading_name: valOrNull('tradingName'),
+      business_type: valOrNull('businessType'),
+      ein: valOrNull('ein'),
+      ssn_last4: valOrNull('ssnLast4'),
+      abn: valOrNull('abn'),
+      acn: valOrNull('acn'),
+      business_email: businessEmail,
+      business_email_is_personal_domain: businessEmail ? isPersonalEmailDomain(businessEmail) : null,
       country: getCountryValue() || null,
       timezone: valOrNull('timezone'),
       studio_type: valOrNull('studioType'),
-      address: valOrNull('address'),
+      // Structured address (Phase 1) + denormalised single-line for backward
+      // compatibility with existing email templates and admin views.
+      address_street:   valOrNull('addressStreet'),
+      address_city:     valOrNull('addressCity'),
+      address_region:   valOrNull('addressRegion'),
+      address_postcode: valOrNull('addressPostcode'),
+      address: composedAddress || valOrNull('address'),
       website: val('website') ? normaliseUrl(val('website')) : null,
       support_url: valOrNull('supportUrl'),
 
@@ -2072,7 +2193,13 @@
       'tiktokHandle','youtubeUrl',
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
+      // Business details (Phase 1).
+      'tradingName','businessType','ein','ssnLast4','abn','acn','businessEmail',
+      'addressStreet','addressCity','addressRegion','addressPostcode',
     ].forEach((id) => setVal(id, sub[idToColumn(id)]));
+    // Prefer the new canonical column for legal business name; fall back to
+    // legacy legal_name for older drafts.
+    setVal('legalName', sub.legal_business_name || sub.legal_name);
     // Country may be a free-text value (when the studio picked "Other" and typed
     // a country we don't list). Route those back to OTHER + manual input.
     if (sub.country) {
@@ -2145,6 +2272,18 @@
     }
     applyCountryToTimezone();
     applyCountryOtherVisibility();
+    applyBusinessTypeConditionals();
+    applyBusinessEmailWarning();
+    // If hydrating an older draft that only has the legacy single-line
+    // address, split it best-effort into the structured fields so the new
+    // UI shows something rather than four blank inputs.
+    if (sub.address && !sub.address_street && !document.getElementById('addressStreet')?.value) {
+      const parts = String(sub.address).split(',').map((s) => s.trim());
+      if (parts.length >= 1) setVal('addressStreet', parts[0]);
+      if (parts.length >= 2) setVal('addressCity', parts[1]);
+      if (parts.length >= 3) setVal('addressRegion', parts[2]);
+      if (parts.length >= 4) setVal('addressPostcode', parts.slice(3).join(' '));
+    }
   }
 
   // Mapping JS field IDs (camelCase) to DB column names (snake_case)
@@ -2163,6 +2302,12 @@
       googleBusinessUrl: 'google_business_url', facebookUrl: 'facebook_url',
       instagramHandle: 'instagram_handle', bookingUrl: 'booking_url',
       tiktokHandle: 'tiktok_handle', youtubeUrl: 'youtube_url',
+      // Business details (Phase 1).
+      tradingName: 'trading_name', businessType: 'business_type',
+      ein: 'ein', ssnLast4: 'ssn_last4', abn: 'abn', acn: 'acn',
+      businessEmail: 'business_email',
+      addressStreet: 'address_street', addressCity: 'address_city',
+      addressRegion: 'address_region', addressPostcode: 'address_postcode',
     };
     return map[id] || id;
   }
@@ -2271,7 +2416,9 @@
         const row = document.getElementById('twilioRow');
         if (row) row.style.display = t.checked ? '' : 'none';
       }
-      else if (t.id === 'country') { applyCountryToTimezone(); applyCountryOtherVisibility(); }
+      else if (t.id === 'country') { applyCountryToTimezone(); applyCountryOtherVisibility(); applyBusinessTypeConditionals(); }
+      else if (t.id === 'businessType') applyBusinessTypeConditionals();
+      else if (t.id === 'businessEmail') applyBusinessEmailWarning();
     });
 
     document.addEventListener('input', (e) => {

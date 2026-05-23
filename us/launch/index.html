@@ -105,13 +105,8 @@
         <div class="f">
           <label for="studioName">Studio name <span class="req">*</span></label>
           <input type="text" id="studioName" data-required placeholder="e.g. Dance Academy Melbourne">
+          <span class="field-note">The trading name families know you by.</span>
           <span class="field-err">Please enter your studio name.</span>
-        </div>
-      </div>
-      <div class="fr x1">
-        <div class="f">
-          <label for="legalName">Legal business name <span class="hint">if different</span></label>
-          <input type="text" id="legalName" placeholder="e.g. Dance Academy Pty Ltd">
         </div>
       </div>
       <div class="fr x1">
@@ -175,16 +170,123 @@
     </div>
   </div>
 
-  <!-- ─────────────── STEP 2: Studio Details ─────────────── -->
+  <!-- ─────────────── STEP 2: Business and contact details ─────────────── -->
   <div class="panel" id="s2">
     <div class="sh">
       <div class="sh-tag">Step 2 of 4</div>
-      <h2 class="sh-title">Your contact details</h2>
-      <div class="sh-desc">Who we\'ll talk to and where families can find you online.</div>
+      <h2 class="sh-title">Business and contact details</h2>
+      <div class="sh-desc">Your registered business details for invoicing and email-footer compliance, and who we'll speak to.</div>
     </div>
 
-            <div class="cards-grid">
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">🏛️</div>Business details</div>
+      <div class="co co-blue" style="margin-bottom:12px;">These are the legal details that appear on your invoices and in the small print at the bottom of every email we send on your behalf. US and Australian law require this. You'll only enter it once.</div>
+      <div class="fr">
+        <div class="f">
+          <label for="legalName">Legal business name <span class="req">*</span></label>
+          <input type="text" id="legalName" data-required placeholder="e.g. Dance Academy LLC">
+          <span class="field-note">Exactly as it appears on your tax registration.</span>
+          <span class="field-err">Please enter your legal business name.</span>
+        </div>
+        <div class="f">
+          <label for="tradingName">Trading name / DBA <span class="hint">if different</span></label>
+          <input type="text" id="tradingName" placeholder="e.g. Dance Academy">
+          <span class="field-note">Only if you trade under a different name.</span>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="f">
+          <label for="businessType">Business type <span class="req">*</span></label>
+          <select id="businessType" data-required>
+            <option value="">Select</option>
+            <option value="sole_prop">Sole Proprietor</option>
+            <option value="llc">LLC</option>
+            <option value="corp">Corporation</option>
+            <option value="partnership">Partnership</option>
+            <option value="nonprofit">Non-profit</option>
+            <option value="pty_ltd">Pty Ltd (Australian company)</option>
+            <option value="other_au">Other Australian entity</option>
+            <option value="other">Other</option>
+          </select>
+          <span class="field-err">Please select your business type.</span>
+        </div>
+        <div class="f" id="einField" hidden>
+          <label for="ein">EIN <span class="req">*</span></label>
+          <input type="text" id="ein" placeholder="XX-XXXXXXX" inputmode="numeric" maxlength="10">
+          <span class="field-note">Your IRS Employer Identification Number.</span>
+          <span class="field-err">Please enter your EIN.</span>
+        </div>
+        <div class="f" id="ssnField" hidden>
+          <label for="ssnLast4">Last 4 of owner SSN <span class="req">*</span></label>
+          <input type="password" id="ssnLast4" placeholder="••••" inputmode="numeric" maxlength="4" autocomplete="off">
+          <span class="field-note">Required by US carriers to register a Sole Proprietor SMS sender. We never see the full number.</span>
+          <span class="field-err">Please enter the last 4 digits.</span>
+        </div>
+        <div class="f" id="abnField" hidden>
+          <label for="abn">ABN <span class="req">*</span></label>
+          <input type="text" id="abn" placeholder="11 222 333 444" inputmode="numeric" maxlength="14">
+          <span class="field-note">Your Australian Business Number (11 digits).</span>
+          <span class="field-err">Please enter your ABN.</span>
+        </div>
+        <div class="f" id="acnField" hidden>
+          <label for="acn">ACN <span class="req">*</span></label>
+          <input type="text" id="acn" placeholder="123 456 789" inputmode="numeric" maxlength="11">
+          <span class="field-note">Australian Company Number (9 digits, Pty Ltd only).</span>
+          <span class="field-err">Please enter your ACN.</span>
+        </div>
+      </div>
+      <div class="fr x1">
+        <div class="f">
+          <label for="businessEmail">Business email address <span class="req">*</span></label>
+          <input type="email" id="businessEmail" data-required placeholder="hello@yourstudio.com">
+          <span class="field-note" id="businessEmailNote">Used on your business profile, invoices, and SMS sender registration.</span>
+          <span class="field-err">Please enter a business email address.</span>
+        </div>
+      </div>
+    </div>
 
+    <div class="card">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">📍</div>Registered business address</div>
+      <div class="co co-blue" style="margin-bottom:12px;">This appears in the small print at the bottom of every commercial email we send for you — required by US (CAN-SPAM) and Australian (SPAM Act) law. Use a real street address, not a PO Box.</div>
+      <div class="fr x1">
+        <div class="f">
+          <label for="addressStreet">Street address <span class="req">*</span></label>
+          <input type="text" id="addressStreet" data-required placeholder="e.g. 123 Main Street, Suite 4">
+          <span class="field-err">Please enter your street address.</span>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="f">
+          <label for="addressCity">City / suburb <span class="req">*</span></label>
+          <input type="text" id="addressCity" data-required placeholder="e.g. Melbourne">
+          <span class="field-err">Please enter your city.</span>
+        </div>
+        <div class="f">
+          <label for="addressRegion">State / region <span class="req">*</span></label>
+          <input type="text" id="addressRegion" data-required placeholder="e.g. VIC or California">
+          <span class="field-err">Please enter your state or region.</span>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="f">
+          <label for="addressPostcode">Postcode / ZIP <span class="req">*</span></label>
+          <input type="text" id="addressPostcode" data-required placeholder="e.g. 3000 or 90210">
+          <span class="field-err">Please enter your postcode.</span>
+        </div>
+        <div class="f">
+          <label for="website">Website URL <span class="req">*</span></label>
+          <input type="text" id="website" data-required placeholder="yourstudio.com">
+          <span class="field-note">Just the domain. We add https:// for you.</span>
+          <span class="field-err">Please enter a valid website URL.</span>
+        </div>
+      </div>
+      <!-- Denormalised single-line address kept for backward compatibility with
+           existing email templates and admin views. Populated automatically
+           from the structured fields by form.js. -->
+      <input type="hidden" id="address">
+    </div>
+
+    <div class="cards-grid">
       <div class="card">
         <div class="ct"><div class="ct-icon" aria-hidden="true">👤</div>Primary contact</div>
         <div class="fr">
@@ -209,7 +311,7 @@
         <div class="fr">
           <div class="f">
             <label for="contactPhone">Phone <span class="req">*</span></label>
-            <input type="tel" id="contactPhone" data-required placeholder="+61 4XX XXX XXX">
+            <input type="tel" id="contactPhone" data-required placeholder="(555) 555-0123">
             <span class="field-err">Please enter your phone number.</span>
           </div>
           <div class="f">
@@ -222,24 +324,6 @@
               <option>Admin</option>
             </select>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="ct"><div class="ct-icon" aria-hidden="true">📍</div>Location and web</div>
-      <div class="fr">
-        <div class="f">
-          <label for="address">Studio address <span class="req">*</span></label>
-          <input type="text" id="address" data-required placeholder="Street, suburb, state, postcode">
-          <span class="field-note">Used in email footers and business verification.</span>
-          <span class="field-err">Please enter your studio address.</span>
-        </div>
-        <div class="f">
-          <label for="website">Website URL <span class="req">*</span></label>
-          <input type="text" id="website" data-required placeholder="yourstudio.com">
-          <span class="field-note">Just the domain. We add https:// for you.</span>
-          <span class="field-err">Please enter a valid website URL.</span>
         </div>
       </div>
     </div>
@@ -457,10 +541,25 @@
         </div>
       </div>
       <div class="sum-sec">
-        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">🏫</span><span class="sum-hdr-title">Studio details</span><button type="button" class="sum-edit" data-edit-step="2">Edit</button></div>
+        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">🏫</span><span class="sum-hdr-title">Studio</span><button type="button" class="sum-edit" data-edit-step="1">Edit</button></div>
         <div class="sum-body">
           <div class="sum-f"><div class="sum-k">Studio name</div><div class="sum-v" id="sv-studio">Not provided</div></div>
           <div class="sum-f"><div class="sum-k">Country</div><div class="sum-v" id="sv-country">Not provided</div></div>
+        </div>
+      </div>
+      <div class="sum-sec">
+        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">🏛️</span><span class="sum-hdr-title">Business details</span><button type="button" class="sum-edit" data-edit-step="2">Edit</button></div>
+        <div class="sum-body">
+          <div class="sum-f"><div class="sum-k">Legal name</div><div class="sum-v" id="sv-legal">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Business type</div><div class="sum-v" id="sv-biztype">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Tax ID</div><div class="sum-v" id="sv-taxid">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Business email</div><div class="sum-v" id="sv-bizemail">Not provided</div></div>
+          <div class="sum-f"><div class="sum-k">Address</div><div class="sum-v" id="sv-address">Not provided</div></div>
+        </div>
+      </div>
+      <div class="sum-sec">
+        <div class="sum-hdr"><span class="sum-hdr-ico" aria-hidden="true">👤</span><span class="sum-hdr-title">Contact</span><button type="button" class="sum-edit" data-edit-step="2">Edit</button></div>
+        <div class="sum-body">
           <div class="sum-f"><div class="sum-k">Contact</div><div class="sum-v" id="sv-contact">Not provided</div></div>
           <div class="sum-f"><div class="sum-k">Email</div><div class="sum-v" id="sv-email">Not provided</div></div>
           <div class="sum-f"><div class="sum-k">Phone</div><div class="sum-v" id="sv-phone">Not provided</div></div>
