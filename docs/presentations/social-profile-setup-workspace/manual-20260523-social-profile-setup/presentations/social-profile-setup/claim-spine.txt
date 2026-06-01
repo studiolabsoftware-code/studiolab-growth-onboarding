@@ -1,0 +1,33 @@
+thesis: StudioLAB Growth onboarding should capture public profile identifiers first, then guide the studio owner through secure OAuth connections inside the product without collecting passwords.
+audience: studio owners and StudioLAB onboarding staff
+one-line arc: identify the right public profiles, prepare the right account owner, connect each platform through the correct StudioLAB Growth area, then verify that the connection supports the intended workflow.
+
+01. Cover, claim: Studio profile connections should feel like a guided setup video, proof object: branded setup journey.
+02. Why this exists, claim: URLs identify accounts; OAuth authorises access, proof object: split-screen model.
+03. No passwords, claim: the studio owner signs in directly with each platform, proof object: secure handoff diagram.
+04. What to have ready, claim: most failed setup attempts are permission problems, proof object: pre-flight checklist.
+05. Where connections happen, claim: three StudioLAB Growth areas cover the setup jobs, proof object: product navigation map.
+06. Setup order, claim: connect Meta first, then Google, TikTok and YouTube as needed, proof object: timeline.
+07. Facebook access, claim: Facebook needs Page control and extra lead access for ads, proof object: permission card.
+08. Facebook click path, claim: leads, DMs and forms start in Settings > Integrations, proof object: annotated UI.
+09. Facebook authorisation, claim: approve all requested permissions and select the Page, proof object: OAuth modal mock.
+10. Facebook verification, claim: success means Page, messages and form mapping are visible, proof object: verification board.
+11. Instagram access, claim: Business or Creator status drives what can connect, proof object: account readiness split.
+12. Instagram click path, claim: social posting uses Social Planner, ads and DMs use the Meta integration, proof object: two-route map.
+13. Instagram authorisation, claim: Direct Instagram Integration is the cleanest posting route, proof object: selection modal.
+14. Instagram verification, claim: confirm the account, Page link and inbox status, proof object: check panel.
+15. Google access, claim: GBP must be verified and managed by the connecting Google account, proof object: ownership card.
+16. Google click path, claim: reviews and reputation connect from Settings, GBP posts use Social Planner or Reputation, proof object: navigation split.
+17. Google authorisation, claim: select the exact business location and call tracking decision, proof object: location picker.
+18. Google verification, claim: reputation sync and GBP posting require different checks, proof object: status board.
+19. TikTok access, claim: posting, lead ads and comment automation are three different setup jobs, proof object: branching map.
+20. TikTok click path, claim: posting starts in Social Planner; lead ads and automations start in Integrations, proof object: two-route UI.
+21. TikTok authorisation, claim: lead ads require advertiser selection and form mapping, proof object: advertiser/form panel.
+22. TikTok verification, claim: test the workflow that matches the package, proof object: test matrix.
+23. YouTube access, claim: YouTube must be connected by the channel primary owner, proof object: owner gate.
+24. YouTube click path, claim: connect YouTube only when publishing is included, proof object: Social Planner UI.
+25. YouTube authorisation, claim: manager access cannot authorise third-party publishing, proof object: channel owner modal.
+26. YouTube verification, claim: confirm the channel appears before scheduling, proof object: connected channel panel.
+27. Internal handoff, claim: StudioLAB should verify the right capability, not just the green connection badge, proof object: operations checklist.
+28. Production package, claim: one master deck plus five short videos is the cleanest onboarding system, proof object: delivery model.
+29. Source notes, claim: every access requirement is source-backed and date stamped, proof object: source appendix.

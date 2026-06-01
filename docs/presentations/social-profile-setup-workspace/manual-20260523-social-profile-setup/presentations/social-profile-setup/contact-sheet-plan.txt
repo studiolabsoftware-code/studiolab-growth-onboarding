@@ -1,0 +1,14 @@
+01 cover with large path visual
+02 split-screen identifier versus authorisation
+03 security handoff diagram
+04 pre-flight checklist
+05 three-area product map
+06 setup order timeline
+07 platform permission card
+08 browser UI click path
+09 OAuth modal and selection panel
+10 verification board
+Repeat platform chapter rhythm with varied visual objects, avoiding three identical layouts in sequence.
+27 operations verification board
+28 production package model
+29 source appendix

@@ -1,0 +1,8 @@
+task mode: create
+primary deck-profile: product-platform
+secondary gates: gtm-growth onboarding clarity, customer self-service clarity
+required proof objects: connection architecture map, profile-by-profile setup frames, permission matrix, internal verification board, production package model
+source and asset requirements: use the StudioLAB Growth logo and icon from existing workspace assets; use the user-provided onboarding screenshot; cite vendor and platform support pages for connection requirements; represent authenticated platform screens as screenshot-style panels when direct live screenshots cannot be captured
+brand authenticity constraints: do not recreate third-party logos; use text labels and neutral platform badges only; use StudioLAB Growth official workspace assets only
+profile-specific QA gates: show the product system rather than isolated feature cards; every connector has meaning; each slide has one claim and one visual proof object; platform claims are source-backed
+known missing inputs: live StudioLAB Growth demo account screenshots and authenticated Meta, Google, TikTok and YouTube authorisation screens are not available in this workspace

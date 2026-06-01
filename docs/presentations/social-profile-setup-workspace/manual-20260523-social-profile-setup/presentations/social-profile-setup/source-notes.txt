@@ -1,0 +1,29 @@
+Assets:
+- StudioLAB Growth logo: outputs/studiolab-growth-facebook-header/assets/studiolab-growth-logo.png, workspace-owned StudioLAB Growth brand asset.
+- StudioLAB icon: outputs/studiolab-growth-facebook-header/assets/studiolab-icon.png, workspace-owned StudioLAB brand asset.
+- Onboarding form screenshot: /Users/gary/Desktop/Screenshot 2026-05-23 at 9.09.31 am.png, user-provided screenshot of the social profile collection form.
+
+Visual screenshot policy:
+- The deck uses the user-provided onboarding screenshot.
+- Live authenticated StudioLAB Growth, Meta, Google, TikTok and YouTube screens were not available in this workspace, so platform walkthrough slides use screenshot-style UI panels built from the verified click paths and permission requirements.
+- Replace these panels with fresh screen captures from a StudioLAB Growth demo account before recording final customer videos.
+
+Sources:
+- User access and sub-account staff permissions, https://help.gohighlevel.com/support/solutions/articles/48000982600-user-access
+- Sub-account roles and permissions, https://help.gohighlevel.com/support/solutions/articles/155000002544-user-roles-permissions-and-assigned-data-subaccount
+- OAuth permission transparency, https://help.gohighlevel.com/support/solutions/articles/155000005002-api-security-oauth-consent-for-marketplace-apps
+- Facebook integration setup, https://help.gohighlevel.com/support/solutions/articles/48001157632-step-by-step-guide-to-facebook-integration-in-highlevel
+- Facebook multi-page lead ads integration, https://help.gohighlevel.com/support/solutions/articles/155000004537-facebook-multi-page-lead-ads-integration
+- Facebook Page publishing setup, https://help.gohighlevel.com/support/solutions/articles/48001210327-how-to-connect-to-your-facebook-page-s-
+- Facebook and Instagram Messenger setup, https://help.gohighlevel.com/support/solutions/articles/155000005068-getting-started-setup-facebook-and-instagram-messenger
+- Instagram direct and Facebook-linked integration, https://help.gohighlevel.com/support/solutions/articles/48001213003-connect-instagram-facebook-linked-vs-direct-instagram-integration
+- Google Business Profile integration, https://help.gohighlevel.com/support/solutions/articles/48001222899
+- Google Business Profile post scheduler, https://help.gohighlevel.com/support/solutions/articles/155000007212-google-business-profile-gbp-post-scheduler-in-highlevel
+- Google Business Profile owner and manager roles, https://support.google.com/business/answer/3403100
+- TikTok Social Planner connection, https://help.gohighlevel.com/support/solutions/articles/48001227317-connect-tiktok-in-social-planner
+- TikTok lead ads integration, https://help.gohighlevel.com/support/solutions/articles/48001223558-how-to-integrate-tiktok-lead-ads
+- TikTok DMs and comment automations, https://help.gohighlevel.com/support/solutions/articles/155000006703-tiktok-dms-comment-automations
+- TikTok account and asset permissions, https://ads.tiktok.com/help/article/about-assets-and-asset-level-permissions
+- TikTok Business Center account management, https://ads.tiktok.com/help/article/manage-tiktok-accounts-business-center
+- YouTube scheduling in Social Planner, https://help.gohighlevel.com/support/solutions/articles/155000002838-schedule-your-youtube-shorts-and-videos-in-social-planner
+- YouTube channel permissions and Brand Account delegation limitations, https://support.google.com/youtube/answer/9367690

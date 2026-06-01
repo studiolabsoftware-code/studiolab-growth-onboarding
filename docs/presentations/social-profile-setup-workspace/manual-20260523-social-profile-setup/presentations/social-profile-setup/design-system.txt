@@ -1,0 +1,14 @@
+slide size: 1280x720
+background system: white and very light StudioLAB surface with deep indigo text; dark indigo chapter slides for contrast
+typography: Inter-like sans using Aptos fallback; large claim titles, compact labels
+palette: StudioLAB indigo #4A3F8A, action magenta #E8197F, foreground #13102E, muted #6B6D8A, border #DFE0EC, surface #F8F7FC, ok #047857, warn #B45309, crit #B91C1C, info #0284C7
+chart grammar: direct labels, no legends unless unavoidable
+diagram grammar: browser or product panels use left nav, content region, highlighted click target, and numbered cursor markers
+connector grammar: thin indigo lines for product sequence; magenta only for active click targets
+container grammar: cards represent real permission groups, verification states or setup routes
+source/footer grammar: quiet footer with Source note and slide number
+page marker grammar: bottom-right 2-digit slide number
+title/kicker grammar: small uppercase kicker plus bold claim title
+brand asset policy: use StudioLAB Growth logo and icon from workspace assets; do not recreate third-party logos
+allowed layout families: cover, split screen, workflow map, browser UI frame, permission card, verification board, source appendix
+banned motifs: decorative blobs, fake third-party logos, feature card grids without workflow meaning, em dashes
