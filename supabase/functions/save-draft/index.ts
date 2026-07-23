@@ -24,6 +24,14 @@ const ALLOWED_FIELDS = new Set([
   'email_tone','footer_notes','studio_description','from_name','reply_email',
   'custom_domain','email_domain','dns_access','sms_type','area_code','port_number',
   'sms_tone','lead_sources','kb_profile','kb_classes',
+  // Onboarding form refinement (migration 044). Additive, contract-safe.
+  // sms_setup_requested replaces the retired number-preference / Twilio /
+  // porting capture; the retired sms_type/area_code/port_number/has_twilio/
+  // twilio_number keys stay in the allow-list so older drafts still round-trip,
+  // but the current form no longer sends them. Consent trio is the audited
+  // send-on-behalf authorisation from the review step.
+  'sms_setup_requested',
+  'consent_send_on_behalf','consent_captured_at','consent_version',
   'kb_pricing','kb_price_quoting','kb_policies','kb_events','kb_faqs','kb_restricted',
   'kb_tone','voice_hours','voice_escalate','extra_notes',
   // Optional future-proof URLs for studios planning to upgrade later.
@@ -98,6 +106,19 @@ Deno.serve(async (req) => {
     delete (update as Record<string, unknown>).contact_email;
 
     if (finalize === true) {
+      // Send-on-behalf consent is a legal authorisation to email/SMS families
+      // on the studio's behalf. The client blocks submit without it, but a
+      // direct API call could set finalize:true and skip that gate, so refuse
+      // server-side too. Merge the incoming payload value over the stored row.
+      const consentGiven = (update.consent_send_on_behalf as boolean | null | undefined)
+        ?? (row.consent_send_on_behalf as boolean | null | undefined);
+      if (consentGiven !== true) {
+        return jsonResponse({
+          ok: false,
+          error: 'Send-on-behalf consent is required before submitting.',
+          code: 'consent_required',
+        }, 400);
+      }
       update.status = 'submitted';
       update.submitted_at = new Date().toISOString();
       // The session token deliberately stays valid after finalize so the

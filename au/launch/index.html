@@ -101,6 +101,7 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🏫</div>Studio</div>
+      <div class="co co-blue" style="margin-bottom:12px;">Let's start with the basics. If anything here is already filled in from your signup, just check it looks right and add whatever is missing.</div>
       <div class="fr x1">
         <div class="f">
           <label for="studioName">Studio name <span class="req">*</span></label>
@@ -157,7 +158,7 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🏛️</div>Business details</div>
-      <div class="co co-blue" style="margin-bottom:12px;">These are the legal details that appear on your invoices and in the small print at the bottom of every email we send on your behalf. US and Australian law require this. You'll only enter it once.</div>
+      <div class="co co-blue" style="margin-bottom:12px;">These are optional, and you can add them now or send them to us later. They appear on your invoices and in the small print at the bottom of every email we send for you, which US and Australian law require, and on text-enabled plans they are also what registers your studio's texting number with the carriers. You will only enter them once.</div>
       <div class="fr">
         <div class="f">
           <label for="legalName">Legal business name </label>
@@ -224,7 +225,7 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">📍</div>Registered business address</div>
-      <div class="co co-blue" style="margin-bottom:12px;">This appears in the small print at the bottom of every commercial email we send for you — required by US (CAN-SPAM) and Australian (SPAM Act) law. Use a real street address, not a PO Box.</div>
+      <div class="co co-blue" style="margin-bottom:12px;">This appears in the small print at the bottom of every commercial email we send for you, as US (CAN-SPAM) and Australian (SPAM Act) law require. Use a real street address, not a PO Box.</div>
       <div class="fr x1">
         <div class="f">
           <label for="addressStreet">Street address </label>
@@ -309,8 +310,8 @@
         <div class="ct"><div class="ct-icon" aria-hidden="true">📈</div>Planning to grow? <span class="future-proof-pill">Optional</span></div>
         <span class="future-proof-toggle" aria-hidden="true"></span>
       </summary>
-      <p class="future-proof-hint">Add your online listings now and lead-source and review automations can switch on the moment you upgrade. Skip if you'd rather come back to it later.</p>
-      <p class="future-proof-hint" style="margin-top:6px;">URLs only — no passwords. When you upgrade, you'll connect each platform via OAuth from Settings → Integrations inside StudioLAB Growth (about 2 minutes per platform).</p>
+      <p class="future-proof-hint">Share your online listings now so we can see your studio's style and tag you in the right places when you upgrade. Lead-source and review automations then switch on the moment you do. Skip if you would rather come back to it later.</p>
+      <p class="future-proof-hint" style="margin-top:6px;">URLs only, no passwords. The actual connection happens together during setup, where you connect each platform via OAuth from Settings → Integrations inside StudioLAB Growth (about 2 minutes per platform).</p>
       <div class="fr">
         <div class="f">
           <label for="googleBusinessUrl">Google Business profile URL</label>
@@ -445,19 +446,19 @@
       </div>
       <div class="sig-preview">
         <div class="sig-preview-label">Preview</div>
-        <div class="sig-preview-body" id="signOffPreview">—</div>
+        <div class="sig-preview-body" id="signOffPreview">Your sign-off will appear here</div>
       </div>
       <input type="hidden" id="signOff">
     </div>
     </div>
 
     <div class="card">
-    <div class="ct"><div class="ct-icon" aria-hidden="true">🌐</div>Custom email domain</div>
-    <div class="co co-amber"><strong>Strongly recommended.</strong> Sending from your own domain (e.g. @yourstudio.com) significantly improves deliverability and prevents emails landing in spam. Requires a DNS record change. We provide the exact records to add.</div>
+    <div class="ct"><div class="ct-icon" aria-hidden="true">🌐</div>Custom email domain <span class="hint">optional</span></div>
+    <div class="co co-blue">Sending from your own domain (e.g. @yourstudio.com) helps your emails land in the inbox instead of the spam folder. If you would like this, just tell us the domain and <strong>we set up SPF, DKIM, and DMARC for you during onboarding.</strong> There is nothing technical for you to do.</div>
     <div class="f">
-      <span class="f-q-label" id="lbl-dns">Would you like to set up a custom sending domain?</span>
+      <span class="f-q-label" id="lbl-dns">Do you have your own website domain you would like emails to come from?</span>
       <div class="yn" id="dnsYN" role="radiogroup" aria-labelledby="lbl-dns">
-        <button type="button" class="yn-b" id="dnsY" data-yn="dns" data-val="true" role="radio" aria-checked="false">Yes, set it up</button>
+        <button type="button" class="yn-b" id="dnsY" data-yn="dns" data-val="true" role="radio" aria-checked="false">Yes</button>
         <button type="button" class="yn-b" id="dnsN" data-yn="dns" data-val="false" role="radio" aria-checked="false">No, use built-in email for now</button>
       </div>
     </div>
@@ -466,10 +467,9 @@
         <div class="f">
           <label for="emailDomain">Your email domain </label>
           <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com">
-          <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
+          <span class="field-note">Just the domain, not a full URL. We handle all the technical setup during onboarding, so you will not need to touch any DNS records yourself.</span>
         </div>
       </div>
-      <div class="co co-amber" style="margin-bottom:0; margin-top:8px;"><strong>Heads up: this needs DNS changes.</strong> We will generate the DKIM and Return Path records and send them across with clear instructions. You will then need to sign in to your domain or email hosting provider (GoDaddy, Crazy Domains, Cloudflare, etc.) and add them to the DNS settings yourself. <span><strong>If you choose Done-For-You:</strong> Not comfortable with that? Give us admin access during setup and we will add the records for you.</span>Propagation takes 1 to 48 hours once the records are live.</div>
     </div>
     </div>
 
@@ -491,7 +491,7 @@
 
     <div class="card">
       <div class="ct" id="lbl-setup-review"><div class="ct-icon" aria-hidden="true">🛠️</div>Choose your setup option</div>
-      <p style="margin:0 0 12px; color:var(--g6); font-size:13px; line-height:1.55;">You can have us build the whole account for you, or follow our guided checklist and configure it yourself. Same outcome either way — pick what fits your time and confidence.</p>
+      <p style="margin:0 0 12px; color:var(--g6); font-size:13px; line-height:1.55;">You can have us build the whole account for you, or follow our guided checklist and configure it yourself. Same outcome either way, so pick what fits your time and confidence.</p>
       <div class="setup-grid" role="radiogroup" aria-labelledby="lbl-setup-review">
         <label class="setup-card sel" id="sc-dfy" data-setup="dfy">
           <input type="radio" name="setup" value="dfy" aria-label="Done-For-You: our team configures your account, typically 5 to 7 business days" checked>
@@ -579,8 +579,8 @@
 
     <div class="card" style="margin-top:14px;">
       <div class="ct"><div class="ct-icon" aria-hidden="true">📎</div>Attachments <span class="hint">optional</span></div>
-      <p class="attach-hint">Drop in anything that helps us set you up faster — brand guidelines, contracts, exported docs, spreadsheets. <strong>Up to 5 files, 25 MB each.</strong> PDF, PNG, JPG, SVG, DOCX, DOC, XLSX, XLS.</p>
-      <div class="attach-retention"><span class="attach-retention-ico" aria-hidden="true">🔒</span><span>Files we keep auto-delete 7 days after your onboarding is complete, or 90 days from upload — whichever is sooner.</span></div>
+      <p class="attach-hint">Drop in anything that helps us set you up faster, such as brand guidelines, contracts, exported docs, or spreadsheets. <strong>Up to 5 files, 25 MB each.</strong> PDF, PNG, JPG, SVG, DOCX, DOC, XLSX, XLS.</p>
+      <div class="attach-retention"><span class="attach-retention-ico" aria-hidden="true">🔒</span><span>Files we keep auto-delete 7 days after your onboarding is complete, or 90 days from upload, whichever is sooner.</span></div>
       <div id="attachZone" class="attach-zone" role="button" tabindex="0" aria-label="Upload files. Drag and drop, or press Enter to choose files." aria-describedby="attachZoneSecondary">
         <div class="attach-zone-ico" aria-hidden="true">⬆️</div>
         <div class="attach-zone-primary">Drag files here, or click to choose</div>
@@ -597,6 +597,17 @@
     <div class="hp" aria-hidden="true">
       <label for="hp-company">Company (leave blank)</label>
       <input type="text" id="hp-company" tabindex="-1" autocomplete="off">
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <div class="ct"><div class="ct-icon" aria-hidden="true">✅</div>Permission to send on your behalf <span class="req">*</span></div>
+      <div class="f">
+        <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer; font-size:13px; line-height:1.55; color:var(--g6);">
+          <input type="checkbox" id="consentSendOnBehalf" style="margin-top:3px; flex:none;">
+          <span>I authorise StudioLAB Growth to send emails and text messages to my families on my studio's behalf, using the studio name, branding, and contact details I have provided, for the automations and communications included in my plan. I confirm I am authorised to give this permission for my studio.</span>
+        </label>
+        <span class="field-err">Please confirm this to continue.</span>
+      </div>
     </div>
 
     <div class="submit-err" id="submitErr" role="alert">Something went wrong. Please try again, or email <a href="mailto:info@studiolabsoftware.com">info@studiolabsoftware.com</a> if it keeps failing.</div>
