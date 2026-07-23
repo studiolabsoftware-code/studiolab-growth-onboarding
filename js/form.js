@@ -1247,7 +1247,9 @@
       reply_email: valOrNull('replyEmail'),
       custom_domain: state.yn.dns,
       email_domain: state.yn.dns ? valOrNull('emailDomain') : null,
-      dns_access: state.yn.dns ? valOrNull('dnsAccess') : null,
+      // dns_access retired: the DNS self-assessment was removed from the form
+      // (SPF/DKIM/DMARC is done by us in onboarding). Column is left in place;
+      // we simply no longer write it. The Connector never reads it.
 
       sms_type: isScalePlus ? valOrNull('smsType') : null,
       has_twilio: isScalePlus ? !!(document.getElementById('hasTwilio') && document.getElementById('hasTwilio').checked) : null,

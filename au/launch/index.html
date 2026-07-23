@@ -126,8 +126,8 @@
       </div>
       <div class="fr x1">
         <div class="f">
-          <label for="timezone">Time zone <span class="req">*</span></label>
-          <select id="timezone" data-required>
+          <label for="timezone">Time zone </label>
+          <select id="timezone">
             <option value="">Select</option>
             <optgroup label="Australia">
               <option value="Australia/Sydney">Sydney / Melbourne (AEST)</option>
@@ -160,8 +160,8 @@
       <div class="co co-blue" style="margin-bottom:12px;">These are the legal details that appear on your invoices and in the small print at the bottom of every email we send on your behalf. US and Australian law require this. You'll only enter it once.</div>
       <div class="fr">
         <div class="f">
-          <label for="legalName">Legal business name <span class="req">*</span></label>
-          <input type="text" id="legalName" data-required placeholder="e.g. Dance Academy LLC">
+          <label for="legalName">Legal business name </label>
+          <input type="text" id="legalName" placeholder="e.g. Dance Academy LLC">
           <span class="field-note">Exactly as it appears on your tax registration.</span>
           <span class="field-err">Please enter your legal business name.</span>
         </div>
@@ -173,8 +173,8 @@
       </div>
       <div class="fr">
         <div class="f">
-          <label for="businessType">Business type <span class="req">*</span></label>
-          <select id="businessType" data-required>
+          <label for="businessType">Business type </label>
+          <select id="businessType">
             <option value="">Select</option>
             <option value="sole_prop">Sole Proprietor</option>
             <option value="llc">LLC</option>
@@ -188,25 +188,25 @@
           <span class="field-err">Please select your business type.</span>
         </div>
         <div class="f" id="einField" hidden>
-          <label for="ein">EIN <span class="req">*</span></label>
+          <label for="ein">EIN </label>
           <input type="text" id="ein" placeholder="XX-XXXXXXX" inputmode="numeric" maxlength="10">
           <span class="field-note">Your IRS Employer Identification Number.</span>
           <span class="field-err">Please enter your EIN.</span>
         </div>
         <div class="f" id="ssnField" hidden>
-          <label for="ssnLast4">Last 4 of owner SSN <span class="req">*</span></label>
+          <label for="ssnLast4">Last 4 of owner SSN </label>
           <input type="password" id="ssnLast4" placeholder="••••" inputmode="numeric" maxlength="4" autocomplete="off">
           <span class="field-note">Required by US carriers to register a Sole Proprietor SMS sender. We never see the full number.</span>
           <span class="field-err">Please enter the last 4 digits.</span>
         </div>
         <div class="f" id="abnField" hidden>
-          <label for="abn">ABN <span class="req">*</span></label>
+          <label for="abn">ABN </label>
           <input type="text" id="abn" placeholder="11 222 333 444" inputmode="numeric" maxlength="14">
           <span class="field-note">Your Australian Business Number (11 digits).</span>
           <span class="field-err">Please enter your ABN.</span>
         </div>
         <div class="f" id="acnField" hidden>
-          <label for="acn">ACN <span class="req">*</span></label>
+          <label for="acn">ACN </label>
           <input type="text" id="acn" placeholder="123 456 789" inputmode="numeric" maxlength="11">
           <span class="field-note">Australian Company Number (9 digits, Pty Ltd only).</span>
           <span class="field-err">Please enter your ACN.</span>
@@ -214,8 +214,8 @@
       </div>
       <div class="fr x1">
         <div class="f">
-          <label for="businessEmail">Business email address <span class="req">*</span></label>
-          <input type="email" id="businessEmail" data-required placeholder="hello@yourstudio.com">
+          <label for="businessEmail">Business email address </label>
+          <input type="email" id="businessEmail" placeholder="hello@yourstudio.com">
           <span class="field-note" id="businessEmailNote">Used on your business profile, invoices, and SMS sender registration.</span>
           <span class="field-err">Please enter a business email address.</span>
         </div>
@@ -227,32 +227,32 @@
       <div class="co co-blue" style="margin-bottom:12px;">This appears in the small print at the bottom of every commercial email we send for you — required by US (CAN-SPAM) and Australian (SPAM Act) law. Use a real street address, not a PO Box.</div>
       <div class="fr x1">
         <div class="f">
-          <label for="addressStreet">Street address <span class="req">*</span></label>
-          <input type="text" id="addressStreet" data-required placeholder="e.g. 123 Main Street, Suite 4">
+          <label for="addressStreet">Street address </label>
+          <input type="text" id="addressStreet" placeholder="e.g. 123 Main Street, Suite 4">
           <span class="field-err">Please enter your street address.</span>
         </div>
       </div>
       <div class="fr">
         <div class="f">
-          <label for="addressCity">City / suburb <span class="req">*</span></label>
-          <input type="text" id="addressCity" data-required placeholder="e.g. Melbourne">
+          <label for="addressCity">City / suburb </label>
+          <input type="text" id="addressCity" placeholder="e.g. Melbourne">
           <span class="field-err">Please enter your city.</span>
         </div>
         <div class="f">
-          <label for="addressRegion">State / region <span class="req">*</span></label>
-          <input type="text" id="addressRegion" data-required placeholder="e.g. VIC or California">
+          <label for="addressRegion">State / region </label>
+          <input type="text" id="addressRegion" placeholder="e.g. VIC or California">
           <span class="field-err">Please enter your state or region.</span>
         </div>
       </div>
       <div class="fr">
         <div class="f">
-          <label for="addressPostcode">Postcode / ZIP <span class="req">*</span></label>
-          <input type="text" id="addressPostcode" data-required placeholder="e.g. 3000 or 90210">
+          <label for="addressPostcode">Postcode / ZIP </label>
+          <input type="text" id="addressPostcode" placeholder="e.g. 3000 or 90210">
           <span class="field-err">Please enter your postcode.</span>
         </div>
         <div class="f">
-          <label for="website">Website URL <span class="req">*</span></label>
-          <input type="text" id="website" data-required placeholder="yourstudio.com">
+          <label for="website">Website URL </label>
+          <input type="text" id="website" placeholder="yourstudio.com">
           <span class="field-note">Just the domain. We add https:// for you.</span>
           <span class="field-err">Please enter a valid website URL.</span>
         </div>
@@ -268,27 +268,27 @@
         <div class="ct"><div class="ct-icon" aria-hidden="true">👤</div>Primary contact</div>
         <div class="fr">
           <div class="f">
-            <label for="firstName">First name <span class="req">*</span></label>
-            <input type="text" id="firstName" data-required placeholder="Sarah">
+            <label for="firstName">First name </label>
+            <input type="text" id="firstName" placeholder="Sarah">
             <span class="field-err">Please enter your first name.</span>
           </div>
           <div class="f">
-            <label for="lastName">Last name <span class="req">*</span></label>
-            <input type="text" id="lastName" data-required placeholder="Johnson">
+            <label for="lastName">Last name </label>
+            <input type="text" id="lastName" placeholder="Johnson">
             <span class="field-err">Please enter your last name.</span>
           </div>
         </div>
         <div class="fr x1">
           <div class="f">
-            <label for="contactEmail">Email address <span class="req">*</span></label>
-            <input type="email" id="contactEmail" data-required placeholder="sarah@yourstudio.com">
+            <label for="contactEmail">Email address </label>
+            <input type="email" id="contactEmail" placeholder="sarah@yourstudio.com">
             <span class="field-err">Please enter a valid email address.</span>
           </div>
         </div>
         <div class="fr">
           <div class="f">
-            <label for="contactPhone">Phone <span class="req">*</span></label>
-            <input type="tel" id="contactPhone" data-required placeholder="+61 4XX XXX XXX">
+            <label for="contactPhone">Phone </label>
+            <input type="tel" id="contactPhone" placeholder="+61 4XX XXX XXX">
             <span class="field-err">Please enter your phone number.</span>
           </div>
           <div class="f">
@@ -374,10 +374,10 @@
       <div class="ct"><div class="ct-icon" aria-hidden="true">🎨</div>Brand colours</div>
       <div class="brand-cols">
         <div class="brand-col">
-          <label for="col1t">Primary <span class="req">*</span></label>
+          <label for="col1t">Primary </label>
           <div class="cf cf-tight">
             <input type="color" id="col1p" value="#E8197F" aria-label="Primary colour picker">
-            <input type="text" id="col1t" placeholder="#E8197F" maxlength="7" data-required>
+            <input type="text" id="col1t" placeholder="#E8197F" maxlength="7">
           </div>
           <span class="field-err">Please choose a primary colour.</span>
         </div>
@@ -416,14 +416,14 @@
       <div class="co co-blue">These control how your emails appear in families' inboxes. The <strong>From name</strong> is what they see first, and the <strong>Reply-to email</strong> is where replies go. Get these right and your emails feel personal, not automated.</div>
       <div class="fr">
         <div class="f">
-          <label for="fromName">From name <span class="req">*</span></label>
-          <input type="text" id="fromName" data-required placeholder="e.g. Sarah at Dance Academy">
+          <label for="fromName">From name </label>
+          <input type="text" id="fromName" placeholder="e.g. Sarah at Dance Academy">
           <span class="field-note">This is what appears as the sender name in the inbox. Keep it personal: first name or first name plus studio works best.</span>
           <span class="field-err">Please enter a From name.</span>
         </div>
         <div class="f">
-          <label for="replyEmail">Reply-to email address <span class="req">*</span></label>
-          <input type="email" id="replyEmail" data-required placeholder="hello@yourstudio.com">
+          <label for="replyEmail">Reply-to email address </label>
+          <input type="email" id="replyEmail" placeholder="hello@yourstudio.com">
           <span class="field-note">Where family replies will go. Usually your main studio email.</span>
           <span class="field-err">Please enter a valid reply-to email.</span>
         </div>
@@ -434,8 +434,8 @@
       <div class="ct"><div class="ct-icon" aria-hidden="true">✍️</div>Email sign-off</div>
       <div class="sig-rows">
         <div class="f">
-          <label for="signOffLine1">Line 1 <span class="hint">your name</span> <span class="req">*</span></label>
-          <input type="text" id="signOffLine1" data-required placeholder="e.g. Sarah Johnson" autocomplete="off">
+          <label for="signOffLine1">Line 1 <span class="hint">your name</span> </label>
+          <input type="text" id="signOffLine1" placeholder="e.g. Sarah Johnson" autocomplete="off">
           <span class="field-err">Please enter at least a name.</span>
         </div>
         <div class="f">
@@ -464,7 +464,7 @@
     <div class="cond" id="dnsCond">
       <div class="fr x1">
         <div class="f">
-          <label for="emailDomain">Your email domain <span class="req">*</span></label>
+          <label for="emailDomain">Your email domain </label>
           <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com">
           <span class="field-note">The domain you want to send from. Just the domain, not a full URL.</span>
         </div>
