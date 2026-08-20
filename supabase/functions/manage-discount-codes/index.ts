@@ -4,6 +4,7 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { getCallerProfile } from '../_shared/caller.ts';
+import { normaliseDiscountCode } from '../_shared/discount-code.ts';
 
 const VALID_KINDS = new Set(['percentage', 'fixed_amount']);
 const VALID_CURRENCIES = new Set(['AUD', 'USD']);
@@ -15,12 +16,11 @@ function parseIsoOrNull(v: unknown): string | null {
   return d.toISOString();
 }
 
-function normaliseCode(raw: unknown): string {
-  // Trim outer whitespace, uppercase, collapse internal whitespace runs to
-  // a single hyphen (so "EARLY BIRD" becomes "EARLY-BIRD"). Keeps the
-  // stored code URL-safe + easy to type at checkout.
-  return String(raw || '').trim().toUpperCase().replace(/\s+/g, '-');
-}
+// Moved to _shared/discount-code.ts on 2026-08-21 so the checkout lookup imports the SAME function
+// rather than keeping its own near-copy. The two had already drifted: this side collapsed internal
+// whitespace to a hyphen, the reader did not, so "EARLY BIRD" was stored as "EARLY-BIRD" and could
+// never be redeemed by typing it. Now there is one definition to get wrong instead of two.
+const normaliseCode = normaliseDiscountCode;
 
 function validatePayload(body: Record<string, unknown>): { ok: true; patch: Record<string, unknown> } | { ok: false; error: string } {
   const patch: Record<string, unknown> = {};

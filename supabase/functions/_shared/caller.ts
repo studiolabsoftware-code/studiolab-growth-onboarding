@@ -88,7 +88,12 @@ function base64UrlDecode(s: string): string {
   return atob(toStandardBase64(s));
 }
 
-function base64UrlToBytes(s: string): Uint8Array {
+// Returns Uint8Array<ArrayBuffer>, not a bare Uint8Array: `new Uint8Array(len)` below allocates its
+// own ArrayBuffer, but the wider annotation resolved to Uint8Array<ArrayBufferLike>, which is not a
+// BufferSource, which is why crypto.subtle.verify above would not type-check. Tightening the return
+// type is the accurate fix; casting at the call site would have hidden a real signature-verification
+// path behind an assertion.
+function base64UrlToBytes(s: string): Uint8Array<ArrayBuffer> {
   const b64 = toStandardBase64(s);
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
@@ -120,9 +125,15 @@ export async function getCallerProfile(req: Request): Promise<CallerProfile | nu
 
   const email = String(userData.user.email).toLowerCase();
   const sb = adminClient();
+  // LIKE-METACHARACTER SAFETY (2026-08-21). This used .ilike() on the address from a verified JWT.
+  // `%` and `_` are LIKE wildcards and `%` is a legal email local-part character (RFC 5321), so an
+  // account whose own verified address contained one could match a DIFFERENT admin row and inherit
+  // that person's role. Narrow, but free to close. Production has zero mixed-case admin_users rows
+  // and `email` is already lower-cased above, so .eq() is equivalent for real data. Same defect
+  // class as the send-otp / verify-otp fix a day earlier; this pass swept what that one did not.
   const { data: row } = await sb.from('admin_users')
     .select('id, email, name, role, is_active')
-    .ilike('email', email)
+    .eq('email', email)
     .maybeSingle();
   if (!row || !row.is_active) return null;
   return row as CallerProfile;

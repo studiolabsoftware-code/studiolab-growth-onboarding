@@ -69,11 +69,19 @@ written down: a session that does not know these exist will ship auth changes wi
 deno check supabase/functions/<function>/index.ts
 
 # 2. Run the unit tests. Deno's runner needs nothing installed and nothing committed but the tests.
-deno test supabase/functions/_shared/prebind.test.ts
+#    --allow-read, and the whole directory rather than one file: no-like-wildcards.test.ts scans the
+#    Edge Function sources for `.ilike(` and needs to read them.
+deno test --allow-read supabase/functions/_shared/
 
 # 3. The form is a plain script, so at minimum parse it.
 node --check js/form.js
 ```
+
+**Four functions did not type-check at all until 2026-08-21** (`manage-admin-users`,
+`create-custom-invoice`, `create-quote`, `manage-discount-codes`), because the gate above did not
+exist before 2026-08-20 and nobody had ever run `deno check` on them. All four are clean now. If you
+touch a function that has never been checked, expect to fix something unrelated to your change, and
+fix it rather than skipping the gate.
 
 **Put testable logic in `supabase/functions/_shared/`, not in an `index.ts`.** The entrypoints cannot
 be imported under `deno test` without a Deno runtime and live env vars, so anything embedded in one is

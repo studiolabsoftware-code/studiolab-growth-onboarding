@@ -227,9 +227,11 @@ Deno.serve(async (req) => {
         contactRow = data;
       } else if ('email' in recipient && recipient.email) {
         const normEmail = recipient.email.trim().toLowerCase();
+        // LIKE-METACHARACTER SAFETY (2026-08-21). Same site, same fault, same fix as
+        // create-custom-invoice: request-body input, .ilike() turned it into a pattern match.
         const { data: existing } = await sb.from('external_contacts')
           .select('id, email, name, country, stripe_customer_id')
-          .ilike('email', normEmail)
+          .eq('email', normEmail)
           .maybeSingle();
         if (existing) {
           contactRow = existing;

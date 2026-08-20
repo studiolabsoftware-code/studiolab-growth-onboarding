@@ -198,3 +198,24 @@ production rows are unchanged.
 - Onboarding form refinement: optional fields, SMS collapse, consent, honest copy.
 - Socials retirement: pasted `facebook`/`instagram`/`tiktok`/`youtube` handles gone
   from all six routes. Facebook as a *lead source* on Scale and Dominate AI stands.
+
+## Moved out of IN-FLIGHT 2026-08-21 (settled, no longer live state)
+
+## State of the Scenario B thread
+
+- **C1 `signup-webhook-receiver` is DEPLOYED and INERT.** It mints the pre-bind token and emails
+  `…/{region}/{plan}?t=<token>`. Nothing calls it until step 3 above.
+- **Tier 2 pre-fill (address, phone, website) is CANCELLED** on its own evidence: the fleet-wide
+  check found those fields absent or junk. The form still ASKS for them, deliberately.
+- **Studio-specific branding of the form is not possible.** The ADR-0018 fleet scan found zero
+  branding custom values anywhere, so there is nothing to pull.
+- **The match-at-Connect seam is not dead yet.** C3 made `location_id` readable; `conversation-bind`
+  still resolves by an email guess. That slice is queued in the Connector's `IN-FLIGHT.md`.
+
+## Answered, recorded so it is not re-asked
+
+- **Does the platform send its own signup email?** Yes, and it links to this form. Gary is disabling
+  it as part of the cutover.
+- **Why is there still an OTP on the token path?** The token is a bearer credential sitting in an
+  inbox. It removes typing, never verification. Worst case for a forwarded link is a code mailed to
+  the legitimate studio.

@@ -97,10 +97,16 @@ Deno.serve(async (req) => {
     let senderRole: 'admin' | 'studio' = 'studio';
     let senderAdminId: string | null = null;
     if (fromEmail) {
+      // LIKE-METACHARACTER SAFETY (2026-08-21). This is the worst of the sweep: fromEmail comes off
+      // the From header of an INBOUND EMAIL, so anyone who can send mail to the inbound address
+      // controls it. With .ilike(), a From of `%@yourdomain.com` matched an admin row and the message
+      // was filed as sent BY that admin rather than by a studio - sender spoofing inside the inbox,
+      // from an unauthenticated position. extractEmail() already lower-cases, and production has zero
+      // mixed-case admin_users rows, so .eq() changes nothing for real mail.
       const { data: admin } = await sb
         .from('admin_users')
         .select('id, email, name')
-        .ilike('email', fromEmail)
+        .eq('email', fromEmail)
         .eq('is_active', true)
         .maybeSingle();
       if (admin) {

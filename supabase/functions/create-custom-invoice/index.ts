@@ -208,9 +208,13 @@ Deno.serve(async (req) => {
         const normEmail = recipient.email.trim().toLowerCase();
         // Look up by email first — re-invoicing the same person should
         // converge on the existing row.
+        // LIKE-METACHARACTER SAFETY (2026-08-21). normEmail is request-body input. With .ilike() an
+        // admin posting `%` attached the invoice to whichever single contact happened to match, or
+        // fell through and created a junk contact row with `%` as its address. Production has zero
+        // mixed-case external_contacts rows, so .eq() is equivalent for real data.
         const { data: existing } = await sb.from('external_contacts')
           .select('id, email, name, country, stripe_customer_id')
-          .ilike('email', normEmail)
+          .eq('email', normEmail)
           .maybeSingle();
         if (existing) {
           contactRow = existing;
@@ -397,7 +401,7 @@ Deno.serve(async (req) => {
       const draftRead = await stripeRequest<StripeInvoiceShape>(
         'GET',
         `invoices/${encodeURIComponent(invoiceId)}`,
-        undefined,
+        null,
         secretKey,
       );
       if (!draftRead.ok || !draftRead.body) {

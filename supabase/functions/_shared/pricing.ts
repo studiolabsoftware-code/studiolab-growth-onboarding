@@ -5,6 +5,7 @@
 // is added by Stripe Tax at Checkout time via automatic_tax.
 
 import { adminClient } from './supabase.ts';
+import { normaliseDiscountCode } from './discount-code.ts';
 
 export type Currency = 'AUD' | 'USD';
 export type Plan = 'launch' | 'scale' | 'ai';
@@ -98,11 +99,26 @@ export async function resolvePricing(args: {
   let discountId: string | null = null;
   let discountCode: string | null = null;
   if (args.discount_code) {
-    const raw = String(args.discount_code).trim().toUpperCase();
+    // LIKE-METACHARACTER SAFETY (2026-08-21), and this is the one that mattered. `discount_code`
+    // comes straight off the request body of create-checkout-session, which is a PUBLIC path, and it
+    // was only ever trimmed and upper-cased - never checked for LIKE metacharacters. With .ilike()
+    // a caller could post `%` and match whatever single code was in the table, applying a discount
+    // they were never given and never knew the name of. A pattern like `A%` also narrows the search,
+    // so codes could be found by probing rather than guessing outright. It was unexploitable on the
+    // day it was found only by luck: the one code in the table had expired three months earlier, and
+    // the expiry gate below caught it. It would have armed itself the moment a working code existed.
+    //
+    // The literal SAME function the write path uses, imported rather than re-typed. Reader and
+    // writer disagreeing about spaces meant a code created as "SUMMER 2026" was stored as
+    // "SUMMER-2026" and could never be redeemed by typing it the way it was written down.
+    const raw = normaliseDiscountCode(args.discount_code);
+    // A blank code is not a code. Without this an empty-after-normalisation string would be handed
+    // to .eq(), which matches a stored empty string perfectly happily.
+    if (!raw) return { ok: false, error: 'That discount code was not recognised.', code: 'discount_invalid' };
     const { data: codeRow } = await sb
       .from('discount_codes')
       .select('*')
-      .ilike('code', raw)
+      .eq('code', raw)
       .maybeSingle();
     if (!codeRow) return { ok: false, error: 'That discount code was not recognised.', code: 'discount_invalid' };
     if (!codeRow.active) return { ok: false, error: 'That discount code is no longer active.', code: 'discount_inactive' };

@@ -28,9 +28,12 @@ async function getCallerProfile(req: Request) {
   const { data: userData } = await client.auth.getUser();
   if (!userData?.user?.email) return null;
   const sb = adminClient();
+  // LIKE-METACHARACTER SAFETY (2026-08-21). Same swap as caller.ts, plus the .toLowerCase() this
+  // one was missing: .ilike() hid the fact that the JWT address was never normalised, and .eq() would
+  // silently stop matching a capitalised address without it.
   const { data: row } = await sb.from('admin_users')
     .select('id, email, name, role, is_active')
-    .ilike('email', userData.user.email)
+    .eq('email', String(userData.user.email).toLowerCase())
     .maybeSingle();
   if (!row || !row.is_active) return null;
   return row;

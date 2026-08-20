@@ -36,9 +36,13 @@ async function getCallerProfile(req: Request) {
 
   const email = String(userData.user.email).toLowerCase();
   const sb = adminClient();
+  // LIKE-METACHARACTER SAFETY (2026-08-21), all three admin_users lookups in this file. `email` is
+  // already lower-cased at every one of them and production has zero mixed-case rows, so .eq() is
+  // equivalent for real data. On the two request-body sites below it also stops an admin turning a
+  // uniqueness check into a pattern match.
   const { data: row } = await sb.from('admin_users')
     .select('id, email, name, role, is_active')
-    .ilike('email', email)
+    .eq('email', email)
     .maybeSingle();
   if (!row || !row.is_active) return null;
   return row;
@@ -69,7 +73,7 @@ Deno.serve(async (req) => {
       // If already exists, reactivate + update role/name rather than error.
       const { data: existing } = await sb.from('admin_users')
         .select('id, is_active, role')
-        .ilike('email', email)
+        .eq('email', email)
         .maybeSingle();
 
       let userId: string;
@@ -183,7 +187,7 @@ Deno.serve(async (req) => {
         if (e !== String(target.email).toLowerCase()) {
           const { data: clash } = await sb.from('admin_users')
             .select('id')
-            .ilike('email', e)
+            .eq('email', e)
             .maybeSingle();
           if (clash && clash.id !== id) {
             return jsonResponse({ ok: false, error: 'Another admin user already uses this email.' }, 400);
@@ -247,6 +251,6 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: false, error: 'Unknown action.' }, 400);
   } catch (err) {
     console.error('manage-admin-users error:', err);
-    return jsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+    return jsonResponse({ ok: false, error: String((err as { message?: unknown })?.message ?? err) }, 500);
   }
 });
