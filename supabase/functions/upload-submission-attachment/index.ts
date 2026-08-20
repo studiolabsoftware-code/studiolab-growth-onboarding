@@ -188,8 +188,17 @@ Deno.serve(async (req) => {
         if (!deliv) {
           return jsonResponse({ ok: false, error: 'Deliverable not found.' }, 404);
         }
-        // Supabase returns the joined row as an object (single related row).
-        const proj = (deliv as { projects?: { id: string; submission_id: string | null; external_contact_id: string | null } | null }).projects;
+        // The generated client types this embed as an ARRAY, while the runtime returns a single
+        // object for a to-one relation. The previous line asserted the object shape straight over the
+        // array type, which TS refuses because the two do not overlap - which is why this function has
+        // never type-checked. Normalising is better than casting harder: it takes the first element if
+        // an array really does arrive and the value itself otherwise, so it is right either way rather
+        // than right until the client changes its mind.
+        const rawProj = (deliv as unknown as { projects?: unknown }).projects;
+        const proj = (Array.isArray(rawProj) ? rawProj[0] : rawProj) as
+          | { id: string; submission_id: string | null; external_contact_id: string | null }
+          | null
+          | undefined;
         if (!proj) {
           return jsonResponse({ ok: false, error: 'Deliverable has no parent project.' }, 400);
         }

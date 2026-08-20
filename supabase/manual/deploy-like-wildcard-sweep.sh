@@ -62,9 +62,17 @@ say "1/5  Running the repo's own gate before touching production"
 # form of LIKE match survives, including the operator-string spellings PostgREST also accepts. If it
 # fails there is no sense deploying, because the thing being fixed is still in the code.
 deno test --allow-read supabase/functions/_shared/ || die "the test gate failed. Nothing deployed."
+
+# Collect EVERY type-check failure before reporting, rather than dying on the first one. The first
+# version of this script bailed on the first red function and made you re-run to discover the next,
+# which is a miserable way to find out you have three. (It found exactly one, and that one had been
+# broken since long before this change.)
+TYPE_FAILURES=""
 for f in "${URGENT[@]}" "${REST[@]}"; do
-  deno check "supabase/functions/$f/index.ts" >/dev/null 2>&1 || die "deno check failed on $f. Nothing deployed."
+  deno check "supabase/functions/$f/index.ts" >/dev/null 2>&1 || TYPE_FAILURES="$TYPE_FAILURES $f"
 done
+[ -n "$TYPE_FAILURES" ] && die "deno check failed on:$TYPE_FAILURES
+Nothing has been deployed. Run \`deno check supabase/functions/<name>/index.ts\` on each to see why."
 echo "gate green: tests pass and all 25 functions type-check"
 
 # ---------------------------------------------------------------------------------------------
