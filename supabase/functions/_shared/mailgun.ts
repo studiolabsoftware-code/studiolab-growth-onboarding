@@ -47,7 +47,12 @@ export async function sendEmail(args: SendArgs): Promise<void> {
   }
   if (args.attachments) {
     for (const att of args.attachments) {
-      const blob = new Blob([att.content], { type: att.contentType || 'application/octet-stream' });
+      // Copy into a fresh ArrayBuffer before handing it to Blob. A Uint8Array may be
+      // backed by a SharedArrayBuffer, which is not a valid BlobPart, so passing the
+      // view straight through fails the typecheck. The copy is a few KB per email.
+      const buf = new ArrayBuffer(att.content.byteLength);
+      new Uint8Array(buf).set(att.content);
+      const blob = new Blob([buf], { type: att.contentType || 'application/octet-stream' });
       form.append('attachment', blob, att.filename);
     }
   }
