@@ -23,7 +23,7 @@ const ALLOWED_FIELDS = new Set([
   'studiolab_email','logo_url','primary_colour','secondary_colour','sign_off',
   'email_tone','footer_notes','studio_description','from_name','reply_email',
   'custom_domain','email_domain','dns_access','sms_type','area_code','port_number',
-  'sms_tone','lead_sources','kb_profile','kb_classes',
+  'sms_tone','lead_sources',
   // Onboarding form refinement (migration 044). Additive, contract-safe.
   // sms_setup_requested replaces the retired number-preference / Twilio /
   // porting capture; the retired sms_type/area_code/port_number/has_twilio/
@@ -32,8 +32,15 @@ const ALLOWED_FIELDS = new Set([
   // send-on-behalf authorisation from the review step.
   'sms_setup_requested',
   'consent_send_on_behalf','consent_captured_at','consent_version',
-  'kb_pricing','kb_price_quoting','kb_policies','kb_events','kb_faqs','kb_restricted',
-  'kb_tone','voice_hours','voice_escalate','extra_notes',
+  'extra_notes',
+  // The kb_* and voice_* columns are deliberately NOT writable here. They have
+  // exactly one owner, save-kb (plus scrape-and-extract, service-role), and the
+  // onboarding form has no inputs for them. While they were allowed, the form
+  // sent every one as null on each save, which nulled the scraped knowledge
+  // base whenever a Dominate AI studio cancelled at Stripe and returned to the
+  // still-'draft' form. The post-submit guard below does not cover that window.
+  // Removing them from this allow-list is the backstop; the form no longer
+  // sends them either.
   // Optional future-proof URLs for studios planning to upgrade later.
   'google_business_url','facebook_url','instagram_handle','booking_url',
   // Additional social handles collected on Scale and AI lead-sources step.

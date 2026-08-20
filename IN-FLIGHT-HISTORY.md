@@ -39,6 +39,31 @@ never a claim about state, so the unproven `admin-mark-active` path cannot make
 the door lie. Verified in production: no submission has ever reached
 `status='active'`.
 
+## 2026-08-20: knowledge base could be nulled by the onboarding form
+
+`js/form.js` `buildPayload` sent `kb_profile`..`voice_escalate` on every save,
+reading `kb-*` and `voice*` inputs that exist in no route (all 21 live in
+`kb.html`, which uses `js/kb.js`). Those columns were in `save-draft`'s
+allow-list, so the nulls were written.
+
+Reachable and destructive, though not by the route first suspected. A re-save
+after a studio types their KB is impossible: `save-draft` refuses once `status`
+leaves `draft`. The live path was the **website scrape**. On Dominate AI the pay
+button fires `scrape-and-extract`, which populates the `kb_*` columns while
+status is still `draft`. A studio who cancels at Stripe returns to a live form
+inside that same `draft` window, and the next autoSave nulled the scraped
+knowledge base. `kb_scrape_status` was already `complete`, so the KB page would
+not re-scrape and the studio saw empty fields where their pre-fill should have
+been.
+
+Fixed on both sides: the keys are gone from `buildPayload`, and `kb_*` /
+`voice_*` are out of `save-draft`'s allow-list so `save-kb` (plus the
+service-role scraper) is now their only writer. Verified against the deployed
+function with a temporary draft row: a payload of
+`{kb_profile:null, kb_faqs:[], voice_hours:null, studio_name:'After'}` updated
+`studio_name` and left all three KB sentinels intact. Test row deleted; the four
+production rows are unchanged.
+
 ## Earlier
 
 - Onboarding form refinement: optional fields, SMS collapse, consent, honest copy.

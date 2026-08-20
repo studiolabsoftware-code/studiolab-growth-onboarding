@@ -13,11 +13,7 @@ Last updated: 2026-08-20
 
 ## Next slices, in order
 
-1. **Form dead code.** `js/form.js` `buildPayload` (~line 1298) writes nine `kb_*`
-   fields from `kb-` inputs that exist in no route. All twenty-one live in
-   `kb.html`, which uses `js/kb.js`. They always write null, so a form re-save
-   after a studio completes their knowledge base would wipe it.
-2. **Accuracy sweep, then voice.** Audit copy against what the code does before
+1. **Accuracy sweep, then voice.** Audit copy against what the code does before
    touching tone: every defect found on 2026-08-20 was friendly but untrue and
    would survive a voice pass. Known live ones:
    - The domain card still claims "we set up SPF, DKIM and DMARC for you... There
@@ -31,7 +27,7 @@ Last updated: 2026-08-20
    - `js/form.js` `enterForm` reads `#restoredBanner`, which exists in no route.
      Guarded, so dead rather than broken.
    - Every route carries one unclosed `<div>`, present before the door.
-3. **Pre-fill, Scenario B.** Plan in `outputs/onboarding-prefill-scenario-b-plan.md`.
+2. **Pre-fill, Scenario B.** Plan in `outputs/onboarding-prefill-scenario-b-plan.md`.
    Server-side token resolve only, never client-side. Blocked on both questions
    below plus the C1 deploy.
 

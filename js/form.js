@@ -1295,17 +1295,24 @@
 
       lead_sources: isScalePlus ? collectLeads() : null,
 
-      kb_profile: isAi ? valOrNull('kb-profile') : null,
-      kb_classes: isAi ? valOrNull('kb-classes') : null,
-      kb_pricing: isAi ? valOrNull('kb-pricing') : null,
-      kb_price_quoting: isAi ? state.yn.quotePrice : null,
-      kb_policies: isAi ? valOrNull('kb-policies') : null,
-      kb_events: isAi ? valOrNull('kb-events') : null,
-      kb_faqs: isAi ? collectFaqs() : null,
-      kb_restricted: isAi ? valOrNull('kb-restricted') : null,
-      kb_tone: isAi ? valOrNull('kb-tone') : null,
-      voice_hours: isAi ? valOrNull('voiceHours') : null,
-      voice_escalate: isAi ? valOrNull('voiceEscalate') : null,
+      // The knowledge base is NOT collected here. It lives in kb.html (all 21
+      // inputs) and is written by save-kb; the website scrape writes the same
+      // columns. This form has no kb-* or voice* inputs at all, so the old
+      // lines here read nothing and sent kb_profile..voice_escalate as null on
+      // every save. Those columns are in save-draft's allow-list, so the nulls
+      // were written.
+      //
+      // That was reachable, and it destroyed data. On Dominate AI the pay
+      // button fires scrape-and-extract, which populates the kb_* columns while
+      // status is still 'draft'. A studio who then cancels at Stripe lands back
+      // on this step with the form live, and the next autoSave overwrote the
+      // scraped knowledge base with nulls. save-draft's post-submit guard did
+      // not help: it only refuses once status leaves 'draft', and this whole
+      // window is inside 'draft'. The KB page then skips re-scraping because
+      // kb_scrape_status is already 'complete', so the studio saw empty fields
+      // where their pre-fill should have been.
+      //
+      // Do not reinstate these keys unless the inputs actually exist here.
 
       extra_notes: valOrNull('extraNotes'),
 
