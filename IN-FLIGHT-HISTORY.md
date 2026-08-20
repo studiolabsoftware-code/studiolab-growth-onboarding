@@ -39,6 +39,48 @@ never a claim about state, so the unproven `admin-mark-active` path cannot make
 the door lie. Verified in production: no submission has ever reached
 `status='active'`.
 
+## 2026-08-20: escalation to a human, and standing ops reminders
+
+Gary's point: chasing the studio by email cannot solve an email problem. The
+studios most at risk are the ones our invite never reached (junk, bad address),
+and from our side they look identical to the ones who ignored it. They have also
+paid for a subscription they cannot use.
+
+So `nudge-abandoned-onboarding` now escalates as well as nudges. After 7 days
+with no movement, or immediately on a confirmed bounce or spam complaint, the
+account owner gets one email per studio carrying the contact, how many
+follow-ups went out, and the actual delivery status pulled live from Mailgun's
+Events API (`_shared/mailgun-events.ts`). An unreachable studio gets a red banner
+saying to phone them rather than email again. Migration 046 adds
+`onboarding_escalated_at`.
+
+New `ops-reminders` function and `public.ops_reminders` table: standing internal
+nags for tasks only a human can do, repeating on their own interval until the
+one-click link in the email closes them. Verified end to end against the
+deployed function with a throwaway row: first click closes it, second says
+already done, a bad token is refused. The one-click GET needs
+`verify_jwt = false` because it is opened from an email client with no auth
+header at all; its own random token is the gate and the worst case is a closed
+reminder.
+
+### The pre-build gate paid for itself here
+
+Before building "cover the studios who never opened the form", checked what
+exists. The Connector already has BOTH halves: `missed-signup-sweep` reconciles
+live sub-accounts from the deployed `ghl-adapter` against `inbound_signup` and
+invites anyone missed, and `mailgun-event-webhook` records every delivery event.
+Neither is deployed and their tables do not exist. Building a parallel version
+in this repo would have duplicated a working design. Deploying them is Gary's
+call, since the sweep sends real invites to real studios.
+
+### Sequencing hazard, recorded because it would have been expensive
+
+Gary said he would turn off the platform's own signup email since ours replaces
+it. Ours does not exist in production yet, and the platform's email is currently
+the only thing that gets a studio to the form. Disabling it first would leave
+new studios with no way in. That is now a standing reminder with the correct
+order in its body.
+
 ## 2026-08-20: copy accuracy fixes, and the abandoned-onboarding follow-up
 
 All 14 audited defects resolved per Gary's decisions. Route edits run through

@@ -698,6 +698,64 @@ export function kbAbandonmentNudge(opts: { studioName: string; resumeUrl: string
 }
 
 // ---------------------------------------------------------------------------
+// Internal escalation: a studio has paid for a subscription and has not
+// actioned their setup. Chasing them by email is not enough on its own,
+// because the studios most at risk are the ones our email never reached, and
+// from our side those look exactly like the ones who ignored it. This tells a
+// human, with the delivery status, so the follow-up can be a phone call.
+// ---------------------------------------------------------------------------
+
+export function onboardingEscalation(opts: {
+  studioName: string;
+  contactEmail: string;
+  plan: string;
+  region: string;
+  daysSinceSignup: number;
+  nudgesSent: number;
+  deliverySummary: string;
+  unreachable: boolean;
+  adminUrl: string;
+}): { subject: string; html: string } {
+  const flag = opts.unreachable ? 'Not reaching them: ' : '';
+  const subject = `${flag}${opts.studioName} has not started setup (${opts.daysSinceSignup} days)`;
+  const banner = opts.unreachable
+    ? `<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;font-weight:600;">Our emails are not getting through. This one needs a phone call, not another email.</p>`
+    : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Needs a personal follow-up</h1>
+    ${banner}
+    <p style="margin:0 0 14px;"><strong>${escape(opts.studioName)}</strong> signed up ${opts.daysSinceSignup} days ago on <strong>${escape(opts.plan)}</strong> (${escape(opts.region)}) and still has not completed their setup form. They are paying for a subscription they cannot use yet.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 16px;font-size:14px;">
+      <tr><td style="padding:7px 0;color:${COL.g6};width:150px;">Contact</td><td style="padding:7px 0;"><a href="mailto:${escape(opts.contactEmail)}" style="color:${COL.in};">${escape(opts.contactEmail)}</a></td></tr>
+      <tr><td style="padding:7px 0;color:${COL.g6};">Follow-ups sent</td><td style="padding:7px 0;">${opts.nudgesSent}</td></tr>
+      <tr><td style="padding:7px 0;color:${COL.g6};">Email delivery</td><td style="padding:7px 0;">${escape(opts.deliverySummary)}</td></tr>
+    </table>
+    ${cta('Open their record', opts.adminUrl)}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">Sent once per studio. You will not get this again for ${escape(opts.studioName)}.</p>`;
+  return { subject, html: layout({ previewText: `${opts.studioName}: ${opts.deliverySummary}`, body }) };
+}
+
+// ---------------------------------------------------------------------------
+// Standing internal reminder for a task only a human can do. Repeats on its
+// own interval until the one-click link in the email closes it.
+// ---------------------------------------------------------------------------
+
+export function opsReminder(opts: {
+  title: string;
+  body: string;
+  doneUrl: string;
+  sentCount: number;
+}): { subject: string; html: string } {
+  const nth = opts.sentCount > 1 ? ` (reminder ${opts.sentCount})` : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">${escape(opts.title)}</h1>
+    <p style="margin:0 0 16px;white-space:pre-wrap;">${escape(opts.body)}</p>
+    ${cta('Mark this done', opts.doneUrl)}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">This will keep arriving until you tap the button. That is the point.</p>`;
+  return { subject: `Still to do: ${opts.title}${nth}`, html: layout({ previewText: opts.body.slice(0, 120), body }) };
+}
+
+// ---------------------------------------------------------------------------
 // Abandoned-onboarding follow-up. A short, finite sequence for a studio who
 // signed up, opened the setup form and then stopped. Three emails, then we
 // leave them alone: a fourth would be nagging, and the draft keeps saving

@@ -11,30 +11,46 @@ Last updated: 2026-08-20
 - **C1 `signup-webhook-receiver`** is in the **Growth Connector** repo, green,
   deploy gated on Gary. Needed before the `?t=` pre-fill path does anything.
 
-## Next slices, in order
+## Blocked on Gary, and the order matters
 
-1. **Abandoned-onboarding, population A.** The nudge cron only reaches studios
-   who have a draft, meaning they opened the form and verified their email. A
-   studio who signed up and never opened it leaves no row in `public.submissions`
-   at all; the only record is `growth_manager.inbound_signup`, written by the
-   Connector's `signup-webhook-receiver`. That function is built and green but
-   NOT DEPLOYED, so that population does not exist in the database yet. When it
-   ships, add a second pass in `nudge-abandoned-onboarding` over inbound_signup
-   rows with no matching submission. The scope note at the top of that function
-   says the same thing.
-2. **Pre-fill, Scenario B.** Plan in `outputs/onboarding-prefill-scenario-b-plan.md`.
-   Server-side token resolve only, never client-side. Blocked on the same C1
-   deploy plus the signup-email question below.
-3. **Voice pass.** Accuracy is done. Worth a look: the door and step 1 both open
-   with "Welcome to StudioLAB Growth", and `kb.html`, the admin console and the
-   outbound email templates were never swept for accuracy at all.
+1. **Do NOT turn off the platform's signup email yet.** Gary said on 2026-08-20
+   that the platform sends its own signup email linking to our form, and that he
+   would disable it. Right now that email is the ONLY thing that gets a studio to
+   the form. Our replacement (`signup-webhook-receiver`) is built, undeployed, its
+   tables do not exist, and the webhook is not pointed at us. Correct order:
+   apply the Connector migrations, deploy the receiver, point the platform's
+   signup automation at it, watch one real signup produce our invite, THEN
+   disable the platform email. A standing `ops_reminders` row emails Gary every
+   2 days about this until he taps the one-click done link.
+2. **Deploy the Connector's `missed-signup-sweep` and `mailgun-event-webhook`.**
+   Both are built and green; neither is deployed and their tables
+   (`growth_manager.inbound_signup`, `growth_manager.email_event`) do not exist.
+   The sweep is exactly the "studios who never opened the form" cover Gary asked
+   for: it reconciles live sub-accounts from the already-deployed `ghl-adapter`
+   against `inbound_signup` and invites anyone missed. Gary's call, not Claude's,
+   because deploying it sends real invite emails to real studios.
 
-## Waiting on Gary
+## Next slices
 
-1. Does StudioLAB Growth send its own onboarding email at signup, and how many?
-   Gates the whole cutover. Step 1 of `outputs/signup-email-cutover-runbook.md`.
-2. Does the platform's AI knowledge base now read the StudioLAB database
-   automatically? If yes, `kb.html` shrinks to "any specific requirements?". If no,
-   keep it: our capture is the source and `copy-kb-for-ghl` exports the Markdown
-   that gets pasted into the platform. The 2026-06-20 KB-retirement decision applied
-   to the rebuilt form, shelved 2026-07-23, so it never took effect on the live path.
+1. **Retire the knowledge-base capture.** Gary confirmed 2026-08-20 that the
+   platform's AI knowledge base now reads the StudioLAB database automatically
+   and is pre-built and auto-populating. He believes it reads the studio website
+   too but wants to confirm that separately, so treat the website half as
+   assumed, not established. If both hold, this touches: `kb.html` (21 inputs),
+   `save-kb`, `get-kb-status`, `copy-kb-for-ghl`, `nudge-abandoned-kb`,
+   `scrape-and-extract`, the AI route's step-1 copy ("we scan your website and
+   pre-fill your AI knowledge base"), `account.html`'s AI stages, and the
+   post-payment redirect to `/kb.html`. Scope it before touching anything.
+2. **Population A pass in `nudge-abandoned-onboarding`,** over `inbound_signup`
+   rows with no matching submission. Blocked on item 2 above.
+3. **Pre-fill, Scenario B.** Plan in `outputs/onboarding-prefill-scenario-b-plan.md`.
+4. **Voice pass.** Accuracy is done. The door and step 1 both open with "Welcome
+   to StudioLAB Growth"; `kb.html`, the admin console and outbound email
+   templates were never swept for accuracy at all.
+
+## Answered, recorded here so it is not re-asked
+
+- **Does the platform send its own signup email?** Yes, and it links to this
+  form. Gary is disabling it, sequencing above.
+- **Does the AI knowledge base read the database automatically?** Yes, and it is
+  pre-built and auto-populating. Website reading is assumed but unconfirmed.

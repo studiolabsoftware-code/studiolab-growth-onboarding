@@ -18,6 +18,13 @@
 [functions.nudge-abandoned-onboarding]
 verify_jwt = false
 
+# ops-reminders needs this for a second reason as well as the cron: its
+# one-click "mark done" link is opened straight from an email client, which
+# carries no Authorization header at all. The link's own random token is the
+# gate, and the worst it can do is close a reminder.
+[functions.ops-reminders]
+verify_jwt = false
+
 [functions.nudge-abandoned-kb]
 verify_jwt = false
 
