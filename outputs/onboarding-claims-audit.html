@@ -1,0 +1,781 @@
+<title>Onboarding Claims Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+/* ── Tokens ────────────────────────────────────────────────────────────────
+   Ground is the StudioLAB warm paper, because this audits a StudioLAB surface
+   and the platform's own palette is the house system. Cobalt is the single
+   structural accent. The three severity hues are semantic and deliberately
+   sit outside the brand blush so "this is wrong" never reads as branding. */
+:root {
+  --paper:   #f7f3ec;
+  --card:    #fffefb;
+  --sunk:    #f1eae0;
+  --ink:     #241a1d;
+  --ink-2:   #493d43;
+  --muted:   #786970;
+  --rule:    #e7ded4;
+  --rule-2:  #d8cbbe;
+  --cobalt:  #4a429b;
+  --untrue:  #a3242e;
+  --untrue-bg: #f8e9e8;
+  --incons:  #855f0d;
+  --incons-bg: #f7efdd;
+  --dead:    #556670;
+  --dead-bg: #ecefef;
+  --shadow:  0 1px 2px rgba(36,26,29,.05), 0 8px 24px rgba(36,26,29,.045);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:   #161215;
+    --card:    #1f1a1e;
+    --sunk:    #262027;
+    --ink:     #f3ece7;
+    --ink-2:   #d6cad0;
+    --muted:   #a1929a;
+    --rule:    #332b31;
+    --rule-2:  #453a41;
+    --cobalt:  #a49bf0;
+    --untrue:  #f2898f;
+    --untrue-bg: #33191c;
+    --incons:  #dfb254;
+    --incons-bg: #2f2513;
+    --dead:    #9aabb3;
+    --dead-bg: #21282b;
+    --shadow:  0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"] {
+  --paper:   #161215;
+  --card:    #1f1a1e;
+  --sunk:    #262027;
+  --ink:     #f3ece7;
+  --ink-2:   #d6cad0;
+  --muted:   #a1929a;
+  --rule:    #332b31;
+  --rule-2:  #453a41;
+  --cobalt:  #a49bf0;
+  --untrue:  #f2898f;
+  --untrue-bg: #33191c;
+  --incons:  #dfb254;
+  --incons-bg: #2f2513;
+  --dead:    #9aabb3;
+  --dead-bg: #21282b;
+  --shadow:  0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 940px; margin: 0 auto; padding: 0 28px 96px; }
+
+/* ── Masthead ─────────────────────────────────────────────────────────── */
+.head { padding: 64px 0 0; }
+.eyebrow {
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: .17em;
+  text-transform: uppercase; color: var(--cobalt); margin: 0 0 16px;
+}
+h1 {
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(34px, 5.4vw, 52px); font-weight: 800; letter-spacing: -.033em;
+  line-height: 1.06; margin: 0 0 20px; text-wrap: balance;
+}
+.standfirst {
+  font-size: 19px; line-height: 1.58; color: var(--ink-2);
+  max-width: 62ch; margin: 0 0 34px;
+}
+.standfirst strong { font-weight: 600; color: var(--ink); }
+
+/* ── Tally ────────────────────────────────────────────────────────────── */
+.tally {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+  border-radius: 12px; overflow: hidden; margin: 0 0 20px;
+}
+.tally-cell { background: var(--card); padding: 18px 20px 20px; }
+.tally-n {
+  font-family: Archivo, sans-serif; font-size: 38px; font-weight: 800;
+  letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums;
+  display: block; margin-bottom: 9px;
+}
+.tally-cell.t-untrue .tally-n { color: var(--untrue); }
+.tally-cell.t-incons .tally-n { color: var(--incons); }
+.tally-cell.t-dead   .tally-n { color: var(--dead); }
+.tally-cell.t-scope  .tally-n { color: var(--cobalt); }
+.tally-k {
+  font-family: Archivo, sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--ink);
+  display: block; margin-bottom: 4px;
+}
+.tally-d { font-size: 14px; line-height: 1.45; color: var(--muted); }
+
+.scopebar {
+  font-family: Archivo, sans-serif; font-size: 13px; color: var(--muted);
+  border-top: 1px solid var(--rule); padding-top: 14px; margin: 0 0 8px;
+  line-height: 1.6;
+}
+.scopebar b { color: var(--ink-2); font-weight: 600; }
+
+/* ── Section headers ──────────────────────────────────────────────────── */
+.band { margin: 62px 0 0; }
+.band-head {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding-bottom: 12px; border-bottom: 2px solid var(--ink);
+}
+h2 {
+  font-family: Archivo, sans-serif; font-size: 25px; font-weight: 800;
+  letter-spacing: -.022em; margin: 0; line-height: 1.15;
+}
+.band-count {
+  font-family: Archivo, sans-serif; font-size: 12px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.band-note {
+  font-size: 16px; color: var(--ink-2); margin: 14px 0 0; max-width: 64ch;
+}
+
+/* ── Finding cards ────────────────────────────────────────────────────── */
+.finding {
+  background: var(--card); border: 1px solid var(--rule);
+  border-radius: 12px; box-shadow: var(--shadow);
+  margin-top: 20px; overflow: hidden;
+}
+.f-top {
+  display: flex; align-items: flex-start; gap: 13px;
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--rule);
+}
+.f-id {
+  font-family: Archivo, sans-serif; font-size: 11px; font-weight: 800;
+  letter-spacing: .08em; padding: 4px 9px; border-radius: 5px;
+  flex: none; margin-top: 3px; font-variant-numeric: tabular-nums;
+}
+.untrue .f-id { background: var(--untrue-bg); color: var(--untrue); }
+.incons .f-id { background: var(--incons-bg); color: var(--incons); }
+.dead   .f-id { background: var(--dead-bg);   color: var(--dead); }
+.f-title {
+  font-family: Archivo, sans-serif; font-size: 19.5px; font-weight: 700;
+  letter-spacing: -.018em; line-height: 1.3; margin: 0; text-wrap: balance;
+}
+.f-where {
+  font-family: Archivo, sans-serif; font-size: 12.5px; font-weight: 500;
+  color: var(--muted); margin: 6px 0 0; line-height: 1.5;
+}
+
+/* The claim/reality pair is the real structure of a copy audit: the words a
+   studio reads, then what is actually so. Product copy is set in Inter, the
+   form's own typeface, so a quote looks the way the studio sees it. */
+.pair { display: grid; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .pair { grid-template-columns: 1fr 1fr; } }
+.side { padding: 18px 24px 22px; }
+.side + .side { border-top: 1px solid var(--rule); }
+@media (min-width: 760px) {
+  .side + .side { border-top: 0; border-left: 1px solid var(--rule); }
+}
+.side .side-k {
+  font-family: Archivo, sans-serif; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .15em; text-transform: uppercase; margin: 0 0 11px;
+  line-height: 1.4;
+}
+.side-say .side-k { color: var(--muted); }
+.untrue .side-true .side-k { color: var(--untrue); }
+.incons .side-true .side-k { color: var(--incons); }
+.dead   .side-true .side-k { color: var(--dead); }
+
+.quote {
+  font-family: Inter, -apple-system, "Segoe UI", Arial, sans-serif;
+  font-size: 14.5px; line-height: 1.6; color: var(--ink);
+  background: var(--sunk); border-radius: 9px; padding: 13px 15px;
+  margin: 0 0 11px;
+}
+.quote:last-child { margin-bottom: 0; }
+.quote em { font-style: normal; background: var(--untrue-bg); color: var(--untrue);
+  padding: 0 3px; border-radius: 3px; font-weight: 500; }
+.incons .quote em { background: var(--incons-bg); color: var(--incons); }
+.q-src {
+  font-family: Archivo, sans-serif; font-size: 11px; font-weight: 600;
+  color: var(--muted); margin: 7px 0 0; letter-spacing: .01em;
+}
+.side-true p { margin: 0 0 12px; font-size: 16px; line-height: 1.58; color: var(--ink-2); }
+.side-true p:last-child { margin-bottom: 0; }
+.side-true strong { color: var(--ink); font-weight: 600; }
+
+.f-fix {
+  padding: 15px 24px 17px; border-top: 1px solid var(--rule);
+  background: var(--sunk);
+  display: flex; gap: 11px; align-items: baseline; flex-wrap: wrap;
+}
+.fix-k {
+  font-family: Archivo, sans-serif; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .15em; text-transform: uppercase; color: var(--cobalt);
+  flex: none;
+}
+.fix-v { font-size: 15.5px; line-height: 1.55; color: var(--ink-2); margin: 0; flex: 1 1 340px; }
+
+code {
+  white-space: nowrap;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: .87em; background: var(--sunk); padding: 1px 5px;
+  border-radius: 4px; border: 1px solid var(--rule-2); color: var(--ink);
+}
+.f-fix code, .quote code { background: var(--card); }
+
+/* ── Order of work ────────────────────────────────────────────────────── */
+.order { margin-top: 22px; border: 1px solid var(--rule); border-radius: 12px;
+  background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+.order-row {
+  display: grid; grid-template-columns: 42px 1fr; gap: 16px;
+  padding: 18px 24px; align-items: start;
+}
+.order-row + .order-row { border-top: 1px solid var(--rule); }
+.order-n {
+  font-family: Archivo, sans-serif; font-size: 22px; font-weight: 800;
+  color: var(--cobalt); line-height: 1.15; font-variant-numeric: tabular-nums;
+}
+.order-t {
+  font-family: Archivo, sans-serif; font-size: 16.5px; font-weight: 700;
+  letter-spacing: -.012em; margin: 0 0 5px; line-height: 1.3;
+}
+.order-d { margin: 0; font-size: 15.5px; color: var(--ink-2); line-height: 1.55; }
+
+/* ── Asks ─────────────────────────────────────────────────────────────── */
+.ask {
+  border-left: 3px solid var(--cobalt); background: var(--card);
+  border-radius: 0 11px 11px 0; padding: 18px 22px; margin-top: 18px;
+  box-shadow: var(--shadow);
+}
+.ask h3 {
+  font-family: Archivo, sans-serif; font-size: 16.5px; font-weight: 700;
+  letter-spacing: -.012em; margin: 0 0 7px; line-height: 1.3;
+}
+.ask p { margin: 0; font-size: 15.5px; color: var(--ink-2); line-height: 1.56; }
+
+.foot {
+  margin-top: 58px; padding-top: 20px; border-top: 1px solid var(--rule);
+  font-family: Archivo, sans-serif; font-size: 13px; color: var(--muted);
+  line-height: 1.65;
+}
+.foot b { color: var(--ink-2); font-weight: 600; }
+
+:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 3px; border-radius: 5px; }
+@media (max-width: 620px) {
+  .wrap { padding: 0 20px 72px; }
+  body { font-size: 16px; }
+  .f-top, .side, .f-fix, .order-row { padding-left: 18px; padding-right: 18px; }
+}
+</style>
+
+<div class="wrap">
+
+<header class="head">
+  <p class="eyebrow">StudioLAB Growth, onboarding form</p>
+  <h1>What the form promises, and what actually happens</h1>
+  <p class="standfirst">An accuracy sweep of every claim the onboarding form makes to a studio, checked against what the code, the database and the post-payment surfaces actually do. Voice comes later. <strong>Every defect below is friendly, well written, and would survive a tone pass untouched.</strong></p>
+
+  <div class="tally">
+    <div class="tally-cell t-untrue">
+      <span class="tally-n">4</span>
+      <span class="tally-k">Untrue</span>
+      <span class="tally-d">We tell a studio something that is not so</span>
+    </div>
+    <div class="tally-cell t-incons">
+      <span class="tally-n">6</span>
+      <span class="tally-k">Contradictory</span>
+      <span class="tally-d">Two of our own surfaces disagree</span>
+    </div>
+    <div class="tally-cell t-dead">
+      <span class="tally-n">4</span>
+      <span class="tally-k">Unreachable</span>
+      <span class="tally-d">Copy or logic no studio can get to</span>
+    </div>
+    <div class="tally-cell t-scope">
+      <span class="tally-n">14</span>
+      <span class="tally-k">Total</span>
+      <span class="tally-d">None fixed yet, all verified in code</span>
+    </div>
+  </div>
+
+  <p class="scopebar"><b>Swept:</b> the six live routes (<code>au</code> and <code>us</code> &times; Launch, Scale, Dominate AI), <code>account.html</code>, <code>js/form.js</code>, and the <code>save-draft</code>, <code>save-kb</code>, <code>scrape-and-extract</code> and <code>cleanup-attachments</code> functions. <b>Not swept:</b> <code>kb.html</code>, the admin console, and outbound email templates.</p>
+</header>
+
+<!-- ══════════════════════ UNTRUE ══════════════════════ -->
+<section class="band">
+  <div class="band-head">
+    <h2>Untrue</h2>
+    <span class="band-count">4 findings</span>
+  </div>
+  <p class="band-note">A studio reads these and forms a false expectation. Two of them also change what data we collect, which makes them more than a copy problem.</p>
+
+  <article class="finding untrue">
+    <div class="f-top">
+      <span class="f-id">U1</span>
+      <div>
+        <h3 class="f-title">We promise to handle email DNS, which we cannot do without access to their registrar</h3>
+        <p class="f-where">All six routes, step 3, two separate places each. 12 instances.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What the studio reads</p>
+        <p class="quote">Sending from your own domain helps your emails land in the inbox instead of the spam folder. If you would like this, just tell us the domain and <em>we set up SPF, DKIM, and DMARC for you during onboarding. There is nothing technical for you to do.</em></p>
+        <p class="quote">Just the domain, not a full URL. <em>We handle all the technical setup during onboarding, so you will not need to touch any DNS records yourself.</em></p>
+        <p class="q-src">au/scale/index.html lines 527 and 540, mirrored on all six routes</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>SPF, DKIM and DMARC are records on the studio's own domain, held at their registrar. We can generate the values, but somebody with access to that DNS has to publish them. We do not have that access and the form never asks for it.</p>
+        <p>The form even has a <code>dns_access</code> question, so the product already knows this varies by studio. The copy promises the outcome anyway.</p>
+        <p><strong>The second cost is worse than the false promise.</strong> A studio who has no idea how to reach their DNS is exactly the studio who should be steered to Done For You. This line tells them there is nothing to worry about, so that signal never fires.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Say what we do and what they do: we send the exact records and walk them through it, or on Done For You we do it with them on a call. Then let the answer route them.</p>
+    </div>
+  </article>
+
+  <article class="finding untrue">
+    <div class="f-top">
+      <span class="f-id">U2</span>
+      <div>
+        <h3 class="f-title">We require the last four of a US owner's social security number on a plan that has no texting</h3>
+        <p class="f-where">us/launch. Verified live in the browser: the field renders and carries <code>data-required</code>.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What the studio reads</p>
+        <p class="quote"><strong>Last 4 of owner SSN</strong><br><em>Required by US carriers to register a Sole Proprietor SMS sender.</em> We never see the full number.</p>
+        <p class="q-src">Shown on us/launch as soon as a studio selects Sole Proprietor, under a heading that says these details are optional</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>Launch has no SMS. There is no carrier registration, no texting number, and nothing for those digits to be used for.</p>
+        <p><code>applyBusinessTypeConditionals()</code> in <code>js/form.js</code> decides visibility from country and business type only. <strong>It never checks the plan.</strong> So the field appears on Launch exactly as it does on Scale, and because it also carries <code>data-required</code>, a US sole proprietor cannot get past step 2 without entering it.</p>
+        <p>This is a data question before it is a copy question: we would be collecting sensitive identity data for a stated purpose that does not exist on that plan, and refusing to continue without it.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Gate the SSN and EIN fields on the plan as well as the country, so they only appear where texting is actually included. This one is worth flagging to whoever advises you on US privacy, since it touches what we hold and why.</p>
+    </div>
+  </article>
+
+  <article class="finding untrue">
+    <div class="f-top">
+      <span class="f-id">U3</span>
+      <div>
+        <h3 class="f-title">The consent tick box asks Launch studios to authorise text messages we will never send</h3>
+        <p class="f-where">au/launch and us/launch, step 4. This is the box that blocks submission.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What the studio reads</p>
+        <p class="quote">I authorise StudioLAB Growth to send emails <em>and text messages</em> to my families on my studio's behalf, using the studio name, branding, and contact details I have provided, for the automations and communications included in my plan.</p>
+        <p class="q-src">Identical wording on all six routes, including both Launch routes</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>Launch is email automations only. The authorisation collected is broader than the service bought.</p>
+        <p>The clause does end with "included in my plan", which limits it, but the studio is still being asked to tick a permission for a channel they have not purchased. On a page whose whole job is to be trustworthy about what happens to their families' contact details, that reads badly.</p>
+        <p><strong>Elsewhere the form already handles this correctly.</strong> The business details intro says the tax details matter "on text-enabled plans", which is exactly the right hedge. The consent line simply was not given the same treatment.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Drop "and text messages" on the Launch routes. Same consent version, same audit trail, one clause narrower. Worth a second opinion from your legal adviser given it is a recorded authorisation.</p>
+    </div>
+  </article>
+
+  <article class="finding untrue">
+    <div class="f-top">
+      <span class="f-id">U4</span>
+      <div>
+        <h3 class="f-title">We say texting needs nothing technical from them, then the account page hands them a technical task list</h3>
+        <p class="f-where">Scale and Dominate AI, step 4, against the SMS task in <code>account.html</code>.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What the studio reads, before paying</p>
+        <p class="quote">If you would like it, we set up your texting number and handle the carrier registration for you during onboarding. <em>You do not need a provider or any technical setup.</em></p>
+        <p class="q-src">au/scale and au/ai, step 4. The US routes add "(A2P / 10DLC)" but keep the same promise.</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What the same studio reads after paying</p>
+        <p>On Done For You they still have to pick an industry vertical, describe how families opt in, review two sample messages, and supply a Privacy Policy URL and a Terms of Service URL, both of which have to mention SMS handling and STOP or HELP.</p>
+        <p>On Guided it goes further: <strong>"Publish a Privacy Policy and Terms of Service on your website"</strong>, then <strong>"Inside StudioLAB Growth, go to Settings, Phone Numbers, A2P Registration and submit your business identity."</strong></p>
+        <p>Both lists live in <code>account.html</code> under the <code>sms_a2p</code> task, so this is our own documented process contradicting our own pre-sale copy.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Say we handle the number, the carrier paperwork and the submission, and that they will need a privacy policy and terms page on their site. Naming it before payment also gives Done For You a real reason to exist.</p>
+    </div>
+  </article>
+</section>
+
+<!-- ══════════════════════ CONTRADICTORY ══════════════════════ -->
+<section class="band">
+  <div class="band-head">
+    <h2>Contradictory</h2>
+    <span class="band-count">6 findings</span>
+  </div>
+  <p class="band-note">Nothing here is a lie on its own. Each one is two StudioLAB surfaces telling the same studio different things, usually minutes apart.</p>
+
+  <article class="finding incons">
+    <div class="f-top">
+      <span class="f-id">C1</span>
+      <div>
+        <h3 class="f-title">Every route disagrees with itself about how long the form takes</h3>
+        <p class="f-where">All six routes. The two numbers sit one screen apart.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">The two screens, in order</p>
+        <p class="quote"><strong>Launch</strong><br>Welcome door: <em>About 5 minutes</em><br>Step 1 card: <em>Takes about 10 minutes</em></p>
+        <p class="quote"><strong>Scale</strong><br>Welcome door: <em>About 10 minutes</em><br>Step 1 card: <em>Takes about 15 minutes</em></p>
+        <p class="quote"><strong>Dominate AI</strong><br>Welcome door: <em>About 15 minutes</em><br>Step 1 card: <em>This form takes about 10 minutes</em></p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>There is one coded source of truth: <code>PLAN_MINS</code> in <code>js/setup-gate.js</code> holds 5, 10 and 15. The old auth gate used it, and the new welcome door inherited it. The step 1 cards are hand written text that nobody reconciled.</p>
+        <p><strong>Dominate AI is the one that stings.</strong> The door says 15 minutes and the very next screen says 10, so the longest plan advertises itself as the quickest. It also happens to be the plan with the highest setup fee.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Treat <code>PLAN_MINS</code> as canon and rewrite the three step 1 cards to match. Better still, render the number from that constant so the two can never drift again.</p>
+    </div>
+  </article>
+
+  <article class="finding incons">
+    <div class="f-top">
+      <span class="f-id">C2</span>
+      <div>
+        <h3 class="f-title">Three surfaces quote four different turnaround times for the same setup</h3>
+        <p class="f-where">Step 1, the setup cards at step 5, and <code>account.html</code> after payment.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What a Scale studio reads, in sequence</p>
+        <p class="quote"><strong>Step 1</strong><br>Your account is typically ready in <em>3 to 7 business days</em></p>
+        <p class="quote"><strong>Step 5, the card they pay on</strong><br>Done For You: <em>Typically 5 to 7 business days</em><br>Guided: <em>Typically 3 to 5 business days</em></p>
+        <p class="quote"><strong>account.html, right after paying</strong><br>Reviewing your submission and setting up your account behind the scenes. This typically takes <em>1 to 2 business days</em></p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>The setup card text is the one generated from code (<code>SETUP_DISPLAY</code> in <code>js/form.js</code>), and it is the number attached to the price they agree to, so it is the one that counts commercially.</p>
+        <p>The account page then quotes <strong>1 to 2 days</strong> to the same studio, which is both the lowest number and the last one they read. Beating it looks impossible; missing it looks like a broken promise on the surface they will check repeatedly.</p>
+        <p>Dominate AI is consistent, at 7 to 10 days in both places. Only the Launch and Scale branch is wrong.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Pick one number per plan and setup type, put it in code once, and have step 1 and the account page both read from it. This is your call rather than mine, since it is a commitment to customers rather than a technical detail.</p>
+    </div>
+  </article>
+
+  <article class="finding incons">
+    <div class="f-top">
+      <span class="f-id">C3</span>
+      <div>
+        <h3 class="f-title">We tell Scale studios to prepare their lead sources, then never ask for them</h3>
+        <p class="f-where">Scale and Dominate AI. Step 1 promises it, step 4 is titled after it, no input exists.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What the studio reads</p>
+        <p class="quote"><strong>Step 1, what you'll need before you start</strong><br><em>Which lead sources to connect: Facebook Lead Ads, Google Business Messages, website chat</em></p>
+        <p class="quote"><strong>Step 4 heading and intro</strong><br>Text messaging <em>and lead sources</em><br>Optional setup for SMS automations and <em>lead-source tracking</em> on your Scale plan.</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>Step 4 collects one thing: a Google Business Profile URL. There is no lead source picker anywhere in any route.</p>
+        <p><code>collectLeads()</code> reads <code>input[data-lead]</code>. <strong>There are zero such inputs across all six routes</strong>, so <code>lead_sources</code> is written as an empty array on every save and the handover document reaches the setup team blank.</p>
+        <p>So a studio does homework we asked for, arrives ready, is never asked, and we start their build without the answer.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Two honest options: add the picker back to step 4, or delete both promises and rename the step. Adding it is the better one, since the setup team genuinely needs the answer, but either beats the current state.</p>
+    </div>
+  </article>
+
+  <article class="finding incons">
+    <div class="f-top">
+      <span class="f-id">C4</span>
+      <div>
+        <h3 class="f-title">The review summary promises we will activate everything, on the screen where they choose to do it themselves</h3>
+        <p class="f-where">All six routes, step 5, directly above the Done For You and Guided choice.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What the studio reads</p>
+        <p class="quote"><strong>Automations</strong> &nbsp; Included<br><em>All Scale automations will be activated during setup</em></p>
+        <p class="q-src">Static text, shown identically whichever setup path is selected</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>On Guided self setup the studio configures their own account from a checklist. We do not activate it for them, that is the entire distinction between the two paths and the reason they cost different amounts.</p>
+        <p>Sitting inches above the choice, this line quietly argues that the cheaper option gets the same hands on treatment. It undercuts the case for Done For You on the exact screen where that case has to be made.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Make the line follow the selection: "we activate all Scale automations for you" on Done For You, "your checklist covers all Scale automations" on Guided. The selection already drives other copy on that step, so the wiring exists.</p>
+    </div>
+  </article>
+
+  <article class="finding incons">
+    <div class="f-top">
+      <span class="f-id">C5</span>
+      <div>
+        <h3 class="f-title">The US routes are written in Australian English</h3>
+        <p class="f-where">us/launch, us/scale, us/ai. Nine visible instances per route.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What a US studio reads</p>
+        <p class="quote">Brand <em>colour</em> hex codes, or a screenshot we can match</p>
+        <p class="quote">Brand <em>colours</em> &nbsp;&middot;&nbsp; Primary <em>colour</em> &nbsp;&middot;&nbsp; Secondary <em>colour</em></p>
+        <p class="quote">Please choose a primary <em>colour</em>.</p>
+        <p class="quote">Drop a screenshot or website image here and we will match the <em>colours</em> for you.</p>
+        <p class="quote">Please enter your <em>postcode</em>.</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>There is a runtime spelling swap, <code>swapSpelling()</code>, and it looked like this was handled. <strong>It only converts the enrol and enrolment family.</strong> Colour, authorise, organise and the rest are untouched.</p>
+        <p>The word "authorise" was fixed by hand in the US consent text, which shows somebody noticed the problem and fixed one instance rather than the rule.</p>
+        <p>The brand voice canon we corrected in the last session says country aware surfaces use the reader's conventions. A route literally called <code>/us/</code> is as country aware as it gets.</p>
+        <p>Also worth a look while you are in there: the ZIP field is labelled "Postcode / ZIP" with the placeholder "e.g. 3000 or 90210", offering an Australian example to an American studio.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Extend <code>swapSpelling()</code> to the full our/or and ise/ize sets rather than patching the six HTML files, so any copy added later is converted automatically. Then set the ZIP label and placeholder from the region.</p>
+    </div>
+  </article>
+
+  <article class="finding incons">
+    <div class="f-top">
+      <span class="f-id">C6</span>
+      <div>
+        <h3 class="f-title">Both regions are offered the other country's legal entity types</h3>
+        <p class="f-where">All six routes, step 2, on the field that feeds tax and carrier registration.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">The same list on every route</p>
+        <p class="quote">Sole Proprietor &nbsp;&middot;&nbsp; LLC &nbsp;&middot;&nbsp; Corporation &nbsp;&middot;&nbsp; Partnership &nbsp;&middot;&nbsp; Non-profit &nbsp;&middot;&nbsp; <em>Pty Ltd (Australian company)</em> &nbsp;&middot;&nbsp; <em>Other Australian entity</em> &nbsp;&middot;&nbsp; Other</p>
+        <p class="q-src">Not filtered by region, so an Australian studio is offered LLC and a US studio is offered Pty Ltd</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>LLC is not an Australian structure and Pty Ltd is not a US one. An Australian owner scanning that list can reasonably pick LLC, thinking it is the generic company option.</p>
+        <p>The ABN and EIN fields underneath are driven by country rather than by this answer, so nothing breaks. But the stored <code>business_type</code> is then wrong on a record that feeds invoices and SMS sender registration.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Filter the option list by region, the same way the timezone list already is. Keep "Other" on both.</p>
+    </div>
+  </article>
+</section>
+
+<!-- ══════════════════════ UNREACHABLE ══════════════════════ -->
+<section class="band">
+  <div class="band-head">
+    <h2>Unreachable</h2>
+    <span class="band-count">4 findings</span>
+  </div>
+  <p class="band-note">No studio can see any of this today, so none of it is urgent. It matters because it makes the codebase lie to whoever reads it next, including me. I nearly filed the first one as a live contradiction before tracing who actually calls it.</p>
+
+  <article class="finding dead">
+    <div class="f-top">
+      <span class="f-id">D1</span>
+      <div>
+        <h3 class="f-title">A finished success screen that only a spam bot has ever seen</h3>
+        <p class="f-where">The <code>doneScreen</code> block in all six routes.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What the file says a studio sees</p>
+        <p class="quote"><strong>All received. Thank you!</strong><br>We've got everything we need to get your Scale setup underway. Our team will review your submission and be in touch shortly.<br><br>Timeline &nbsp; Typically 3 to 5 business days</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>Two functions can reveal that panel. <code>showDone()</code> is called from exactly one place, the honeypot branch that fires when the hidden spam trap field is filled. <code>showSavedForLater()</code> overwrites the heading, the description and the timeline with "Draft saved. Pay when you're ready."</p>
+        <p>So the written copy reaches nobody. A real studio goes from step 5 to Stripe and comes back to the account page.</p>
+        <p><strong>The risk is not today, it is the next person.</strong> Anyone reading these files reasonably believes studios see this, and the timelines in it disagree with the setup cards. The Dominate AI version quotes 5 to 10 days against a card that says 7 to 10.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Either delete the block, or leave it and put one comment at the top saying which two functions reach it and that both rewrite the text. A comment costs nothing and stops the next audit chasing the same ghost.</p>
+    </div>
+  </article>
+
+  <article class="finding dead">
+    <div class="f-top">
+      <span class="f-id">D2</span>
+      <div>
+        <h3 class="f-title">A returning studio is never told their work was restored</h3>
+        <p class="f-where"><code>js/form.js</code>, <code>enterForm()</code>.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What the code intends</p>
+        <p class="quote">if (isReturning) { const banner = document.getElementById('restoredBanner'); if (banner) banner.classList.add('vis'); }</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>No element with that id exists in any route. The lookup is guarded, so nothing errors, it simply never shows.</p>
+        <p>A studio who comes back days later, signs in and lands mid form gets no acknowledgement that anything was saved. The reassurance was designed and then lost.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Small and worth doing: add the banner. "Welcome back, we've restored everything you filled in." The door already promises the form saves as you go, so this is the moment that proves it.</p>
+    </div>
+  </article>
+
+  <article class="finding dead">
+    <div class="f-top">
+      <span class="f-id">D3</span>
+      <div>
+        <h3 class="f-title">Validation that demands ten FAQs on a step that does not exist</h3>
+        <p class="f-where"><code>js/form.js</code>, <code>validatePanel()</code>.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">What the code intends</p>
+        <p class="quote">if (stepNum === 7 &amp;&amp; state.plan === 'ai') { const faqPairs = collectFaqs(); if (faqPairs.length &lt; 10) ok = false; }</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>The Dominate AI route has five panels. There is no step 7, and no <code>#faqList</code> element anywhere, so <code>collectFaqs()</code> would return nothing even if it ran.</p>
+        <p>This is a leftover from the rebuilt form that was shelved in July. It is the same family as the knowledge base fields that were nulling the scrape, which were live enough to destroy data.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Delete it, along with <code>collectFaqs()</code>, which now has no other caller.</p>
+    </div>
+  </article>
+
+  <article class="finding dead">
+    <div class="f-top">
+      <span class="f-id">D4</span>
+      <div>
+        <h3 class="f-title">Every route has one unclosed div</h3>
+        <p class="f-where">All six routes. Predates the welcome door.</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="side side-say">
+        <p class="side-k">The count</p>
+        <p class="quote">au/scale: 328 opening tags, 327 closing<br>us/ai: 332 opening tags, 331 closing<br>Same pattern on all six</p>
+      </div>
+      <div class="side side-true">
+        <p class="side-k">What is actually so</p>
+        <p>Browsers close it silently at the end of the body, which is why nothing looks wrong and why it has survived this long.</p>
+        <p>It is listed here because it makes structural checking unreliable. Any future audit has to work out whether the imbalance is the old one or a new one, which is exactly the sort of small ambiguity that hides a real break.</p>
+      </div>
+    </div>
+    <div class="f-fix">
+      <p class="fix-k">Fix</p>
+      <p class="fix-v">Find it once, close it in the generator, and the balance check becomes a clean pass or fail from then on.</p>
+    </div>
+  </article>
+</section>
+
+<!-- ══════════════════════ ORDER ══════════════════════ -->
+<section class="band">
+  <div class="band-head">
+    <h2>The order I would fix these in</h2>
+    <span class="band-count">4 passes</span>
+  </div>
+  <p class="band-note">Grouped so each pass is one coherent change with one review, rather than fourteen separate edits across six files.</p>
+
+  <div class="order">
+    <div class="order-row">
+      <span class="order-n">1</span>
+      <div>
+        <h3 class="order-t">The two that change what we collect and commit to</h3>
+        <p class="order-d">U2 and U3. Plan gate the SSN and EIN fields, narrow the Launch consent clause. These are the only findings where the current state affects data we hold and permissions we record, so they go first regardless of how they look.</p>
+      </div>
+    </div>
+    <div class="order-row">
+      <span class="order-n">2</span>
+      <div>
+        <h3 class="order-t">The two promises we cannot keep</h3>
+        <p class="order-d">U1 and U4. Rewrite the DNS card and the texting card to say what we do and what they do. Both currently hide the signal that should push a studio toward Done For You, so honest copy here should help conversion rather than hurt it.</p>
+      </div>
+    </div>
+    <div class="order-row">
+      <span class="order-n">3</span>
+      <div>
+        <h3 class="order-t">One numbers pass across every surface</h3>
+        <p class="order-d">C1, C2 and C4. Settle on one duration per plan and one turnaround per setup type, put each in code once, and have the door, step 1, the setup cards and the account page all read from it. Needs your decision on the turnaround numbers before I can write it.</p>
+      </div>
+    </div>
+    <div class="order-row">
+      <span class="order-n">4</span>
+      <div>
+        <h3 class="order-t">Regional correctness, then the tidy up</h3>
+        <p class="order-d">C5, C6 and C3, then the four unreachable items. Extending the spelling swap and filtering the entity list are contained changes. C3 needs your call on whether the lead source picker comes back or the promise goes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════ ASKS ══════════════════════ -->
+<section class="band">
+  <div class="band-head">
+    <h2>Three things I need from you</h2>
+    <span class="band-count">Blocking pass 3 and 4</span>
+  </div>
+  <p class="band-note">Everything else I can decide and build. These three are commitments to customers, so they are yours.</p>
+
+  <div class="ask">
+    <h3>How long does setup actually take, per plan and per setup type?</h3>
+    <p>Right now we say 1 to 2 days, 3 to 5, 3 to 7, 5 to 7 and 7 to 10 across different screens. Give me the real numbers you are willing to be held to and I will make every surface read from them.</p>
+  </div>
+
+  <div class="ask">
+    <h3>Do we still want lead sources captured at onboarding?</h3>
+    <p>The form promises to ask and then does not. Either I add the picker back to step 4, or I strip the promise and rename the step. Adding it is my recommendation, because the setup team needs the answer either way and is currently starting builds without it.</p>
+  </div>
+
+  <div class="ask">
+    <h3>What can we genuinely offer on custom email domains?</h3>
+    <p>We cannot publish DNS records on a domain we have no access to. So what is the real offer: we send them the records and a guide, we do it live with them on a call under Done For You, or we ask for delegated access. Tell me which and I will write it.</p>
+  </div>
+</section>
+
+<p class="foot"><b>Method.</b> Every claim was checked against the code that implements it, not against another document. Where a finding turned on whether a studio can actually reach a screen, I traced the callers rather than assuming, which is how the four unreachable items were separated out from the live ones. <b>Not covered:</b> <code>kb.html</code>, the admin console, and the outbound email templates, all of which make claims to studios and none of which were swept here. <b>Voice was deliberately ignored.</b> There is a separate pass worth doing on tone, repetition and the two screens that both open with "Welcome to StudioLAB Growth", but none of it matters until the sentences are true.</p>
+
+</div>
