@@ -290,8 +290,44 @@
     }
     applyCountryToTimezone();
     applyCountryOtherVisibility();
+    applyBusinessTypeOptions();
     applyRegionalCopy();
     applySmartDefaults();
+  }
+
+  // Offer only the entity types that exist in the studio's country, and use
+  // that country's name for them. The list was identical on every route, so an
+  // Australian studio was offered LLC (which does not exist here) and a US
+  // studio was offered Pty Ltd. Nothing broke, because the ABN and EIN fields
+  // key off country rather than off this answer, but business_type feeds
+  // invoices and carrier registration, so a wrong value there is a real one.
+  //
+  // Values are deliberately unchanged: sole_prop and pty_ltd drive
+  // applyBusinessTypeConditionals(), and existing rows have to keep resolving.
+  // Only labels and availability move.
+  function applyBusinessTypeOptions() {
+    const sel = document.getElementById('businessType');
+    if (!sel) return;
+    const isAU = (REGION_DEFAULT_COUNTRY[REGION] || 'AU') === 'AU';
+    const LABELS = isAU
+      ? { sole_prop: 'Sole Trader', partnership: 'Partnership', nonprofit: 'Non-profit / incorporated association',
+          pty_ltd: 'Pty Ltd (Australian company)', other_au: 'Other Australian entity', other: 'Other' }
+      : { sole_prop: 'Sole Proprietor', llc: 'LLC', corp: 'Corporation',
+          partnership: 'Partnership', nonprofit: 'Non-profit', other: 'Other' };
+    Array.prototype.slice.call(sel.options).forEach((opt) => {
+      if (!opt.value) return; // keep the "Select" placeholder
+      const label = LABELS[opt.value];
+      if (label) {
+        opt.textContent = label;
+        opt.hidden = false;
+        opt.disabled = false;
+      } else {
+        // Not a thing in this country. Hide rather than remove, so a draft
+        // saved before this shipped still round-trips its stored value.
+        opt.hidden = true;
+        opt.disabled = true;
+      }
+    });
   }
 
   // Smart defaults for fields where the URL region or the verified
@@ -360,26 +396,73 @@
     const signOff = document.getElementById('signOff');
     if (signOff && !isAU) signOff.placeholder = signOff.placeholder.replace('Melbourne', '');
 
-    // Single-l → double-l spelling everywhere except AU
+    // Australian spelling everywhere except the US routes, where the reader's
+    // own conventions win (Brand Voice, clarified 2026-08-20: US English is the
+    // fallback for country-blind surfaces, not an override on country-aware
+    // ones). A route literally called /us/ is as country-aware as it gets.
     if (!isAU) {
       swapSpelling(document.body);
+      // The ZIP field is the one place where the label, the hint and the error
+      // all have to change together, so it is handled explicitly rather than by
+      // word swap.
+      const pc = document.getElementById('addressPostcode');
+      if (pc) {
+        const wrap = pc.closest('.f');
+        const label = wrap && wrap.querySelector('label');
+        const err = wrap && wrap.querySelector('.field-err');
+        if (label) label.textContent = 'ZIP code ';
+        if (err) err.textContent = 'Please enter your ZIP code.';
+        pc.placeholder = 'e.g. 90210';
+      }
     }
   }
 
-  // Recursive case-preserving swap of 'enrol' family words across text nodes,
-  // placeholder attributes, and aria-labels. Skips inputs/script/style/textareas
-  // that already contain user input.
+  // Recursive case-preserving swap of AU spellings to US ones across text
+  // nodes, placeholder attributes and aria-labels. Values typed by the studio
+  // are never touched, since those are not text nodes.
+  //
+  // An explicit word list, NOT a blanket -ise/-ize or -our/-or rule. A blanket
+  // rule mangles words that only look like the pattern: Louise, promise,
+  // franchise, otherwise, our, four, hour, favour vs favourite. Every entry
+  // below is a word the form actually uses or plausibly will.
   function swapSpelling(root) {
-    const SWAPS = [
-      [/Enrolment/g, 'Enrollment'],
-      [/enrolment/g, 'enrollment'],
-      [/Enrol(?!l)/g, 'Enroll'],
-      [/enrol(?!l)/g, 'enroll'],
+    const WORDS = [
+      ['colour', 'color'], ['colours', 'colors'], ['coloured', 'colored'],
+      ['authorise', 'authorize'], ['authorised', 'authorized'], ['authorisation', 'authorization'],
+      ['organise', 'organize'], ['organised', 'organized'], ['organisation', 'organization'],
+      ['personalise', 'personalize'], ['personalised', 'personalized'],
+      ['customise', 'customize'], ['customised', 'customized'],
+      ['recognise', 'recognize'], ['recognised', 'recognized'],
+      ['optimise', 'optimize'], ['optimised', 'optimized'],
+      ['minimise', 'minimize'], ['summarise', 'summarize'],
+      ['specialise', 'specialize'], ['specialised', 'specialized'],
+      ['apologise', 'apologize'], ['analyse', 'analyze'],
+      ['normalise', 'normalize'], ['normalised', 'normalized'],
+      ['centre', 'center'], ['centres', 'centers'],
+      ['catalogue', 'catalog'], ['catalogues', 'catalogs'],
+      ['fulfil', 'fulfill'], ['fulfilled', 'fulfilled'],
+      ['cancelled', 'canceled'], ['cancelling', 'canceling'],
+      ['enrolment', 'enrollment'], ['enrolments', 'enrollments'],
+      ['enrol', 'enroll'], ['enrolled', 'enrolled'], ['enrolling', 'enrolling'],
+      ['postcode', 'ZIP code'], ['postcodes', 'ZIP codes'],
     ];
+    // Longest first so 'colours' is not half-matched by 'colour', and word
+    // boundaries so 'enrol' never eats the middle of 'enrolment'.
+    const SWAPS = WORDS
+      .slice()
+      .sort((a, b) => b[0].length - a[0].length)
+      .map(([from, to]) => [new RegExp('\\b' + from + '\\b', 'gi'), to]);
+    // Match the casing of what was there: 'Colour' -> 'Color', 'COLOUR' ->
+    // 'COLOR', 'colour' -> 'color'.
+    function matchCase(src, rep) {
+      if (src === src.toUpperCase() && src !== src.toLowerCase()) return rep.toUpperCase();
+      if (src[0] === src[0].toUpperCase()) return rep[0].toUpperCase() + rep.slice(1);
+      return rep;
+    }
     function apply(text) {
       if (!text) return text;
       let out = text;
-      for (const [re, rep] of SWAPS) out = out.replace(re, rep);
+      for (const [re, rep] of SWAPS) out = out.replace(re, (m) => matchCase(m, rep));
       return out;
     }
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
