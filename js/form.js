@@ -2017,6 +2017,10 @@
     if (gate) gate.style.display = visible ? 'block' : 'none';
     if (wrap) wrap.classList.toggle('form-hidden', visible);
     if (signoutRow) signoutRow.style.display = visible ? 'none' : '';
+    // The welcome door carries its own progress track and its own warm ground.
+    // css/door.css uses this class to suppress the header's thin progress bar,
+    // which would otherwise read as a second, competing progress indicator.
+    document.body.classList.toggle('door-open', visible);
   }
 
   function injectPreviewBanner() {
