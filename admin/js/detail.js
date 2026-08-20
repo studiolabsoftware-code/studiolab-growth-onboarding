@@ -594,7 +594,6 @@
         ['Trading name / DBA', fmtVal(sub.trading_name), undefined, 'trading_name'],
         ['Business type', fmtVal(businessTypeLabel(sub.business_type)), undefined, 'business_type'],
         ['EIN', maskTaxId(sub.ein, 'ein'), undefined, 'ein'],
-        ['SSN (last 4)', sub.ssn_last4 ? '••••' + ESC(sub.ssn_last4) : empty, undefined, 'ssn_last4'],
         ['ABN', fmtVal(sub.abn), undefined, 'abn'],
         ['ACN', fmtVal(sub.acn), undefined, 'acn'],
         ['Business email',

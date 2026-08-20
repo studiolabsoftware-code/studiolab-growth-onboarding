@@ -49,11 +49,17 @@ const ALLOWED_FIELDS = new Set([
   'brand_reference_url',
   // Optional Twilio account connection (Scale and AI).
   'has_twilio', 'twilio_number',
-  // Business identity & structured address (migration 040 — Phase 1 of
-  // onboarding access & compliance plan). EIN and ssn_last4 are stored
-  // plain text; admin UI masks on display. Do not log these fields.
+  // Business identity & structured address (migration 040, Phase 1 of the
+  // onboarding access & compliance plan). EIN is stored plain text; the admin
+  // UI masks it on display. Do not log these fields.
+  //
+  // ssn_last4 is deliberately NOT writable. We stopped collecting it on
+  // 2026-08-20: a US sole proprietor proves identity through the platform's own
+  // A2P brand check, a third-party verification they complete in their own
+  // sub-account, which we can neither run for them nor feed digits into. The
+  // column stays for any historical row; nothing may write it again.
   'legal_business_name','trading_name','business_type',
-  'ein','ssn_last4','abn','acn',
+  'ein','abn','acn',
   'business_email','business_email_is_personal_domain',
   'address_street','address_city','address_region','address_postcode',
 ]);

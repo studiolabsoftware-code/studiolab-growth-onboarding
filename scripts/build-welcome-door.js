@@ -12,10 +12,15 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 
+// One duration for every plan and every surface. Per-plan minutes (5/10/15)
+// disagreed with each step 1 card on all six routes, and the exact number was
+// never the point: the job of the line is "this is not a big job, start now".
+const FORM_MINUTES = '10';
+
 const PLANS = {
-  launch: { name: 'Launch',      label: 'Launch',      mins: '5'  },
-  scale:  { name: 'Scale',       label: 'Scale',       mins: '10' },
-  ai:     { name: 'Dominate AI', label: 'Dominate AI', mins: '15' },
+  launch: { name: 'Launch',      label: 'Launch'      },
+  scale:  { name: 'Scale',       label: 'Scale'       },
+  ai:     { name: 'Dominate AI', label: 'Dominate AI' },
 };
 
 const REGIONS = {
@@ -85,7 +90,7 @@ function door(planKey, regionKey) {
         </div>
       </div>
 
-      <p class="dr-micro">${ICONS.clock}About ${p.mins} minutes, and it saves as you go</p>
+      <p class="dr-micro">${ICONS.clock}About ${FORM_MINUTES} minutes, and it saves as you go</p>
     </div>
   </div>
 

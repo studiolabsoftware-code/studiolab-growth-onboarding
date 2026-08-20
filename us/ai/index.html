@@ -70,7 +70,7 @@
         </div>
       </div>
 
-      <p class="dr-micro"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>About 15 minutes, and it saves as you go</p>
+      <p class="dr-micro"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>About 10 minutes, and it saves as you go</p>
     </div>
   </div>
 
@@ -182,8 +182,8 @@
       <div class="ct"><div class="ct-icon" aria-hidden="true">👋</div>About this setup</div>
       <p style="margin:0 0 10px; color:var(--g6); line-height:1.55; font-size:13px;">Dominate AI is everything in Scale plus an AI chat widget on your website and an AI voice agent for inbound calls.</p>
       <p style="margin:0 0 10px; color:var(--g6); line-height:1.55; font-size:13px;">Both answer from a knowledge base you'll build with us, so the AI never invents anything about your studio.</p>
-      <p style="margin:0 0 10px; color:var(--g6); line-height:1.55; font-size:13px;">This form takes about 10 minutes. Right after payment we scan your website and pre-fill your AI knowledge base for you, then you confirm it, tweak anything that isn't quite right, and you're done.</p>
-      <p style="margin:0; color:var(--g6); line-height:1.55; font-size:13px;">Your account typically goes live 7 to 10 business days after we review and approve the knowledge base.</p>
+      <p style="margin:0 0 10px; color:var(--g6); line-height:1.55; font-size:13px;">This form takes about 10 minutes and it saves as you go. Right after payment we scan your website and pre-fill your AI knowledge base for you, then you confirm it, tweak anything that isn't quite right, and you're done.</p>
+      <p style="margin:0; color:var(--g6); line-height:1.55; font-size:13px;">Most studios are live within 7 to 10 business days, once we have reviewed and approved your knowledge base.</p>
     </div>
 
     <div class="card">
@@ -192,7 +192,7 @@
         <li>Your studio logo as a PNG with a transparent background (350 × 180 px, max 2.5 MB)</li>
         <li>Brand colour hex codes, or a screenshot we can match</li>
         <li>The email address you want family replies to land in</li>
-        <li>Whether you would like us to set up text messaging for you (we handle the number and carrier setup)</li>
+        <li>Whether you want text messaging turned on (a few of the steps need you, and we walk you through them)</li>
         <li>Your studio's website URL, which we scan the moment you pay and pre-fill your AI knowledge base from it. No website yet? You can still add one on the next screen, or fill the knowledge base in by hand.</li>
       </ul>
     </div>
@@ -280,7 +280,7 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🏛️</div>Business details</div>
-      <div class="co co-blue" style="margin-bottom:12px;">These are optional, and you can add them now or send them to us later. They appear on your invoices and in the small print at the bottom of every email we send for you, which US and Australian law require, and on text-enabled plans they are also what registers your studio's texting number with the carriers. You will only enter them once.</div>
+      <div class="co co-blue" style="margin-bottom:12px;">These are optional, and you can add them now or send them to us later. They appear on your invoices and in the small print at the bottom of every email we send for you, which US and Australian law require. On plans with text messaging you use them again when you register your number, which happens inside StudioLAB Growth. You will only enter them once.</div>
       <div class="fr">
         <div class="f">
           <label for="legalName">Legal business name </label>
@@ -315,12 +315,6 @@
           <input type="text" id="ein" placeholder="XX-XXXXXXX" inputmode="numeric" maxlength="10">
           <span class="field-note">Your IRS Employer Identification Number.</span>
           <span class="field-err">Please enter your EIN.</span>
-        </div>
-        <div class="f" id="ssnField" hidden>
-          <label for="ssnLast4">Last 4 of owner SSN </label>
-          <input type="password" id="ssnLast4" placeholder="••••" inputmode="numeric" maxlength="4" autocomplete="off">
-          <span class="field-note">Required by US carriers to register a Sole Proprietor SMS sender. We never see the full number.</span>
-          <span class="field-err">Please enter the last 4 digits.</span>
         </div>
         <div class="f" id="abnField" hidden>
           <label for="abn">ABN </label>
@@ -548,7 +542,7 @@
 
     <div class="card">
     <div class="ct"><div class="ct-icon" aria-hidden="true">🌐</div>Custom email domain <span class="hint">optional</span></div>
-    <div class="co co-blue">Sending from your own domain (e.g. @yourstudio.com) helps your emails land in the inbox instead of the spam folder. If you would like this, just tell us the domain and <strong>we set up SPF, DKIM, and DMARC for you during onboarding.</strong> There is nothing technical for you to do.</div>
+    <div class="co co-blue">Sending from your own domain (e.g. @yourstudio.com) helps your emails land in the inbox instead of the spam folder. Tell us the domain and we work out the exact records to add. <strong>Adding them changes settings on your domain, so it needs someone with access to your DNS.</strong> On Done-For-You we do it with you on a call. On Guided we send you the records and a walkthrough.</div>
     <div class="f">
       <span class="f-q-label" id="lbl-dns">Do you have your own website domain you would like emails to come from?</span>
       <div class="yn" id="dnsYN" role="radiogroup" aria-labelledby="lbl-dns">
@@ -561,7 +555,7 @@
         <div class="f">
           <label for="emailDomain">Your email domain </label>
           <input type="text" id="emailDomain" placeholder="e.g. yourstudio.com">
-          <span class="field-note">Just the domain, not a full URL. We handle all the technical setup during onboarding, so you will not need to touch any DNS records yourself.</span>
+          <span class="field-note">Just the domain, not a full URL. We send you the exact SPF, DKIM and DMARC records and walk you through adding them.</span>
         </div>
       </div>
     </div>
@@ -578,13 +572,13 @@
   <div class="panel" id="s4">
     <div class="sh">
       <div class="sh-tag">Step 4 of 5</div>
-      <h2 class="sh-title">Text messaging and lead sources</h2>
-      <div class="sh-desc">Optional setup for SMS automations, missed-call text-back, lead-source tracking, and AI chat on your Dominate AI plan. Add what is useful and skip the rest.</div>
+      <h2 class="sh-title">Text messaging and your public listing</h2>
+      <div class="sh-desc">Both optional. Tell us whether you want text messaging, and share your Google Business listing so we can set your review requests up correctly. Your AI chat is set up from the knowledge base you confirm after payment.</div>
     </div>
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">💬</div>Text messaging <span class="hint">optional</span></div>
-      <div class="co co-blue">Text messaging powers your SMS automations and missed-call text-back. If you would like it, we set up your texting number and handle the carrier registration (A2P / 10DLC) for you during onboarding. You do not need a provider or any technical setup.</div>
+      <div class="co co-blue">Text messaging powers your SMS automations and missed-call text-back. Getting it live means buying your studio&#39;s number and clearing A2P / 10DLC registration, which every business has to clear before it can text. <strong>Some of those steps only you can complete, because they verify your identity and your business.</strong> We prepare everything we can, then walk you through the rest, on a call if you would like one.</div>
       <div class="f">
         <span class="f-q-label" id="lbl-sms">Do you want us to set up text messaging for you?</span>
         <div class="yn" id="smsYN" role="radiogroup" aria-labelledby="lbl-sms">
@@ -610,7 +604,7 @@
 
     <div class="card">
       <div class="ct"><div class="ct-icon" aria-hidden="true">🔗</div>Your public listing</div>
-      <div class="co co-blue">If you have a Google Business profile, share the link. It lets your setup team see how your studio presents itself today and set your review requests up correctly. Optional, and we work from whatever you provide.</div>
+      <div class="co co-blue">If you have a Google Business profile, share the link. It lets your setup team see how your studio presents itself today and set your review requests up correctly. Connecting it is something we do together, on a call or by following the walkthrough we send. Optional, and we work from whatever you provide.</div>
       <div class="co co-blue" style="margin-top:8px;">Connecting your social accounts is a separate step you do yourself once your account is configured, from <strong>Settings → Integrations</strong> inside StudioLAB Growth. No passwords are entered here, and <strong>we never post on your behalf</strong>. We send a short walkthrough showing exactly where to click (about 2 minutes per platform, and you will need admin access on each one).</div>
       <div class="fr x1">
         <div class="f">
@@ -634,26 +628,26 @@
     <div class="sh">
       <div class="sh-tag">Step 5 of 5</div>
       <h2 class="sh-title">Review and submit</h2>
-      <div class="sh-desc">Check everything before submitting. Our team will review your information, contact you shortly to begin configuration.</div>
+      <div class="sh-desc">Check everything before submitting. We review what you have sent and get in touch to book your setup in.</div>
     </div>
 
 
     <div class="card">
       <div class="ct" id="lbl-setup-review"><div class="ct-icon" aria-hidden="true">🛠️</div>Choose your setup option</div>
-      <p style="margin:0 0 12px; color:var(--g6); font-size:13px; line-height:1.55;">You can have us build the whole account for you, or follow our guided checklist and configure it yourself. Same outcome either way, so pick what fits your time and confidence.</p>
+      <p style="margin:0 0 12px; color:var(--g6); font-size:13px; line-height:1.55;">Neither option is hands-off. A few things can only be done by you, because they need your logins, your domain, or your identity: connecting your social accounts, adding records to your domain, and verifying your business with the phone carriers. What changes is how much of the rest we do, and whether we are on the call while you do your part.</p>
       <div class="setup-grid" role="radiogroup" aria-labelledby="lbl-setup-review">
         <label class="setup-card sel" id="sc-dfy" data-setup="dfy">
-          <input type="radio" name="setup" value="dfy" aria-label="Done-For-You: our team configures your account, typically 5 to 7 business days" checked>
+          <input type="radio" name="setup" value="dfy" aria-label="Done-For-You: We do the bulk of the build, and sit with you on a call for the parts that need your logins, your domain, or your identity." checked>
           <div class="setup-dot" aria-hidden="true"></div>
           <div class="setup-name" aria-hidden="true">Done-For-You</div>
-          <div class="setup-desc" aria-hidden="true">Our team configures your entire account. You provide the information, we handle everything else. Typically 5 to 7 business days.</div>
+          <div class="setup-desc" aria-hidden="true">Everything in Done-For-You, plus your knowledge base build, AI chat and voice agent setup and testing, and a live walkthrough.</div>
           <div class="setup-price" data-price-slot="dfy" aria-hidden="true"></div>
         </label>
         <label class="setup-card" id="sc-guided" data-setup="guided">
-          <input type="radio" name="setup" value="guided" aria-label="Guided self-setup: configure your own account with our step-by-step checklist">
+          <input type="radio" name="setup" value="guided" aria-label="Guided (self-setup): You work through our checklist at your own pace. We send a walkthrough for each step that needs your own logins, and we are on hand if you get stuck.">
           <div class="setup-dot" aria-hidden="true"></div>
           <div class="setup-name" aria-hidden="true">Guided (self-setup)</div>
-          <div class="setup-desc" aria-hidden="true">You configure your own account using our step-by-step checklist, with support available if you get stuck. Typically 3 to 5 business days.</div>
+          <div class="setup-desc" aria-hidden="true">You work through our checklist at your own pace. We send a walkthrough for each step that needs your own logins, and we are on hand if you get stuck.</div>
           <div class="setup-price" data-price-slot="guided" aria-hidden="true"></div>
         </label>
       </div>
@@ -713,7 +707,7 @@
       <div class="sum-sec">
         <div class="sum-hdr sum-hdr-static"><span class="sum-hdr-ico" aria-hidden="true">⚡</span><span class="sum-hdr-title">Automations</span></div>
         <div class="sum-body">
-          <div class="sum-f"><div class="sum-k">Included</div><div class="sum-v" id="sv-automations">All Dominate AI automations will be activated during setup</div></div>
+          <div class="sum-f"><div class="sum-k">Included</div><div class="sum-v" id="sv-automations">We switch on all Dominate AI automations for you</div></div>
         </div>
       </div>
     </div>
@@ -776,6 +770,11 @@
 
 </div><!-- /fmain -->
 
+<!-- Reached only by js/form.js showDone() (spam-honeypot branch) and
+     showSavedForLater(). BOTH rewrite the title, description and timeline
+     below, so this text is a fallback that no studio sees on the normal
+     path (step 5 goes to Stripe, then to account.html). Keep it truthful
+     anyway; do not treat it as the live success copy. -->
 <div class="done-screen" id="doneScreen" role="status" aria-live="polite" tabindex="-1">
   <div class="done-ico">✓</div>
   <div class="done-title">All received. Thank you!</div>
@@ -785,7 +784,7 @@
     <div class="done-detail-row"><span class="done-detail-key">Studio</span><span class="done-detail-val" id="done-studio"></span></div>
     <div class="done-detail-row"><span class="done-detail-key">Plan</span><span class="done-detail-val" id="done-plan">Dominate AI</span></div>
     <div class="done-detail-row"><span class="done-detail-key">Setup type</span><span class="done-detail-val" id="done-setup"></span></div>
-    <div class="done-detail-row"><span class="done-detail-key">Timeline</span><span class="done-detail-val" id="done-timeline">Typically 5 to 10 business days</span></div>
+    <div class="done-detail-row"><span class="done-detail-key">Timeline</span><span class="done-detail-val" id="done-timeline">Most studios are live within 7 to 10 business days</span></div>
   </div>
 </div>
 

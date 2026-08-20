@@ -98,18 +98,27 @@
 
   // Display label for each setup type, plan-aware. The DFY card on Dominate AI
   // is rebadged as AI Activation Pack with a richer description.
+  // Timings deliberately live on the plan (step 1 and account.html), not here.
+  // Putting them on the setup cards is what produced four different turnaround
+  // numbers across three surfaces.
+  //
+  // Neither path is hands-off and the copy says so. Connecting social accounts,
+  // adding records to their domain and clearing the carrier identity checks all
+  // need the studio's own logins and their own identity, on either path. The
+  // real difference is how much of the rest we do, and whether we are on the
+  // call while they do their part.
   const SETUP_DISPLAY = {
     guided: {
       label: 'Guided (self-setup)',
-      desc:  'You configure your own account using our step-by-step checklist, with support available if you get stuck. Typically 3 to 5 business days.',
+      desc:  'You work through our checklist at your own pace. We send a walkthrough for each step that needs your own logins, and we are on hand if you get stuck.',
     },
     dfy_default: {
       label: 'Done-For-You',
-      desc:  'Our team configures your entire account. You provide the information, we handle everything else. Typically 5 to 7 business days.',
+      desc:  'We do the bulk of the build, and sit with you on a call for the parts that need your logins, your domain, or your identity.',
     },
     dfy_ai: {
       label: 'AI Activation Pack',
-      desc:  'Full Done-For-You configuration plus knowledge base build, AI chat setup, voice agent setup and testing, and a live walkthrough. Typically 7 to 10 business days.',
+      desc:  'Everything in Done-For-You, plus your knowledge base build, AI chat and voice agent setup and testing, and a live walkthrough.',
     },
   };
 
@@ -167,6 +176,11 @@
       const priceSlot = card.querySelector('[data-price-slot]');
       if (nameEl) nameEl.textContent = display.label;
       if (descEl) descEl.textContent = display.desc;
+      // The name and description are aria-hidden, so the radio's own label is
+      // the only thing a screen reader gets. Keep it in step with the visible
+      // copy rather than letting the markup's default go stale.
+      const radio = card.querySelector('input[type="radio"]');
+      if (radio) radio.setAttribute('aria-label', display.label + ': ' + display.desc);
       if (priceSlot) {
         const p = priceFor(setupType);
         priceSlot.innerHTML =
@@ -489,6 +503,16 @@
     // final step (the picker and the summary now live on the same panel).
     const svSetup = document.getElementById('sv-setup');
     if (svSetup) svSetup.innerHTML = setupFeeSummaryHtml();
+    // The automations line sits directly above this choice, so it has to follow
+    // it. Promising we activate everything while a studio is choosing to set it
+    // up themselves argued against the paid option on the screen that sells it.
+    const svAuto = document.getElementById('sv-automations');
+    if (svAuto) {
+      const planName = PLAN_LABEL[state.plan] || 'Growth';
+      svAuto.textContent = setupName === 'guided'
+        ? 'Your checklist covers all ' + planName + ' automations'
+        : 'We switch on all ' + planName + ' automations for you';
+    }
     // Sticky paybar at the top of the review step shows the authoritative
     // total (with tax + discount). Re-fetch it whenever the toggle changes so
     // the "Pay now" headline tracks the live selection without waiting for
@@ -1118,11 +1142,11 @@
   }
 
   function businessTaxIdSummary() {
-    // Review-step display: pick the relevant ID per business type. Mask
-    // SSN entirely (only ever show that we have it); show full EIN/ABN/ACN
-    // since the studio entered them and is reviewing their own data.
+    // Review-step display: pick the relevant ID per business type. EIN/ABN/ACN
+    // show in full, since the studio entered them and is reviewing their own
+    // data. A US sole proprietor has no ID here on purpose: their identity is
+    // verified by the platform's own A2P check, not by us.
     const bt = val('businessType');
-    if (bt === 'sole_prop' && val('ssnLast4')) return 'SSN on file (••••' + val('ssnLast4') + ')';
     const ein = val('ein'); if (ein) return 'EIN ' + ein;
     const abn = val('abn'); if (abn) return 'ABN ' + abn + (val('acn') ? ' · ACN ' + val('acn') : '');
     return '';
@@ -1152,8 +1176,14 @@
     // EIN: shown for US non-Sole-Prop business types (and as a soft default
     // until a type is picked, to keep the field visible for studios who
     // skim ahead). Hidden for AU.
+    //
+    // There is deliberately no SSN field. A US sole proprietor proves identity
+    // through the platform's own A2P brand check, which runs a third-party ID
+    // verification inside their own sub-account, in their own browser. We can
+    // neither complete that for them nor feed their digits into it, so holding
+    // the number would be collecting sensitive data we have no use for. The
+    // pre-work that IS useful lives in the SMS task on account.html.
     show('einField', isUS && bt && !isSoleProp);
-    show('ssnField', isUS && isSoleProp);
     show('abnField', isAU);
     show('acnField', isAU && isPtyLtd);
   }
@@ -1243,7 +1273,6 @@
       trading_name: valOrNull('tradingName'),
       business_type: valOrNull('businessType'),
       ein: valOrNull('ein'),
-      ssn_last4: valOrNull('ssnLast4'),
       abn: valOrNull('abn'),
       acn: valOrNull('acn'),
       business_email: businessEmail,
@@ -1365,7 +1394,8 @@
     setText('done-setup', setupFeeSummaryLine());
     setText('done-timeline', state.setup === 'guided'
       ? 'You complete setup at your own pace'
-      : 'Typically 3 to 7 business days');
+      : (state.plan === 'ai' ? 'Most studios are live within 7 to 10 business days'
+                             : 'Most studios are live within 3 to 5 business days'));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -2258,7 +2288,7 @@
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
       // Business details (Phase 1).
-      'tradingName','businessType','ein','ssnLast4','abn','acn','businessEmail',
+      'tradingName','businessType','ein','abn','acn','businessEmail',
       'addressStreet','addressCity','addressRegion','addressPostcode',
     ].forEach((id) => setVal(id, sub[idToColumn(id)]));
     // Prefer the new canonical column for legal business name; fall back to
@@ -2368,7 +2398,7 @@
       googleBusinessUrl: 'google_business_url', bookingUrl: 'booking_url',
       // Business details (Phase 1).
       tradingName: 'trading_name', businessType: 'business_type',
-      ein: 'ein', ssnLast4: 'ssn_last4', abn: 'abn', acn: 'acn',
+      ein: 'ein', abn: 'abn', acn: 'acn',
       businessEmail: 'business_email',
       addressStreet: 'address_street', addressCity: 'address_city',
       addressRegion: 'address_region', addressPostcode: 'address_postcode',
