@@ -1,4 +1,4 @@
-# Onboarding pre-fill (Scenario B) — build plan
+# Onboarding pre-fill (Scenario B): build plan
 
 Status: PLAN (2026-08-20). Tier-2 (identity binding + live production form). Spans two repos.
 Decision: Gary, 2026-08-20, "pick up the information from them once they sign in ... they just
@@ -42,7 +42,7 @@ picking the token up.
 Gary's ask is "don't make the studio fill in more than they've already given us". Stating plainly
 what that can and cannot reach, because the answer shapes the build.
 
-### Tier 1 — in hand today, zero new integration
+### Tier 1: in hand today, zero new integration
 
 `location_id`, `contact_email`, `first_name`, `last_name`, `company_name` (becomes `studio_name`),
 `plan`, `region`, `tier`.
@@ -50,7 +50,7 @@ what that can and cannot reach, because the answer shapes the build.
 This is the entire "who are you" block. **Step 1 becomes a confirm screen**, which is precisely
 the experience Gary described. This tier is the whole win for the least risk and should ship first.
 
-### Tier 2 — one new adapter verb, live read of the studio's own sub-account
+### Tier 2: one new adapter verb, live read of the studio's own sub-account
 
 Business address, phone, website, timezone, business email, possibly logo.
 
@@ -69,7 +69,7 @@ GHL signup collects only name/email/company, address will be blank fleet-wide an
 nothing. This is a 10-minute check against two or three real sub-accounts and it gates the tier-2
 decision.
 
-### Tier 3 — does not exist anywhere, must be asked
+### Tier 3: does not exist anywhere, must be asked
 
 Branding colours, logo, studio description, email voice/tone/sign-off, legal and tax IDs
 (ABN/ACN/EIN/SSN), custom domain, SMS intent, send-on-behalf consent, public listing links.
