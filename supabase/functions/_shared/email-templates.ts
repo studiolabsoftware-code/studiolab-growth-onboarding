@@ -227,8 +227,12 @@ export interface SubmissionRowLike {
   sms_type?: string | null;
   area_code?: string | null;
   port_number?: string | null;
+  sms_setup_requested?: boolean | null;
   sms_tone?: string | null;
   lead_sources?: unknown;
+  consent_send_on_behalf?: boolean | null;
+  consent_captured_at?: string | null;
+  consent_version?: string | null;
 
   kb_greeting?: string | null;
   kb_assistant_persona_type?: string | null;
@@ -346,16 +350,20 @@ export function submissionDigestHtml(sub: SubmissionRowLike, attachments?: Attac
     ['Reply-to', sub.reply_email],
     ['Custom domain', sub.custom_domain],
     ['Email domain', sub.email_domain],
-    ['DNS access', sub.dns_access],
+  ])));
+
+  sections.push(sectionWrap('Consent', rowsTable([
+    ['Send-on-behalf consent', sub.consent_send_on_behalf == null ? null : (sub.consent_send_on_behalf ? 'Given' : 'Not given')],
+    ['Captured at', sub.consent_captured_at],
+    ['Wording version', sub.consent_version],
   ])));
 
   if (isScale || isAi) {
     sections.push(sectionWrap('SMS & social', rowsTable([
-      ['Number preference', sub.sms_type],
-      ['Area code', sub.area_code],
-      ['Port number', sub.port_number],
+      ['Set up texting?', sub.sms_setup_requested == null ? null : (sub.sms_setup_requested ? 'Yes' : 'No')],
+      ['Texting tone', sub.sms_tone],
       ['Lead sources', sub.lead_sources],
-    ]) + longField('SMS tone notes', sub.sms_tone)));
+    ])));
   }
 
   if (isAi) {

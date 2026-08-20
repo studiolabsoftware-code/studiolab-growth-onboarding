@@ -634,14 +634,17 @@
         ['Reply-to', fmtVal(sub.reply_email), undefined, 'reply_email'],
         ['Custom domain', fmtBool(sub.custom_domain)],
         ['Email domain', fmtVal(sub.email_domain), undefined, 'email_domain'],
-        ['DNS access', fmtVal(sub.dns_access), undefined, 'dns_access'],
+      ])}
+
+      ${section('✅ Consent', [
+        ['Send-on-behalf consent', sub.consent_send_on_behalf == null ? '—' : (sub.consent_send_on_behalf ? 'Given' : 'Not given')],
+        ['Captured at', fmtVal(sub.consent_captured_at)],
+        ['Wording version', fmtVal(sub.consent_version)],
       ])}
 
       ${(isScale || isAi) ? section('💬 SMS & social', [
-        ['Number preference', fmtVal(sub.sms_type), undefined, 'sms_type'],
-        ['Area code', fmtVal(sub.area_code), undefined, 'area_code'],
-        ['Port number', fmtVal(sub.port_number), undefined, 'port_number'],
-        ['SMS tone notes', fmtVal(sub.sms_tone), undefined, 'sms_tone'],
+        ['Set up texting?', sub.sms_setup_requested == null ? '—' : (sub.sms_setup_requested ? 'Yes' : 'No')],
+        ['Texting tone', fmtVal(sub.sms_tone), undefined, 'sms_tone'],
         ['Lead sources', fmtList(sub.lead_sources)],
       ]) : planNotice('SMS & social', 'Launch')}
 

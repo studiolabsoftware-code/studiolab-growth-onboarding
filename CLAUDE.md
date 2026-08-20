@@ -22,7 +22,11 @@ For business, product, and commercial framing (brand voice, design system, Maste
 
 ## Cross-reference: Growth pricing and margin knowledge base
 
-For StudioLAB Growth pricing, margin structure, setup fees, upgrade pricing, plan packaging, Family App / Communities notes, source authority, and open cost gaps, read:
+For StudioLAB Growth pricing, margin structure, setup fees, upgrade pricing, plan packaging, Family App / Communities notes, source authority, and open cost gaps, start with the Dropbox active source of truth:
+
+`/Users/gary/Library/CloudStorage/Dropbox/Gary's Files/StudioLAB/Growth - GHL/StudioLAB Growth/ACTIVE_SOURCE_OF_TRUTH/00-agent-start/agent-quick-start-current.md`
+
+Then use the local working mirror:
 
 `/Users/gary/Claude_Projects/Growth - Onboarding/outputs/studiolab-growth-knowledge-base/agent-quick-start.md`
 
@@ -30,7 +34,7 @@ Then open the relevant file in:
 
 `/Users/gary/Claude_Projects/Growth - Onboarding/outputs/studiolab-growth-knowledge-base/`
 
-This is the shared knowledge base for Claude and Codex-style sessions. Do not rely on old chat exports or April 2026 pricing files until the fact has been promoted into this folder or confirmed by the current catalog/code.
+This is the shared knowledge base for Claude and Codex-style sessions. Do not rely on old chat exports, archived pricing files, old upgrade addendums, or generated PDFs until the fact has been promoted into the Dropbox active source or confirmed by the current catalog/code.
 
 Most relevant files for any web design, copy, or brand work on Growth onboarding surfaces:
 - `00-Core/Brand-Voice.md` - voice rules and copy conventions
@@ -52,4 +56,4 @@ Most relevant files for any web design, copy, or brand work on Growth onboarding
 `/Users/gary/Claude_Projects/StudioLAB-Shared/studiolab-api-documentation.md` — full API contract for the live StudioLAB platform. Reference when Growth onboarding flows need to integrate with the platform (account creation, family setup, initial enrolment, etc.).
 ## Session handover (HARD RULE, no exceptions)
 
-Continuously self-monitor context. The instant it reaches 60% (or at any natural task or slice boundary, whichever comes first), STOP all work immediately and emit a ready-to-paste HANDOVER PROMPT as a single fenced code block, then start a fresh session. Do not push toward the limit or rely on auto-compaction; the handover takes priority over finishing the current step. Gary may demand it at any time; produce it immediately. Full rule: StudioLAB-Shared/EXECUTION-ROUTING-STANDARD.md.
+Budget the session by TASK SIZE and natural slice boundaries, not by watching a context percentage (a session cannot reliably read its own context usage; see SESSION-STARTUP-CHECK.md §4). Treat ~60% as an intent, wrap before you are deep, not a gauge to watch. At each slice or task boundary decide deliberately: wrap here, or start exactly one more small slice. When wrapping, or the instant Gary asks, STOP all work immediately and emit a ready-to-paste HANDOVER PROMPT as a single fenced code block, then start a fresh session. Do not push toward the limit or rely on auto-compaction; the handover takes priority over finishing the current step. Full rule: StudioLAB-Shared/EXECUTION-ROUTING-STANDARD.md.

@@ -31,6 +31,12 @@
   // region. Switching plans requires re-verification, which is rare.
   const SESSION_KEY = 'sl-growth-session';
 
+  // Send-on-behalf consent. The wording carries compliance weight, so it is
+  // versioned: the stamped version travels with the submission for audit, and
+  // bumping the copy means bumping this string. Keep in lock-step with the
+  // consent checkbox label text in the six index.html files.
+  const CONSENT_VERSION = 'v1-2026-07-23';
+
   async function callFn(name, body) {
     const resp = await fetch(FN_BASE + name, {
       method: 'POST',
@@ -111,7 +117,7 @@
     step: 1,
     plan: PLAN,
     setup: 'dfy',
-    yn: { dns: null, quotePrice: null },
+    yn: { dns: null, quotePrice: null, sms: null },
     logoUrl: null,
     uploading: false,
   };
@@ -546,6 +552,13 @@
     });
     const cond = document.getElementById(key + 'Cond');
     if (cond) cond.classList.toggle('vis', v === true);
+    // When texting is turned off, clear the (now hidden) tone select so we
+    // never persist an sms_tone with sms_setup_requested=false — that pair
+    // would read as inconsistent to the admin digest and anyone reading the row.
+    if (key === 'sms' && v === false) {
+      const tone = document.getElementById('smsTone');
+      if (tone) tone.value = '';
+    }
   }
 
   // Arrow-key navigation inside a radiogroup of yn-b buttons.
@@ -629,7 +642,7 @@
     const hidden = document.getElementById('signOff');
     if (hidden) hidden.value = combined;
     const preview = document.getElementById('signOffPreview');
-    if (preview) preview.textContent = combined || '—';
+    if (preview) preview.textContent = combined || 'Your sign-off will appear here';
   }
 
   function refreshAutoFill() {
@@ -653,7 +666,12 @@
   }
   function clearFieldErr(input) { setFieldErr(input, false); }
 
-  function validatePanel(stepNum) {
+  // opts.requireConsent gates the send-on-behalf consent check. It is TRUE
+  // only on the real finalize path (pay & submit). Step navigation and the
+  // "Save draft, pay later" action pass it falsy, so a studio can still save
+  // and defer the consent decision — ticking the box is a deliberate act at
+  // submit time, not a precondition for saving progress.
+  function validatePanel(stepNum, opts) {
     const p = panel(stepNum);
     if (!p) return true;
     let ok = true;
@@ -693,6 +711,21 @@
         ok = false;
         const list = document.getElementById('faqList');
         if (list && !firstBad) firstBad = list;
+      }
+    }
+
+    // Send-on-behalf consent is the one deliberate exception to "only the
+    // business name is required". It is a legal authorisation to email/text
+    // families on the studio's behalf, not a data field we can chase later, so
+    // an un-ticked box blocks the FINALIZE path (pay & submit). It must NOT
+    // block navigation or "Save draft, pay later" — hence the requireConsent
+    // gate. Preview mode skips it (admins walk the form without submitting).
+    if (!PREVIEW_MODE && opts && opts.requireConsent && stepNum === totalSteps()) {
+      const consent = document.getElementById('consentSendOnBehalf');
+      if (consent && !consent.checked) {
+        ok = false;
+        setFieldErr(consent, true);
+        if (!firstBad) firstBad = consent;
       }
     }
 
@@ -1131,7 +1164,7 @@
     if (!input || !note) return;
     const v = (input.value || '').trim();
     if (v && isPersonalEmailDomain(v)) {
-      note.textContent = 'Heads up — Google, Meta, and US SMS regulators require a business-domain email (e.g. you@yourstudio.com) to register your account. You can fix this later in your portal, but expect to be asked for it.';
+      note.textContent = 'Heads up: Google, Meta, and US SMS regulators require a business-domain email (e.g. you@yourstudio.com) to register your account. You can fix this later in your portal, but expect to be asked for it.';
       note.classList.add('field-warn');
     } else {
       note.textContent = 'Used on your business profile, invoices, and SMS sender registration.';
@@ -1233,7 +1266,6 @@
       contact_email: val('contactEmail'),
       contact_phone: valOrNull('contactPhone'),
       role: valOrNull('contactRole'),
-      studiolab_email: valOrNull('slEmail'),
 
       logo_url: state.logoUrl,
       primary_colour: valOrNull('col1t'),
@@ -1247,20 +1279,20 @@
       reply_email: valOrNull('replyEmail'),
       custom_domain: state.yn.dns,
       email_domain: state.yn.dns ? valOrNull('emailDomain') : null,
-      dns_access: state.yn.dns ? valOrNull('dnsAccess') : null,
+      // dns_access retired: the DNS self-assessment was removed from the form
+      // (SPF/DKIM/DMARC is done by us in onboarding). Column is left in place;
+      // we simply no longer write it. The Connector never reads it.
 
-      sms_type: isScalePlus ? valOrNull('smsType') : null,
-      has_twilio: isScalePlus ? !!(document.getElementById('hasTwilio') && document.getElementById('hasTwilio').checked) : null,
-      twilio_number: isScalePlus ? valOrNull('twilioNumber') : null,
-
-      // Social and business handles. Launch collects these in the optional
-      // future-proof expander; Scale and AI collect them in the SMS step as
-      // first-class inputs. Form skips silently if the inputs don't exist.
-      tiktok_handle: valOrNull('tiktokHandle'),
-      youtube_url:   valOrNull('youtubeUrl'),
-      area_code: isScalePlus ? valOrNull('areaCode') : null,
-      port_number: isScalePlus ? valOrNull('portNum') : null,
+      // SMS intent (Scale and AI). The number-preference / Twilio / porting
+      // capture was retired: we now ask a single yes/no "set up texting for
+      // me" and (optionally) a tone. The provider, number purchase, and A2P
+      // registration are all handled by us during onboarding, so the form no
+      // longer writes sms_type / area_code / has_twilio / twilio_number /
+      // port_number. Those columns are left in place for older rows; we simply
+      // stop writing them. (Migration 044 adds sms_setup_requested.)
+      sms_setup_requested: isScalePlus ? state.yn.sms : null,
       sms_tone: isScalePlus ? valOrNull('smsTone') : null,
+
       lead_sources: isScalePlus ? collectLeads() : null,
 
       kb_profile: isAi ? valOrNull('kb-profile') : null,
@@ -1277,15 +1309,36 @@
 
       extra_notes: valOrNull('extraNotes'),
 
-      // Optional future-proof URLs (Launch only). Form skips them silently
-      // if the inputs don't exist on the current plan.
+      // Public reference links the studio can share without connecting an
+      // account. facebook_url / instagram_handle / tiktok_handle / youtube_url
+      // are RETIRED from the form (social connection is studio-done OAuth, so a
+      // pasted handle drove nothing); their columns are retained for the
+      // Connector read contract. Form skips a field silently if the input
+      // doesn't exist on the current plan (bookingUrl is Launch only).
       google_business_url: valOrNull('googleBusinessUrl'),
-      facebook_url:        valOrNull('facebookUrl'),
-      instagram_handle:    valOrNull('instagramHandle'),
       booking_url:         valOrNull('bookingUrl'),
 
       // Optional brand-reference screenshot for hex matching.
       brand_reference_url: state.brandReferenceUrl || null,
+
+      // Send-on-behalf consent (review step). Captured as a plain boolean plus
+      // an audit trail: the moment it was ticked and the wording version in
+      // force. Only stamp the timestamp/version when consent is actually given,
+      // so an un-ticked or cleared box leaves a clean null audit trail rather
+      // than a misleading "captured at" with no consent. buildPayload runs on
+      // every autosave, so this reflects the live checkbox state each save.
+      ...consentFields(),
+    };
+  }
+
+  // Reads the consent checkbox and returns the three audit columns.
+  function consentFields() {
+    const el = document.getElementById('consentSendOnBehalf');
+    const given = !!(el && el.checked);
+    return {
+      consent_send_on_behalf: given,
+      consent_captured_at: given ? new Date().toISOString() : null,
+      consent_version: given ? CONSENT_VERSION : null,
     };
   }
 
@@ -1340,7 +1393,7 @@
       bar.innerHTML = ''
         + '<div class="paybar-info">'
         +   '<div class="paybar-label">Setup fee</div>'
-        +   '<div class="paybar-amt" id="paybar-amt">—</div>'
+        +   '<div class="paybar-amt" id="paybar-amt">…</div>'
         +   '<div class="paybar-sub" id="paybar-sub"></div>'
         + '</div>'
         + '<div class="paybar-actions">'
@@ -1387,14 +1440,14 @@
         +   '</header>'
         +   '<div class="pay-modal-body">'
         +     '<div class="pay-modal-product">'
-        +       '<div class="pay-modal-product-name" id="pay-prod-name">—</div>'
+        +       '<div class="pay-modal-product-name" id="pay-prod-name">…</div>'
         +       '<div class="pay-modal-product-desc" id="pay-prod-desc"></div>'
         +     '</div>'
         +     '<div class="pay-modal-rows" id="payblock-rows">'
-        +       '<div class="pay-modal-row"><span class="pay-modal-k">Subtotal</span><span class="pay-modal-v" id="pay-subtotal">—</span></div>'
-        +       '<div class="pay-modal-row" id="pay-discount-row" hidden><span class="pay-modal-k" id="pay-discount-k">Discount</span><span class="pay-modal-v" id="pay-discount">—</span></div>'
-        +       '<div class="pay-modal-row" id="pay-tax-row" hidden><span class="pay-modal-k" id="pay-tax-k">GST</span><span class="pay-modal-v" id="pay-tax">—</span></div>'
-        +       '<div class="pay-modal-row pay-modal-total"><span class="pay-modal-k">Total today</span><span class="pay-modal-v" id="pay-total">—</span></div>'
+        +       '<div class="pay-modal-row"><span class="pay-modal-k">Subtotal</span><span class="pay-modal-v" id="pay-subtotal">…</span></div>'
+        +       '<div class="pay-modal-row" id="pay-discount-row" hidden><span class="pay-modal-k" id="pay-discount-k">Discount</span><span class="pay-modal-v" id="pay-discount">…</span></div>'
+        +       '<div class="pay-modal-row" id="pay-tax-row" hidden><span class="pay-modal-k" id="pay-tax-k">GST</span><span class="pay-modal-v" id="pay-tax">…</span></div>'
+        +       '<div class="pay-modal-row pay-modal-total"><span class="pay-modal-k">Total today</span><span class="pay-modal-v" id="pay-total">…</span></div>'
         +     '</div>'
         +     '<div class="pay-modal-discount" id="pay-discount-block" hidden>'
         +       '<label for="pay-code">Have a discount code?</label>'
@@ -1474,7 +1527,7 @@
       ? '<a class="btn btn-ok paybar-pay paybar-paid-cta" id="paybar-kb-link" href="' + kbHref + '">Go to your knowledge base →</a>'
       : '';
     const subtitle = PLAN === 'ai'
-      ? 'Your knowledge base is now your working document — open it any time.'
+      ? 'Your knowledge base is now your working document. Open it any time.'
       : 'Your submission is in the queue. Our team will be in touch shortly.';
     bar.classList.add('paybar-paid');
     bar.innerHTML = ''
@@ -1635,7 +1688,8 @@
     }
     const hp = document.getElementById('hp-company');
     if (hp && hp.value.trim()) { showDone('SPAMTRAP'); return; }
-    if (!validatePanel(totalSteps())) return;
+    // Finalize path: enforce send-on-behalf consent here (and only here).
+    if (!validatePanel(totalSteps(), { requireConsent: true })) return;
     if (state.uploading) { console.warn('Logo upload in progress'); return; }
     const session = loadSession();
     if (!sessionValid(session)) { showAuthGate(true); return; }
@@ -2188,9 +2242,8 @@
       'studioName','legalName','country','timezone','studioType','address','website',
       'firstName','lastName','contactPhone','contactRole',
       'col1t','col2t','fromName','replyEmail','emailDomain',
-      'smsType','portNum','twilioNumber',
-      'googleBusinessUrl','facebookUrl','instagramHandle','bookingUrl',
-      'tiktokHandle','youtubeUrl',
+      'smsTone',
+      'googleBusinessUrl','bookingUrl',
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
       // Business details (Phase 1).
@@ -2245,14 +2298,17 @@
       const btn = document.querySelector('[data-yn="quotePrice"][data-val="' + (sub.kb_price_quoting ? 'true' : 'false') + '"]');
       if (btn) handleYn(btn);
     }
-    if (sub.has_twilio != null) {
-      const cb = document.getElementById('hasTwilio');
-      if (cb) {
-        cb.checked = !!sub.has_twilio;
-        const row = document.getElementById('twilioRow');
-        if (row) row.style.display = cb.checked ? '' : 'none';
-      }
+    // SMS intent yes/no. Programmatically settable so a future token pre-fill
+    // pass (Scenario B) can populate it without re-architecting the form.
+    if (sub.sms_setup_requested != null) {
+      const btn = document.querySelector('[data-yn="sms"][data-val="' + (sub.sms_setup_requested ? 'true' : 'false') + '"]');
+      if (btn) handleYn(btn);
     }
+    // Send-on-behalf consent is DELIBERATELY not hydrated: it is a fresh legal
+    // act the studio must take at submit time, so we never pre-tick the box
+    // from a stored value (an earlier draft, or a future token pre-fill). The
+    // checkbox has a stable id and is still programmatically settable if a
+    // deliberate flow ever needs it; the default is to leave it unticked.
     if (Array.isArray(sub.lead_sources)) {
       $$('input[data-lead]').forEach((cb) => {
         cb.checked = sub.lead_sources.indexOf(cb.value) >= 0;
@@ -2293,15 +2349,12 @@
       firstName: 'first_name', lastName: 'last_name', contactPhone: 'contact_phone',
       contactRole: 'role', col1t: 'primary_colour', col2t: 'secondary_colour',
       signOff: 'sign_off', fromName: 'from_name', replyEmail: 'reply_email',
-      emailDomain: 'email_domain', smsType: 'sms_type', portNum: 'port_number',
-      twilioNumber: 'twilio_number',
+      emailDomain: 'email_domain', smsTone: 'sms_tone',
       'kb-profile': 'kb_profile', 'kb-classes': 'kb_classes', 'kb-pricing': 'kb_pricing',
       'kb-policies': 'kb_policies', 'kb-events': 'kb_events', 'kb-restricted': 'kb_restricted',
       'kb-tone': 'kb_tone', voiceHours: 'voice_hours', voiceEscalate: 'voice_escalate',
       extraNotes: 'extra_notes',
-      googleBusinessUrl: 'google_business_url', facebookUrl: 'facebook_url',
-      instagramHandle: 'instagram_handle', bookingUrl: 'booking_url',
-      tiktokHandle: 'tiktok_handle', youtubeUrl: 'youtube_url',
+      googleBusinessUrl: 'google_business_url', bookingUrl: 'booking_url',
       // Business details (Phase 1).
       tradingName: 'trading_name', businessType: 'business_type',
       ein: 'ein', ssnLast4: 'ssn_last4', abn: 'abn', acn: 'acn',
@@ -2408,14 +2461,6 @@
         const label = t.closest('.tg');
         if (label) label.classList.toggle('chk', t.checked);
       } else if (t.id === 'logoFile') handleLogoChange(t);
-      else if (t.id === 'smsType') {
-        const row = document.getElementById('portRow');
-        if (row) row.style.display = t.value === 'existing' ? '' : 'none';
-      }
-      else if (t.id === 'hasTwilio') {
-        const row = document.getElementById('twilioRow');
-        if (row) row.style.display = t.checked ? '' : 'none';
-      }
       else if (t.id === 'country') { applyCountryToTimezone(); applyCountryOtherVisibility(); applyBusinessTypeConditionals(); }
       else if (t.id === 'businessType') applyBusinessTypeConditionals();
       else if (t.id === 'businessEmail') applyBusinessEmailWarning();
