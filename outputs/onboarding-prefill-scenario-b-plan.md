@@ -64,10 +64,31 @@ is a materially different privacy case from an operator dashboard listing every 
 defensible. But it is a deliberate posture change, so it needs a **new narrowly-scoped verb**
 (`get_location_detail`, single location, studio-scoped), never a widening of the existing list read.
 
-**Verify before building.** These fields only exist if the sub-account was created with them. If
-GHL signup collects only name/email/company, address will be blank fleet-wide and tier 2 yields
-nothing. This is a 10-minute check against two or three real sub-accounts and it gates the tier-2
-decision.
+**VERIFIED 2026-08-20: the answer is no. Tier 2 is CANCELLED.** The adapter verb
+(`get_location_detail`, ADR-0018) was built and run read-only against the live fleet (52 studio
+sub-accounts, agency + 3 masters excluded). Per field:
+
+| Field | Fill | Usable? |
+|---|---|---|
+| `email` (business) | 100% | **Yes**, the one reliable field |
+| `country` | 100% | Yes, but tier 1 already carries `region` |
+| `timezone` | 100% | **No: populated but WRONG.** 43/56 read `America/Los_Angeles` (the platform default), including every AU studio. Pre-filling it shows an Australian studio a Los Angeles timezone to "confirm" |
+| `phone` | 63% | **No**, mostly sequential test numbers, and format is whatever was typed; only 9 of 33 are E.164 (`0414451533`, `+61 414 451 533`, `8956895208`, `+1 555 123 4567`) |
+| `website` | 44% | **No**. 20 of the 24 values are the identical placeholder `https://theonetechnologies.com/`. Real fill is 4 of 52 |
+| `address` / `city` / `state` / `postalCode` | 13-17% | **No**. 7 of 52 carry an address; only three are real (all typed in by hand after signup). The rest is junk (`address: "1"`, `address: "New York"` + `postalCode: "45654"`) |
+
+The *schema* is fine: the address is properly split into street/city/state/postcode/country, not
+a free-text blob, so it would map cleanly to form boxes. The data is simply absent, because
+**signup never asks for it**. These fields populate only when someone later opens the
+sub-account's business profile and types them.
+
+So pre-filling the address block would show most studios empty boxes, a minority junk to correct,
+and an actively wrong timezone. "Confirm rather than type" holds for the tier-1 identity block
+only, which is where the whole win already was.
+
+**What would change the answer:** if signup is ever changed to collect the studio address, the
+data becomes good immediately (the schema is already right), and the verb is already built,
+reviewed and green, so tier 2 would become a deploy plus a form change, not a new build.
 
 ### Tier 3: does not exist anywhere, must be asked
 
@@ -142,10 +163,11 @@ small. The real work is server-side, which is also where it belongs.
    carrying the pre-bound link). Two emails with two different links is the main way this goes
    wrong in production.
 
-### Tier 2, only if the data check passes
+### Tier 2: CANCELLED (data check failed, 2026-08-20)
 
-9. New scoped adapter verb `get_location_detail`, plus a top-up of the address block during
-   `verify-otp`.
+9. ~~New scoped adapter verb `get_location_detail`, plus a top-up of the address block during
+   `verify-otp`.~~ The verb is BUILT, green and committed (Connector ADR-0018) but **NOT deployed**
+   and has no consumer; the address-block top-up is not being built. See the tier-2 table above.
 
 ## Sequencing
 
@@ -159,8 +181,9 @@ its own Tier-2 slice with full adversary review, since it touches identity bindi
 
 ## Open items for Gary
 
-- **Tier-2 data check** (10 minutes): do two or three real sub-accounts actually carry address,
-  phone and website? This decides whether step 9 is worth building.
+- ~~**Tier-2 data check**: do two or three real sub-accounts actually carry address, phone and
+  website?~~ **DONE 2026-08-20: no.** Ran fleet-wide, not just two or three. Tier 2 cancelled;
+  detail in the tier-2 section above and in Connector `DECISIONS-HISTORY.md` (ADR-0018).
 - **Deploy authority**: C1's deploy and the prod writes in the existing runbook are both gated by
   the harness safety classifier. Either grant Bash permission for `supabase functions deploy` and
   `supabase db query --linked`, or run them yourself from the runbook.
