@@ -89,3 +89,42 @@ as empty "please confirm" fields rather than pre-filled. contact_email/plan/regi
   allow-list entry + finalize path.
 - Review: Codex challenge/review + business-logic & gap critics on the diff.
 - Green gate: `node --check js/form.js`; Playwright end-to-end smoke of one AU + one US route.
+
+## Build complete (2026-07-23) — committed on wip/onboarding-form-refinement (8f124eb), pushed
+
+All of Slice 1b + Slice 2 built, adversarially reviewed (Opus + Sonnet critics), green
+(node --check + static structural + deno typecheck of the two edited edge-fn TS files).
+Codex review and the live browser smoke could NOT run in the build sandbox (network /
+loopback / file:// blocked). The Playwright browser CAN reach external HTTPS, so the live
+form is smoke-testable post-deploy.
+
+Critic fixes applied: consent gates finalize only (not save-later); sms_tone cleared when
+texting toggled off; admin email digest + admin detail page surface "Set up texting?" +
+a Consent section; server-side consent guard added to save-draft finalize. Deliberately
+NOT done this wave: consent guard in create-checkout-session (would reject in-flight
+old-frontend payments during the transition window — sequence it as a fast-follow once all
+sessions are on the new frontend). Payment/Stripe otherwise untouched.
+
+## DEPLOY RUNBOOK (prod writes are gated by the harness safety classifier — run in order)
+
+Migration history on prod is out of sync, so `supabase db push` is unsafe. Apply the
+idempotent migration directly. Order matters: columns first, then save-draft (so the new
+columns persist and are accepted), then the frontend.
+
+1. Migration (additive, idempotent):
+   `supabase db query --linked -f supabase/migrations/044_consent_and_sms_intent.sql`
+   verify: `supabase db query --linked -o table "select column_name from information_schema.columns where table_schema='public' and table_name='submissions' and (column_name like 'consent%' or column_name='sms_setup_requested') order by column_name;"`
+2. Edge functions (save-draft is mandatory: new ALLOWED_FIELDS + server consent guard;
+   on-submission for the updated admin digest):
+   `supabase functions deploy save-draft`
+   `supabase functions deploy on-submission`
+3. Frontend to prod (GitHub Pages serves app.studiolabgrowth.com from main). Lands 3
+   commits: handover-rule, Slice 1a, Slice 1b+2:
+   `git checkout main && git merge --no-ff wip/onboarding-form-refinement && git push origin main`
+4. Post-deploy: Playwright `?preview=1` smoke of one AU + one US route on the live URL
+   (steps navigate, consent gate blocks submit until ticked, 0 console errors).
+
+Follow-ups (not blockers): create-checkout-session consent guard (sequenced); Growth
+Connector read-RPC to surface sms_setup_requested + consent; in-flight pre-deploy drafts
+lose old SMS preference display on re-entry (rare); pre-existing _shared/mailgun.ts:50
+Deno type-strictness error (unrelated, doesn't block deploy).
