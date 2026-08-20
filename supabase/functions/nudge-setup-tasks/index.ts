@@ -10,7 +10,7 @@
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
-import { sendEmail } from '../_shared/mailgun.ts';
+import { createGatedSender } from '../_shared/email-gated.ts';
 import { loadStudioEmailPrefs, unsubscribeUrl, injectUnsubscribeFooter } from '../_shared/studio-email.ts';
 import { setupChecklistNudge } from '../_shared/email-templates.ts';
 
@@ -55,6 +55,16 @@ Deno.serve(async (req) => {
     const dryRun = new URL(req.url).searchParams.get('dry_run') === '1';
     const appUrl = Deno.env.get('APP_URL') || '';
     const sb = adminClient();
+
+    // Side-effect emails must respect the test-mode gate: while Stripe is in
+    // test mode a cron must not mail real studios. This was sending straight
+    // through mailgun, which meant a test-mode run reached live inboxes.
+    const { data: paySettings } = await sb.from('payment_settings')
+      .select('stripe_mode').eq('id', 1).maybeSingle();
+    const sendGated = createGatedSender({
+      isLive: (paySettings?.stripe_mode || 'test') === 'live',
+      testRecipient: Deno.env.get('STRIPE_TEST_EMAIL_RECIPIENT') || '',
+    });
     const nowMs = Date.now();
     const paymentCutoffIso = new Date(nowMs - MIN_HOURS_SINCE_PAYMENT * 60 * 60 * 1000).toISOString();
     const nudgeCutoffIso = new Date(nowMs - MIN_DAYS_BETWEEN_NUDGES * 24 * 60 * 60 * 1000).toISOString();
@@ -108,11 +118,12 @@ Deno.serve(async (req) => {
         });
         const unsubUrl = unsubscribeUrl(prefs?.token);
         const finalHtml = unsubUrl ? injectUnsubscribeFooter(t.html, unsubUrl) : t.html;
-        await sendEmail({
+        await sendGated({
           to: r.contact_email,
           subject: t.subject,
           html: finalHtml,
           replyTo: 'info@studiolabsoftware.com',
+          intent: 'setup-task-nudge',
         });
         const stampedAt = new Date().toISOString();
         await sb.from('submissions')

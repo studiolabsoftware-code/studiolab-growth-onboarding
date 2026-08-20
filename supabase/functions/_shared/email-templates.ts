@@ -698,6 +698,68 @@ export function kbAbandonmentNudge(opts: { studioName: string; resumeUrl: string
 }
 
 // ---------------------------------------------------------------------------
+// Abandoned-onboarding follow-up. A short, finite sequence for a studio who
+// signed up, opened the setup form and then stopped. Three emails, then we
+// leave them alone: a fourth would be nagging, and the draft keeps saving
+// either way. Sent by nudge-abandoned-onboarding.
+// ---------------------------------------------------------------------------
+
+export function onboardingNudge(opts: {
+  studioName: string;
+  resumeUrl: string;
+  step: 1 | 2 | 3;
+}): { subject: string; html: string } {
+  const name = escape(opts.studioName);
+  const foot = (t: string) =>
+    `<p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">${t}</p>`;
+
+  if (opts.step === 1) {
+    return {
+      subject: `Your StudioLAB Growth setup is still waiting`,
+      html: layout({
+        previewText: 'Everything you filled in is saved. Pick up where you left off.',
+        body: `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Pick up where you left off</h1>
+    <p style="margin:0 0 14px;">Hi ${name},</p>
+    <p style="margin:0 0 14px;">You started setting up your StudioLAB Growth account a few days ago and did not quite finish. Everything you filled in is saved, so nothing is lost.</p>
+    <p style="margin:0 0 14px;">There is not much left. Once it is in, we can start building your account.</p>
+    ${cta('Finish my setup', opts.resumeUrl)}
+    ${foot('If you have already finished this, please ignore this email and we will sort it on our end.')}`,
+      }),
+    };
+  }
+
+  if (opts.step === 2) {
+    return {
+      subject: `Still here when you are ready, ${opts.studioName}`,
+      html: layout({
+        previewText: 'Stuck on something? Reply and a person will walk you through it.',
+        body: `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Anything we can help with?</h1>
+    <p style="margin:0 0 14px;">Hi ${name},</p>
+    <p style="margin:0 0 14px;">Your setup is still sitting half finished. That usually means one of two things: the week got away from you, or something in the form was not clear.</p>
+    <p style="margin:0 0 14px;">If it is the second one, just reply to this email. A person reads it, and we are happy to walk you through the whole thing on a call instead.</p>
+    ${cta('Finish my setup', opts.resumeUrl)}
+    ${foot('Your progress is saved and the link above picks up exactly where you stopped.')}`,
+      }),
+    };
+  }
+
+  return {
+    subject: `Last reminder about your Growth setup`,
+    html: layout({
+      previewText: 'The last one of these you will get. Your details stay saved.',
+      body: `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">We will leave you to it</h1>
+    <p style="margin:0 0 14px;">Hi ${name},</p>
+    <p style="margin:0 0 14px;">This is the last reminder we will send about finishing your setup. We would rather be useful than be noise.</p>
+    <p style="margin:0 0 14px;">Your details stay saved, so you can come back and finish whenever it suits. If you would rather we walked you through it, reply to this email and we will book a time.</p>
+    ${cta('Finish my setup', opts.resumeUrl)}`,
+    }),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Deliverable lifecycle emails (Phase 6.4). One template per state move
 // surfaced to a human:
 //   * submitted_for_review → client (recipient)

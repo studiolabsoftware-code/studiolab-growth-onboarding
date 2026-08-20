@@ -39,6 +39,51 @@ never a claim about state, so the unproven `admin-mark-active` path cannot make
 the door lie. Verified in production: no submission has ever reached
 `status='active'`.
 
+## 2026-08-20: copy accuracy fixes, and the abandoned-onboarding follow-up
+
+All 14 audited defects resolved per Gary's decisions. Route edits run through
+`scripts/apply-copy-fixes.js`, which asserts a hit count per replacement and is
+idempotent. Headlines: the SSN field is gone everywhere (see below), texting and
+custom-domain copy now say what the studio has to do, Done-For-You is
+repositioned as "not hands-off", and there is one duration (10 minutes) and one
+turnaround (3 to 5 days, 7 to 10 on Dominate AI) across every surface. Full
+findings: `outputs/onboarding-claims-audit.html`.
+
+### Closed: do we need the US owner's SSN? No.
+
+Researched the platform side before deciding, as Gary asked. A US sole
+proprietor proves identity through the A2P brand check, which runs a
+third-party ID verification (Persona) inside their own sub-account, in their own
+browser. We can neither run it for them nor feed digits into it. Registration
+itself happens in Settings, Phone Numbers, in the studio's own sub-account, and
+AU numbers need a Regulatory Bundle with their own documents. The knowledge-base
+canon already says A2P is a post-payment operational item and "the studio should
+not feel like they are buying a compliance project." `account.html`'s `sms_a2p`
+task already collects the pre-work that IS useful and never asked for an SSN.
+Removed from the routes, `buildPayload`, the hydrate map, the admin display and
+`save-draft`'s allow-list. No production row ever held one.
+
+### Abandoned-onboarding follow-up
+
+`nudge-abandoned-onboarding`, daily at 23:30, three emails then stop: about day
+3, day 7 and day 14 from last activity. Migration 045 adds
+`onboarding_nudge_count` and `onboarding_nudged_at`. Respects the studio email
+opt-out and the test-mode gate. Dry run on production returned 3 draft rows, all
+due for step 1.
+
+### Two things found while building it
+
+- `nudge-abandoned-kb` and `nudge-setup-tasks` sent through Mailgun directly,
+  bypassing the test-mode gate, so a test-mode cron run would have emailed real
+  studios. Both now use `createGatedSender`. (`quote-reminders` was already
+  correct; it hand-rolls the same logic inline rather than importing the helper.)
+- The cron functions had been deployed with `--no-verify-jwt` on the command
+  line, which is invisible in the repo. Redeploying `nudge-abandoned-kb` without
+  the flag re-enabled JWT verification and broke its nightly job, since the crons
+  authenticate with a non-JWT `CRON_SECRET`. Now declared in `supabase/config.toml`
+  for all five cron-invoked functions, so a plain deploy keeps the setting. The
+  dry run is what caught it.
+
 ## 2026-08-20: knowledge base could be nulled by the onboarding form
 
 `js/form.js` `buildPayload` sent `kb_profile`..`voice_escalate` on every save,

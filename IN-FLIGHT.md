@@ -13,39 +13,27 @@ Last updated: 2026-08-20
 
 ## Next slices, in order
 
-1. **Fix the 14 audited copy defects.** The sweep is DONE (2026-08-20), nothing is
-   fixed yet. Full findings with evidence: `outputs/onboarding-claims-audit.html`
-   (published at https://claude.ai/code/artifact/969420d0-136e-491e-a527-052455b0e318).
-   Four passes, in order:
-   - **Pass 1, data and commitments.** Plan-gate the SSN/EIN fields (`us/launch`
-     shows a REQUIRED SSN-last-4 on a plan with no SMS: `applyBusinessTypeConditionals()`
-     keys on country + business type, never plan). Narrow the Launch consent clause,
-     which authorises text messages Launch cannot send.
-   - **Pass 2, promises we cannot keep.** The DNS card (SPF/DKIM/DMARC "nothing
-     technical for you to do", 12 instances) and the texting card ("you do not need
-     any technical setup" vs the A2P task list in `account.html`).
-   - **Pass 3, one numbers pass.** Form duration (door vs step 1 disagree on ALL six
-     routes; `PLAN_MINS` in `js/setup-gate.js` is canon) and turnaround (four numbers
-     across step 1, the setup cards, and `account.html`). Blocked on Gary, below.
-   - **Pass 4, regional + tidy.** `swapSpelling()` only converts the enrol family, so
-     US routes read "colour" 9x. Business-type list not region-filtered. Lead sources
-     promised in step 1 and never asked (`collectLeads()` reads `input[data-lead]`,
-     zero exist). Then the four unreachable items.
+1. **Abandoned-onboarding, population A.** The nudge cron only reaches studios
+   who have a draft, meaning they opened the form and verified their email. A
+   studio who signed up and never opened it leaves no row in `public.submissions`
+   at all; the only record is `growth_manager.inbound_signup`, written by the
+   Connector's `signup-webhook-receiver`. That function is built and green but
+   NOT DEPLOYED, so that population does not exist in the database yet. When it
+   ships, add a second pass in `nudge-abandoned-onboarding` over inbound_signup
+   rows with no matching submission. The scope note at the top of that function
+   says the same thing.
 2. **Pre-fill, Scenario B.** Plan in `outputs/onboarding-prefill-scenario-b-plan.md`.
-   Server-side token resolve only, never client-side. Blocked on both questions
-   below plus the C1 deploy.
+   Server-side token resolve only, never client-side. Blocked on the same C1
+   deploy plus the signup-email question below.
+3. **Voice pass.** Accuracy is done. Worth a look: the door and step 1 both open
+   with "Welcome to StudioLAB Growth", and `kb.html`, the admin console and the
+   outbound email templates were never swept for accuracy at all.
 
 ## Waiting on Gary
 
-1. **Turnaround times, per plan and setup type.** We currently quote 1-2, 3-5, 3-7,
-   5-7 and 7-10 business days on different screens. Blocks audit pass 3.
-2. **Lead sources: capture them or drop the promise?** Claude recommends adding the
-   picker back to step 4. Blocks audit pass 4.
-3. **What can we actually offer on custom email domains?** Send records + guide, do it
-   live on a call under Done For You, or ask for delegated DNS access. Blocks pass 2.
-4. Does StudioLAB Growth send its own onboarding email at signup, and how many?
+1. Does StudioLAB Growth send its own onboarding email at signup, and how many?
    Gates the whole cutover. Step 1 of `outputs/signup-email-cutover-runbook.md`.
-5. Does the platform's AI knowledge base now read the StudioLAB database
+2. Does the platform's AI knowledge base now read the StudioLAB database
    automatically? If yes, `kb.html` shrinks to "any specific requirements?". If no,
    keep it: our capture is the source and `copy-kb-for-ghl` exports the Markdown
    that gets pasted into the platform. The 2026-06-20 KB-retirement decision applied
