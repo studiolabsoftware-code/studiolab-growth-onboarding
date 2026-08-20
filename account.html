@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#13102E">
-<title>Your account — StudioLAB Growth</title>
+<title>Your account, StudioLAB Growth</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@
 
 <header class="hdr">
   <div class="hdr-inner">
-    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth — account setup">
+    <a class="hdr-logo" href="/" aria-label="StudioLAB Growth account setup">
       <img src="assets/growth-logo-white.svg" alt="StudioLAB Growth">
     </a>
     <div class="hdr-div" aria-hidden="true"></div>
@@ -397,7 +397,7 @@
       <div class="acct-card">
         <h2>Pick up your setup</h2>
         <p style="margin:0 0 14px;color:var(--g6);font-size:13px;line-height:1.55;">
-          Your progress is saved. Continue from where you left off — you won't lose anything.
+          Your progress is saved. Continue from where you left off, you won't lose anything.
         </p>
         ${reviewUrl ? `<a class="acct-btn" href="${esc(reviewUrl)}">Continue setup →</a>` : ''}
       </div>
@@ -423,7 +423,7 @@
       icon: '🗺️',
       name: 'Google Business Profile',
       tagline: 'Maps listing, reviews, and posts.',
-      whatWeDo: 'We\'ll keep your Google Business listing up to date — verify hours, respond to reviews, and post updates so families always find the right info when they search for your studio.',
+      whatWeDo: 'We\'ll keep your Google Business listing up to date, verify hours, respond to reviews, and post updates so families always find the right info when they search for your studio.',
       whatYouNeedForGuided: 'Your studio claimed on Google Business Profile and verified (postcard or video). If you don\'t have a listing yet, we\'ll create one for you.',
       stepsDfy: [
         'Sign in to business.google.com and select your business.',
@@ -446,9 +446,9 @@
           { value: 'pending', label: 'Verification in progress' },
           { value: 'not_claimed', label: 'Not claimed yet' },
         ] },
-        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have two locations — only the Sydney one is listed.' },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have two locations, only the Sydney one is listed.' },
       ],
-      noAccountLabel: 'I don\'t have a Google Business Profile yet — please create one for me.',
+      noAccountLabel: 'I don\'t have a Google Business Profile yet, please create one for me.',
     },
     ga4: {
       key: 'ga4',
@@ -467,7 +467,7 @@
       stepsGuided: [
         'Go to analytics.google.com and sign in with your Google account.',
         'Click Admin (gear, bottom left) → Create Property and follow the setup.',
-        'Set up a Web data stream pointing at your studio website — copy the Measurement ID it gives you (it looks like G-XXXXXXXXXX).',
+        'Set up a Web data stream pointing at your studio website, copy the Measurement ID it gives you (it looks like G-XXXXXXXXXX).',
         'Install the GA4 tag on your website (Shopify, WordPress, Wix and Squarespace all have a built-in option).',
         'Paste the Measurement ID and Property ID below.',
       ],
@@ -476,9 +476,9 @@
         { key: 'measurement_id', label: 'GA4 Measurement ID', type: 'text', placeholder: 'G-XXXXXXXXXX', hint: 'In GA4 → Admin → Data Streams → click your stream → top right of the panel.' },
         { key: 'property_id', label: 'GA4 Property ID (numeric)', type: 'text', placeholder: '123456789', hint: 'In GA4 → Admin → Property settings → top of the page.' },
         { key: 'account_name', label: 'GA4 Account name (optional)', type: 'text', placeholder: 'e.g. Dance Academy Melbourne' },
-        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have GA4 set up by a previous agency — happy for you to take over.' },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have GA4 set up by a previous agency, happy for you to take over.' },
       ],
-      noAccountLabel: 'I don\'t have GA4 set up yet — please create it for me.',
+      noAccountLabel: 'I don\'t have GA4 set up yet, please create it for me.',
     },
     gsc: {
       key: 'gsc',
@@ -486,40 +486,40 @@
       name: 'Google Search Console',
       tagline: 'Search performance + indexing.',
       whatWeDo: 'We\'ll monitor your search performance, submit your sitemap, and fix any indexing issues so the right pages show up when families search for you.',
-      whatYouNeedForGuided: 'A verified Search Console property for your studio domain. If you don\'t have one, we\'ll set it up — you\'ll just need to add a small verification record to your domain.',
+      whatYouNeedForGuided: 'A verified Search Console property for your studio domain. If you don\'t have one, we\'ll set it up. You\'ll just need to add a small verification record to your domain.',
       stepsDfy: [
         'Go to search.google.com/search-console.',
         'Select your property at the top.',
         'Click the gear (Settings) → Users and permissions.',
         `Click Add user → enter <strong>${OUR_ACCESS_EMAIL}</strong> → set Permission to <strong>Owner</strong> → click Add.`,
-        'Paste the property URL below — exactly as it shows in Search Console (with or without www, https vs http).',
+        'Paste the property URL below, exactly as it shows in Search Console (with or without www, https vs http).',
       ],
       stepsGuided: [
         'Go to search.google.com/search-console.',
         'Click Add Property → choose Domain (preferred) or URL prefix.',
-        'Follow the verification steps Google shows — usually a DNS TXT record or a meta tag on your home page.',
+        'Follow the verification steps Google shows, usually a DNS TXT record or a meta tag on your home page.',
         'Once verified, submit your XML sitemap (most website builders generate one automatically at /sitemap.xml).',
         'Paste the verified property URL below.',
       ],
       copyTokens: [{ label: 'Our email', value: OUR_ACCESS_EMAIL }],
       fields: [
-        { key: 'property_url', label: 'Verified property URL', type: 'url', placeholder: 'https://www.yourstudio.com', hint: 'Exact format matters — match what Search Console shows.' },
+        { key: 'property_url', label: 'Verified property URL', type: 'url', placeholder: 'https://www.yourstudio.com', hint: 'Exact format matters, match what Search Console shows.' },
         { key: 'property_type', label: 'Property type', type: 'select', options: [
           { value: '', label: 'Select…' },
           { value: 'domain', label: 'Domain (preferred)' },
           { value: 'url_prefix', label: 'URL prefix' },
         ] },
-        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We changed domains last year — old one still has some traffic.' },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We changed domains last year, old one still has some traffic.' },
       ],
-      noAccountLabel: 'I don\'t have Search Console set up yet — please create it for me.',
+      noAccountLabel: 'I don\'t have Search Console set up yet, please create it for me.',
     },
     gtm: {
       key: 'gtm',
       icon: '🏷️',
       name: 'Google Tag Manager',
       tagline: 'Tracking pixels and conversion tags.',
-      whatWeDo: 'We\'ll install your GTM container on your site (or check the one already there), then add and maintain every tracking tag — GA4, Meta Pixel, TikTok Pixel, conversion events — without you ever having to touch code.',
-      whatYouNeedForGuided: 'A GTM container installed on your site. If you don\'t have one, GTM is free — we\'ll point you at the right setup steps for your website platform (Shopify, WordPress, Wix, Squarespace, or custom).',
+      whatWeDo: 'We\'ll install your GTM container on your site (or check the one already there), then add and maintain every tracking tag (GA4, Meta Pixel, TikTok Pixel, conversion events) without you ever having to touch code.',
+      whatYouNeedForGuided: 'A GTM container installed on your site. If you don\'t have one, GTM is free, and we\'ll point you at the right setup steps for your website platform (Shopify, WordPress, Wix, Squarespace, or custom).',
       stepsDfy: [
         'Go to tagmanager.google.com → click Admin (top tab).',
         'In the Account column, click User Management → click the blue +.',
@@ -531,7 +531,7 @@
         'Go to tagmanager.google.com and sign in.',
         'Create Account → Create Container → set Target platform to Web.',
         'Copy the GTM snippet shown and paste it into your website\'s <head> (most platforms have a built-in field for this).',
-        'Confirm install by reloading your homepage — GTM Preview should detect the container.',
+        'Confirm install by reloading your homepage, GTM Preview should detect the container.',
         'Paste the Container ID below.',
       ],
       copyTokens: [{ label: 'Our email', value: OUR_ACCESS_EMAIL }],
@@ -546,27 +546,27 @@
           { value: 'squarespace', label: 'Squarespace' },
           { value: 'custom', label: 'Custom / other' },
         ] },
-        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have an existing developer who manages GTM — happy for you to coordinate.' },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have an existing developer who manages GTM, happy for you to coordinate.' },
       ],
-      noAccountLabel: 'I don\'t have GTM set up — please install it for me.',
+      noAccountLabel: 'I don\'t have GTM set up, please install it for me.',
     },
     google_ads: {
       key: 'google_ads',
       icon: '💰',
       name: 'Google Ads',
       tagline: 'Search and Performance Max campaigns.',
-      whatWeDo: 'We\'ll build, launch and optimise your Google Ads campaigns. Billing stays with you — we link our manager account so we can manage without ever touching your card.',
-      whatYouNeedForGuided: 'A Google Ads account with billing set up. Account currency and timezone are permanent — set them carefully when you create the account.',
+      whatWeDo: 'We\'ll build, launch and optimise your Google Ads campaigns. Billing stays with you, we link our manager account so we can manage without ever touching your card.',
+      whatYouNeedForGuided: 'A Google Ads account with billing set up. Account currency and timezone are permanent, set them carefully when you create the account.',
       stepsDfy: [
         'Sign in to ads.google.com.',
         'Tell us your Customer ID below (format: XXX-XXX-XXXX, top right of the Ads dashboard).',
         'We\'ll send you a Manager Account link request from <strong>StudioLAB</strong> within one business day.',
         'You\'ll see a notification (bell icon, top right). Open it and click <strong>Accept</strong>.',
-        'That\'s it — billing stays with you, we manage the rest.',
+        'That\'s it. Billing stays with you, we manage the rest.',
       ],
       stepsGuided: [
         'Go to ads.google.com and sign in.',
-        'Click "Start now" and follow the new-account setup. Pick your currency and timezone carefully — they\'re permanent.',
+        'Click "Start now" and follow the new-account setup. Pick your currency and timezone carefully, they\'re permanent.',
         'Add billing details (your card stays with you).',
         'Once your account exists, paste the Customer ID below so we have it on file for support.',
       ],
@@ -584,15 +584,15 @@
         { key: 'account_timezone', label: 'Account timezone', type: 'text', placeholder: 'e.g. Australia/Sydney' },
         { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We have a monthly ad budget of around $X.' },
       ],
-      noAccountLabel: 'I don\'t have a Google Ads account yet — please create one for me.',
+      noAccountLabel: 'I don\'t have a Google Ads account yet, please create one for me.',
     },
     meta: {
       key: 'meta',
       icon: '📘',
       name: 'Meta Business Manager',
       tagline: 'Facebook + Instagram ads and Pixel.',
-      whatWeDo: 'We\'ll get partner access to your Facebook Page, Instagram, Ad Account and Meta Pixel — so we can build and run your Meta ads, install the Pixel correctly, and track conversions back to families enrolling.',
-      whatYouNeedForGuided: 'A Meta Business Manager set up. Your Instagram must be a Professional account (Business or Creator) and linked to your Facebook Page — without that, ads and analytics can\'t connect properly.',
+      whatWeDo: 'We\'ll get partner access to your Facebook Page, Instagram, Ad Account and Meta Pixel, so we can build and run your Meta ads, install the Pixel correctly, and track conversions back to families enrolling.',
+      whatYouNeedForGuided: 'A Meta Business Manager set up. Your Instagram must be a Professional account (Business or Creator) and linked to your Facebook Page, without that, ads and analytics can\'t connect properly.',
       stepsDfy: [
         'Go to business.facebook.com → Settings (gear, bottom left).',
         'Under Users, click <strong>Partners</strong> → click <strong>Add</strong> → choose "Give a partner access to your assets".',
@@ -604,7 +604,7 @@
         'Go to business.facebook.com → click Create Account if you don\'t have a Business Manager.',
         'Add your Facebook Page, then add your Instagram (Settings → Instagram accounts → Add).',
         'In Instagram itself, switch your account to Professional (Business or Creator) and connect it to your Facebook Page.',
-        'Create an Ad Account (Settings → Ad accounts → Add) — pick your currency carefully, it\'s permanent.',
+        'Create an Ad Account (Settings → Ad accounts → Add), pick your currency carefully, it\'s permanent.',
         'Install Meta Pixel on your website (most platforms have a built-in field).',
         'Paste the IDs below so we can support you.',
       ],
@@ -625,9 +625,9 @@
         ] },
         { key: 'ad_account_id', label: 'Ad Account ID (optional)', type: 'text', placeholder: 'act_1234567890', hint: 'Ads Manager → top of the page.' },
         { key: 'pixel_id', label: 'Meta Pixel / Dataset ID (optional)', type: 'text', placeholder: '1234567890' },
-        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We had a previous agency — Pixel might already be installed but not configured.' },
+        { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We had a previous agency, Pixel might already be installed but not configured.' },
       ],
-      noAccountLabel: 'I don\'t have a Business Manager yet — please set one up for me.',
+      noAccountLabel: 'I don\'t have a Business Manager yet, please set one up for me.',
     },
     tiktok: {
       key: 'tiktok',
@@ -662,31 +662,31 @@
         ] },
         { key: 'notes', label: 'Anything we should know? (optional)', type: 'textarea', placeholder: 'e.g. We post mostly organic content right now.' },
       ],
-      noAccountLabel: 'I don\'t have a TikTok Business Center yet — please set one up for me.',
+      noAccountLabel: 'I don\'t have a TikTok Business Center yet, please set one up for me.',
     },
     sms_a2p: {
       key: 'sms_a2p',
       icon: '💬',
       name: 'SMS compliance & registration',
       tagline: 'Required to send SMS to families.',
-      whatWeDo: 'We\'ll register your business with the US 10DLC carrier registry (or AU SMS sender ID system) so we can send SMS automations on your behalf. This needs business identity info, sample messages, and a couple of policy URLs — it\'s the most regulated part of the setup.',
+      whatWeDo: 'We\'ll register your business with the US 10DLC carrier registry (or AU SMS sender ID system) so we can send SMS automations on your behalf. This needs business identity info, sample messages, and a couple of policy URLs, it\'s the most regulated part of the setup.',
       whatYouNeedForGuided: 'Your privacy policy and terms of service on your website (with SMS handling and STOP/HELP language mentioned), one or two sample messages, and a brief description of how you collect customer consent to text them.',
       stepsDfy: [
-        'Make sure your website has a Privacy Policy and Terms of Service. They must mention how you handle SMS data and include STOP/HELP language. <em>If you don\'t have these, leave the URLs blank — we\'ll send you compliant templates after submission.</em>',
+        'Make sure your website has a Privacy Policy and Terms of Service. They must mention how you handle SMS data and include STOP/HELP language. <em>If you don\'t have these, leave the URLs blank and we\'ll send you compliant templates after submission.</em>',
         'Pick an industry vertical that matches your studio (Education is the closest fit for most dance/music schools).',
         'Tell us how families opt in to receive SMS from you (web form at enrolment, paper form, verbal, etc).',
-        'Review the two pre-filled sample SMS messages below — edit the wording if you like, but keep the brand name and STOP language.',
+        'Review the two pre-filled sample SMS messages below, edit the wording if you like, but keep the brand name and STOP language.',
         'Submit and we\'ll handle the registration. It usually takes 3-7 business days for the carriers to approve.',
       ],
       stepsGuided: [
         'Publish a Privacy Policy and Terms of Service on your website. Both must mention SMS data handling and STOP/HELP. Free templates: termsfeed.com or the StudioLAB resources hub.',
         'Inside StudioLAB Growth (post-handover), go to Settings → Phone Numbers → A2P Registration and submit your business identity (we send you a guide once you reach this step).',
-        'Use compliant sample messages — our pre-fill below shows the safe pattern.',
+        'Use compliant sample messages, our pre-fill below shows the safe pattern.',
         'After carriers approve (3-7 days), your sending limits unlock.',
       ],
       copyTokens: [],
       fields: [
-        { key: 'privacy_policy_url', label: 'Privacy Policy URL', type: 'url', placeholder: 'https://yourstudio.com/privacy', hint: 'Must mention SMS data handling. Leave blank if you don\'t have one yet — we\'ll provide a template.' },
+        { key: 'privacy_policy_url', label: 'Privacy Policy URL', type: 'url', placeholder: 'https://yourstudio.com/privacy', hint: 'Must mention SMS data handling. Leave blank if you don\'t have one yet and we\'ll provide a template.' },
         { key: 'terms_url', label: 'Terms of Service URL', type: 'url', placeholder: 'https://yourstudio.com/terms', hint: 'Must mention message frequency + STOP/HELP. Leave blank if missing.' },
         { key: 'industry_vertical', label: 'Industry vertical', type: 'select', options: [
           { value: '', label: 'Select…' },
@@ -706,8 +706,8 @@
           { value: 'multiple', label: 'Multiple methods' },
         ] },
         { key: 'opt_in_description', label: 'Describe your opt-in in plain English', type: 'textarea', placeholder: 'e.g. Families tick a "Receive class reminders" checkbox on our online enrolment form. The checkbox is unchecked by default.', hint: 'The carriers want a clear plain-English description of how consent is captured.' },
-        { key: 'sample_sms_1', label: 'Sample SMS 1 (pre-filled — edit as needed)', type: 'textarea', placeholder: '', hint: 'Must include your studio name and "Reply STOP to opt out".', defaultTemplate: (studioName) => `${studioName}: Hi {first_name}, this is a reminder about your class on {date} at {time}. Reply STOP to opt out, HELP for support.` },
-        { key: 'sample_sms_2', label: 'Sample SMS 2 (pre-filled — edit as needed)', type: 'textarea', placeholder: '', hint: 'Different use case so the carriers see your message variety.', defaultTemplate: (studioName) => `${studioName}: Term enrolments open today! Browse classes and book your spot: {link}. Reply STOP to opt out.` },
+        { key: 'sample_sms_1', label: 'Sample SMS 1 (pre-filled, edit as needed)', type: 'textarea', placeholder: '', hint: 'Must include your studio name and "Reply STOP to opt out".', defaultTemplate: (studioName) => `${studioName}: Hi {first_name}, this is a reminder about your class on {date} at {time}. Reply STOP to opt out, HELP for support.` },
+        { key: 'sample_sms_2', label: 'Sample SMS 2 (pre-filled, edit as needed)', type: 'textarea', placeholder: '', hint: 'Different use case so the carriers see your message variety.', defaultTemplate: (studioName) => `${studioName}: Term enrolments open today! Browse classes and book your spot: {link}. Reply STOP to opt out.` },
         { key: 'estimated_monthly_volume', label: 'Estimated monthly SMS volume', type: 'select', options: [
           { value: '', label: 'Select…' },
           { value: 'lt_1k', label: 'Under 1,000' },
@@ -719,25 +719,25 @@
         { key: 'opt_in_screenshot_url', label: 'Opt-in screenshot URL (optional)', type: 'url', placeholder: 'https://...', hint: 'Helpful for Toll-Free verification. Upload a screenshot of your enrolment opt-in checkbox somewhere and paste the link, or send it via Messages.' },
         { key: 'notes', label: 'Anything else? (optional)', type: 'textarea', placeholder: 'e.g. We already had Twilio set up by a previous developer.' },
       ],
-      noAccountLabel: 'I don\'t have a Privacy Policy or Terms yet — please help me set them up.',
+      noAccountLabel: 'I don\'t have a Privacy Policy or Terms yet, please help me set them up.',
     },
     whatsapp: {
       key: 'whatsapp',
       icon: '🟢',
       name: 'WhatsApp Business',
-      tagline: 'Optional — AI chat over WhatsApp.',
+      tagline: 'Optional. AI chat over WhatsApp.',
       whatWeDo: 'If you want your AI agent to also answer WhatsApp messages, we\'ll set up WhatsApp Business on the Meta Business Manager you gave us access to, register your display name, and connect it to your AI chat.',
       whatYouNeedForGuided: 'Your Meta Business Manager already connected to us (the Meta tile), a verified business address on your Business Manager, and a digital copy of your business registration (incorporation cert / ASIC extract / utility bill in the business name).',
       stepsDfy: [
-        'Make sure the Meta Business Manager tile above is complete first — WhatsApp setup runs through the same Business Manager.',
+        'Make sure the Meta Business Manager tile above is complete first, WhatsApp setup runs through the same Business Manager.',
         'Decide if you want WhatsApp enabled. It costs extra per conversation (Meta\'s pricing, passed through) but lets families chat with your AI on WhatsApp.',
-        'Pick a display name (this is what families see in WhatsApp — it must match your business name closely).',
+        'Pick a display name (this is what families see in WhatsApp, it must match your business name closely).',
         'Upload your business verification document somewhere accessible and paste the link below (or attach it via Messages).',
-        'We\'ll handle the rest — verification typically takes 2-5 business days.',
+        'We\'ll handle the rest, verification typically takes 2-5 business days.',
       ],
       stepsGuided: [
         'Go to business.facebook.com → WhatsApp Accounts → Add.',
-        'Follow Meta\'s guided setup — they\'ll ask for a phone number that\'s not currently on WhatsApp (or one you can deactivate from WhatsApp), and your business verification document.',
+        'Follow Meta\'s guided setup, they\'ll ask for a phone number that\'s not currently on WhatsApp (or one you can deactivate from WhatsApp), and your business verification document.',
         'Set a display name that matches your business closely (Meta enforces this).',
         'Once verified, connect WhatsApp to the studio AI inside StudioLAB Growth (Settings → Channels → WhatsApp).',
       ],
@@ -746,7 +746,7 @@
         { key: 'enabled', label: 'Do you want WhatsApp enabled?', type: 'select', options: [
           { value: '', label: 'Select…' },
           { value: 'yes', label: 'Yes, please set this up' },
-          { value: 'maybe', label: 'Maybe later — skip for now' },
+          { value: 'maybe', label: 'Maybe later, skip for now' },
           { value: 'no', label: 'No, not needed' },
         ] },
         { key: 'display_name', label: 'WhatsApp display name', type: 'text', placeholder: 'e.g. Dance Academy Melbourne', hint: 'Must match your business name closely. Meta will reject names that look generic or unrelated.' },
@@ -759,15 +759,15 @@
           { value: 'other', label: 'Other' },
         ] },
         { key: 'verification_doc_url', label: 'Business verification document URL', type: 'url', placeholder: 'https://...', hint: 'Incorporation cert, ASIC extract, or a utility bill in the business name. Upload somewhere accessible (Google Drive shareable link works) and paste the link.' },
-        { key: 'notes', label: 'Anything else? (optional)', type: 'textarea', placeholder: 'e.g. Our current WhatsApp number is the owner\'s personal one — happy to use a fresh number.' },
+        { key: 'notes', label: 'Anything else? (optional)', type: 'textarea', placeholder: 'e.g. Our current WhatsApp number is the owner\'s personal one, happy to use a fresh number.' },
       ],
-      noAccountLabel: 'I don\'t want WhatsApp — please skip this for now.',
+      noAccountLabel: 'I don\'t want WhatsApp, please skip this for now.',
     },
   };
 
   const TILE_STATUS_LABEL = {
     pending: 'Not started',
-    submitted: 'Submitted — we\'re on it',
+    submitted: 'Submitted, we\'re on it',
     no_account: 'We\'ll create it',
     in_progress: 'In progress',
     complete: 'Complete',
@@ -1016,13 +1016,13 @@
       ? [
         { label: 'What we have', body: 'Your studio details, branding, knowledge base, and payment. Everything\'s in.' },
         { label: 'What we\'re doing now', body: 'Reviewing your knowledge base and tuning your AI voice and chat agents to match your studio. Most studios are live within 7 to 10 business days.' },
-        { label: 'What we\'ll need from you', body: 'Nothing right now. If we have follow-up questions on your knowledge base, we\'ll send you a message below — you\'ll also get an email.' },
+        { label: 'What we\'ll need from you', body: 'Nothing right now. If we have follow-up questions on your knowledge base, we\'ll send you a message below, and you\'ll also get an email.' },
         { label: 'What happens next', body: 'You\'ll receive a welcome email with your login the moment your AI is ready to go live.' },
       ]
       : [
         { label: 'What we have', body: 'Your studio details, branding, and payment. Everything we need to start.' },
         { label: 'What we\'re doing now', body: 'Reviewing your submission and setting up your account behind the scenes. Most studios are live within 3 to 5 business days.' },
-        { label: 'What we\'ll need from you', body: 'Nothing right now. If anything needs clarifying, we\'ll send you a message below — you\'ll also get an email.' },
+        { label: 'What we\'ll need from you', body: 'Nothing right now. If anything needs clarifying, we\'ll send you a message below, and you\'ll also get an email.' },
         { label: 'What happens next', body: 'You\'ll receive a welcome email with your login the moment your account is ready to go live.' },
       ];
 
@@ -1121,7 +1121,7 @@
     const activationBanner = isActive
       ? `<div class="acct-active-banner">
            <h2>You're live</h2>
-           <p>Your StudioLAB Growth account is active${sub.activated_at ? ' since <strong>' + esc(dateFmt(sub.activated_at)) + '</strong>' : ''}. From here on, everything happens inside your platform — bookings, leads, automations, the lot.</p>
+           <p>Your StudioLAB Growth account is active${sub.activated_at ? ' since <strong>' + esc(dateFmt(sub.activated_at)) + '</strong>' : ''}. From here on, everything happens inside your platform, bookings, leads, automations, the lot.</p>
            <p>You'll receive a separate welcome email with your platform login if you haven't already. You can safely close this tab; this onboarding portal is no longer needed.</p>
            <p class="acct-active-meta">If you can't find the platform welcome email or have any questions during handover, email <a href="mailto:info@studiolabsoftware.com" style="color:#fff;font-weight:700;text-decoration:underline;">info@studiolabsoftware.com</a>.</p>
          </div>`
@@ -1135,14 +1135,14 @@
            <div class="acct-setup-banner-icon" aria-hidden="true">✓</div>
            <div class="acct-setup-banner-body">
              <strong>You chose Done-For-You.</strong>
-             We'll handle the setup. Work through the tiles below at your pace — each one is a different account you invite us into. Nothing is urgent and nothing blocks anything else.
+             We'll handle the setup. Work through the tiles below at your pace, each one is a different account you invite us into. Nothing is urgent and nothing blocks anything else.
            </div>
          </div>`
       : `<div class="acct-setup-banner acct-setup-banner-guided" role="status">
            <div class="acct-setup-banner-icon" aria-hidden="true">★</div>
            <div class="acct-setup-banner-body">
              <strong>You chose Guided self-setup.</strong>
-             You're doing the setup yourself — the tiles below walk you through what to do for each account, and we're here in the messages thread if you get stuck.
+             You're doing the setup yourself, the tiles below walk you through what to do for each account, and we're here in the messages thread if you get stuck.
            </div>
          </div>`);
 
@@ -1495,7 +1495,7 @@
   const REQ_STATUS_LABEL = {
     open:      { cls: 'acct-req-pill-open',      label: 'Submitted' },
     quoted:    { cls: 'acct-req-pill-quoted',    label: 'Quote sent' },
-    paid:      { cls: 'acct-req-pill-paid',      label: 'Quote paid — applying' },
+    paid:      { cls: 'acct-req-pill-paid',      label: 'Quote paid, applying' },
     applied:   { cls: 'acct-req-pill-applied',   label: 'Done' },
     declined:  { cls: 'acct-req-pill-declined',  label: 'Declined' },
     withdrawn: { cls: 'acct-req-pill-withdrawn', label: 'Withdrawn' },
@@ -1761,8 +1761,8 @@
         </div>
         <p style="margin:12px 0 0;color:var(--g6);font-size:12px;line-height:1.55;">
           ${on
-            ? 'You currently receive inbox notifications, quote reminders, and other optional updates by email. You\'ll always receive essential transactional emails — payment receipts, security codes, and confirmations of changes you request — regardless of this setting.'
-            : 'You\'re opted out of inbox notifications, quote reminders, and other optional updates. You\'ll still receive essential transactional emails — payment receipts, security codes, and confirmations of changes you request.'}
+            ? 'You currently receive inbox notifications, quote reminders, and other optional updates by email. You\'ll always receive essential transactional emails, payment receipts, security codes, and confirmations of changes you request, regardless of this setting.'
+            : 'You\'re opted out of inbox notifications, quote reminders, and other optional updates. You\'ll still receive essential transactional emails, payment receipts, security codes, and confirmations of changes you request.'}
         </p>
       </div>`;
   }
@@ -1770,7 +1770,7 @@
   async function toggleStudioNotifications(nextEnabled) {
     const sub = acctState.submission;
     if (!sub || !sub.unsubscribe_token) {
-      alert('Could not update — please refresh and try again.');
+      alert('Could not update. Please refresh and try again.');
       return;
     }
     try {
@@ -2025,7 +2025,7 @@
     }
     const messages = res.data?.messages || [];
     if (!messages.length) {
-      host.innerHTML = '<div class="acct-thread-empty">No messages yet — say hello below and we will get back to you shortly.</div>';
+      host.innerHTML = '<div class="acct-thread-empty">No messages yet. Say hello below and we will get back to you shortly.</div>';
       return;
     }
     host.innerHTML = messages.map(renderThreadMsg).join('');

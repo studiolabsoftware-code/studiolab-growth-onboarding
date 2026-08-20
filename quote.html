@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#13102E">
-<title>Your quote — StudioLAB</title>
+<title>Your quote, StudioLAB</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -124,7 +124,7 @@
       <a href="#" class="q-btn q-btn-pdf" id="qPdfLink" target="_blank" rel="noopener">Download PDF</a>
     </div>
     <div class="q-decline-form" id="qDeclineForm" style="display:none">
-      <label for="qDeclineReason" style="display:block; font-size:13px; margin-bottom:6px; color: var(--g6);">Tell us why (optional) — helps us send a better next quote.</label>
+      <label for="qDeclineReason" style="display:block; font-size:13px; margin-bottom:6px; color: var(--g6);">Tell us why (optional), helps us send a better next quote.</label>
       <textarea id="qDeclineReason" placeholder="e.g. Pricing is out of scope right now"></textarea>
       <div class="q-acts">
         <button type="button" class="q-btn q-btn-decline" id="qDeclineConfirmBtn">Confirm decline</button>
@@ -255,7 +255,7 @@
           ? `<div class="q-success" style="margin-top:14px;">
                <strong>Invoice ${esc(inv.number || '')} is ready.</strong>
                ${inv.status === 'paid'
-                 ? ' Paid in full — thank you!'
+                 ? ' Paid in full. Thank you!'
                  : ' We have emailed it to you, and you can also pay it directly from the link below.'}
                <div class="q-acts" style="margin-top:12px;">
                  <a href="${esc(inv.hosted_url)}" target="_blank" rel="noopener noreferrer" class="q-btn q-btn-accept">${inv.status === 'paid' ? 'View receipt' : 'Pay invoice now'}</a>
@@ -327,7 +327,7 @@
       box.innerHTML = '<strong>Quote accepted.</strong> Invoice <strong>' + esc(invNum || '') + '</strong> is ready to pay.'
         + '<div class="q-acts" style="margin-top:12px;"><a href="' + esc(invUrl) + '" target="_blank" rel="noopener noreferrer" class="q-btn q-btn-accept">Pay invoice now</a></div>';
     } else {
-      box.innerHTML = '<strong>Quote accepted.</strong> We are sending you the invoice email now — check your inbox in the next minute or two. The invoice has a Pay link you can use straight away.';
+      box.innerHTML = '<strong>Quote accepted.</strong> We are sending you the invoice email now. Check your inbox in the next minute or two. The invoice has a Pay link you can use straight away.';
     }
     // Reload after a beat so the page state matches the back-end and the
     // read-only accepted view + invoice card render correctly.
@@ -352,7 +352,7 @@
     box.style.background = 'var(--g1)';
     box.style.color = 'var(--g6)';
     box.style.borderColor = 'var(--g2)';
-    box.innerHTML = '<strong>Thanks — quote declined.</strong> If you change your mind or want a revised quote, reply to the original email.';
+    box.innerHTML = '<strong>Thanks, quote declined.</strong> If you change your mind or want a revised quote, reply to the original email.';
     location.reload();
   }
 

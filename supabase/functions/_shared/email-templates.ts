@@ -588,7 +588,7 @@ export function inboxMessageEmail(opts: {
 // to quotes.token at issue time.
 export function quoteReadyForReview(opts: {
   recipientName: string;
-  studioContext?: string | null;     // e.g. "StudioLAB Growth team" — appears in the body
+  studioContext?: string | null;     // e.g. "StudioLAB Growth team", appears in the body
   quoteNumber: string;
   amountDisplay: string;             // pre-formatted, e.g. "AUD $7,150.00 incl. GST"
   expiresAtIso: string;              // ISO date for "valid until X" line
@@ -669,17 +669,17 @@ export function setupChecklistNudge(opts: {
   const count = opts.openSurfaces.length;
   const subject = opts.isFirstNudge
     ? `${opts.studioName}: ${count} setup ${count === 1 ? 'tile' : 'tiles'} still need a quick action`
-    : `Friendly reminder, ${opts.studioName} — ${count} setup ${count === 1 ? 'tile' : 'tiles'} outstanding`;
+    : `Friendly reminder for ${opts.studioName}: ${count} setup ${count === 1 ? 'tile' : 'tiles'} outstanding`;
   const intro = opts.isFirstNudge
     ? `Hi ${escape(opts.studioName)}, your setup is moving but a few tiles still need a quick action from you before we can finish wiring everything up.`
-    : `Hi ${escape(opts.studioName)}, just a polite nudge — the tiles below are still waiting on something from your end before we can take it from there.`;
+    : `Hi ${escape(opts.studioName)}, just a polite nudge. The tiles below are still waiting on something from your end before we can take it from there.`;
   const list = opts.openSurfaces.map((s) => `<li style="margin:0 0 6px;">${escape(s)}</li>`).join('');
   const body = `
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">A few setup tiles still open</h1>
     <p style="margin:0 0 14px;">${intro}</p>
     <p style="margin:0 0 6px;color:${COL.g6};font-size:12px;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;">Outstanding</p>
     <ul style="margin:0 0 18px;padding-left:18px;color:${COL.in_d};">${list}</ul>
-    <p style="margin:0 0 14px;">Each tile takes a couple of minutes — open your account page and tap any tile to see exactly what we need.</p>
+    <p style="margin:0 0 14px;">Each tile takes a couple of minutes. Open your account page and tap any tile to see exactly what we need.</p>
     ${cta('Open my setup checklist', opts.accountUrl)}
     <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">If a tile doesn't apply to you (e.g. you don't have a TikTok account), just tick "I don't have this yet" inside the tile and we'll take it from there.</p>`;
   return { subject, html: layout({ previewText: `${count} setup ${count === 1 ? 'tile' : 'tiles'} on your StudioLAB Growth account still need a quick action.`, body }) };
@@ -898,7 +898,7 @@ export function studioActivated(opts: {
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">You're live</h1>
     <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
     <p style="margin:0 0 14px;">Your StudioLAB Growth account is now active. Welcome aboard.</p>
-    <p style="margin:0 0 14px;">You'll receive a separate welcome email shortly with your platform login details. From this point on, everything happens inside your platform — bookings, leads, automations, the lot. You no longer need the onboarding portal.</p>
+    <p style="margin:0 0 14px;">You'll receive a separate welcome email shortly with your platform login details. From this point on, everything happens inside your platform, bookings, leads, automations, the lot. You no longer need the onboarding portal.</p>
     ${accountCta}
     <p style="margin:0 0 14px;">If you have any questions during the handover, reply to this email and we'll help out.</p>
     <p style="margin:0;">All the best,<br>The StudioLAB team</p>`;
@@ -962,7 +962,7 @@ export function studioRequestDeclined(opts: {
     <p style="margin:0 0 14px;">Thanks for raising <strong>${escape(opts.summary)}</strong>. Unfortunately we're not able to take this one on right now.</p>
     <p style="margin:14px 0 4px;color:${COL.g6};font-size:12px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;">Why</p>
     <div style="margin:0 0 14px;padding:12px 14px;background:${COL.g1};border-radius:8px;font-size:13px;line-height:1.55;color:${COL.in_d};white-space:pre-wrap;">${escape(opts.reason)}</div>
-    <p style="margin:0 0 14px;">Happy to chat through alternatives — reply to this email and we'll work something out.</p>
+    <p style="margin:0 0 14px;">Happy to chat through alternatives. Reply to this email and we'll work something out.</p>
     ${accountCta}
     <p style="margin:0;">All the best,<br>The StudioLAB team</p>`;
   return { subject, html: layout({ previewText: 'Update on your StudioLAB Growth request.', body }) };

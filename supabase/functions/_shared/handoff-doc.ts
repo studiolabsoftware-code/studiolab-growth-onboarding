@@ -272,7 +272,7 @@ export async function buildHandoffDoc(sub: Submission, opts: DocOptions = {}): P
   if (opts.isRevision) {
     children.push(new Paragraph({
       children: [new TextRun({
-        text: 'UPDATED — please re-check the highlighted fields',
+        text: 'UPDATED, please re-check the highlighted fields',
         bold: true, color: 'B45309',
       })],
     }));
@@ -330,7 +330,7 @@ export async function buildHandoffDoc(sub: Submission, opts: DocOptions = {}): P
 
   const doc = new Document({
     creator: 'StudioLAB Growth',
-    title: `Handoff — ${sub.studio_name || shortRef(sub.id)}`,
+    title: `Handoff: ${sub.studio_name || shortRef(sub.id)}`,
     description: 'Studio onboarding handoff for GHL implementation',
     sections: [{ children }],
   });
