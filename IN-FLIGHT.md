@@ -1,59 +1,53 @@
 # IN-FLIGHT: Growth Onboarding
 
-Live state only. Completed work and resolved decisions live in
-`IN-FLIGHT-HISTORY.md`. Verify anything here against git and the live database
-rather than trusting the file alone.
+Live state only. Completed work and resolved decisions live in `IN-FLIGHT-HISTORY.md`. Verify
+anything here against git and the live database rather than trusting the file alone.
 
 Last updated: 2026-08-20
 
-## Built, not deployed
+## Waiting on Gary, in this order
 
-- **C1 `signup-webhook-receiver`** is in the **Growth Connector** repo, green,
-  deploy gated on Gary. Needed before the `?t=` pre-fill path does anything.
+1. **Deploy the tier-1 pre-fill.** `bash supabase/manual/deploy-prefill.sh`, THEN push `main`.
+   Order matters: `js/form.js` ships via GitHub Pages on any push, so pushing first runs new client
+   code against a `send-otp` that has never heard of the invite token. The script gates on the
+   Connector's resolver RPC and refuses to deploy without it. Smoke steps are in the script's
+   closing note; use a private window and a plus-alias, or you will smoke against your own existing
+   draft and the no-clobber rule will correctly write nothing.
+2. **Take the `email_event` ledger live** (Growth Connector repo):
+   `bash supabase/manual/deploy-mailgun-event-webhook.sh`, then its smoke, then point Mailgun at it.
+3. **The signup cutover, inside StudioLAB Growth.** Rotate `SIGNUP_WEBHOOK_SECRET`, audit every
+   automation that sends an onboarding email on sub-account creation, then flip both switches in one
+   sitting: point the automation's webhook at `signup-webhook-receiver` and disable the platform's
+   own onboarding emails. Never do the second without the audit. Runbook:
+   `outputs/signup-email-cutover-runbook.md`.
 
-## Blocked on Gary, and the order matters
+## Open decisions for Gary
 
-1. **Do NOT turn off the platform's signup email yet.** Gary said on 2026-08-20
-   that the platform sends its own signup email linking to our form, and that he
-   would disable it. Right now that email is the ONLY thing that gets a studio to
-   the form. Our replacement (`signup-webhook-receiver`) is built, undeployed, its
-   tables do not exist, and the webhook is not pointed at us. Correct order:
-   apply the Connector migrations, deploy the receiver, point the platform's
-   signup automation at it, watch one real signup produce our invite, THEN
-   disable the platform email. A standing `ops_reminders` row emails Gary every
-   2 days about this until he taps the one-click done link.
-2. **Deploy the Connector's `missed-signup-sweep` and `mailgun-event-webhook`.**
-   Both are built and green; neither is deployed and their tables
-   (`growth_manager.inbound_signup`, `growth_manager.email_event`) do not exist.
-   The sweep is exactly the "studios who never opened the form" cover Gary asked
-   for: it reconciles live sub-accounts from the already-deployed `ghl-adapter`
-   against `inbound_signup` and invites anyone missed. Gary's call, not Claude's,
-   because deploying it sends real invite emails to real studios.
+- **Should a studio be able to change plan during onboarding?** `plan` was removable by the browser
+  on every autosave and `create-checkout-session` prices off it, so a Dominate AI studio could open
+  `/au/launch/` and check out at Launch pricing. That is now closed (`plan` is off `save-draft`'s
+  allow-list, and the invite token decides the plan). If you WANT studios to be able to switch, it
+  needs a deliberate server-side path, not an autosave side effect.
+- **Two pre-existing items deliberately NOT fixed in the pre-fill slice**, both recorded rather than
+  silently carried: the Supabase JS SDK is loaded from a CDN at a floating major version with no
+  SRI and no CSP on the six form pages; and `send-otp` has no per-IP cap, so a link holder can mail
+  a studio a code every 60 seconds indefinitely.
 
-## Next slices
+## State of the Scenario B thread
 
-1. **Reshape the form to Gary's scope: capture what StudioLAB does not already
-   have, then checkout.** Decided 2026-08-20. Already done: the knowledge base is
-   gone, and the timezone field is gone (StudioLAB holds it and it carries through
-   to the platform). Address, phone, website and business email STAY mandatory:
-   the platform's copies are optional there and not format-guaranteed, and ours
-   feed invoices, the legal email footer and carrier registration. The business
-   email is deliberately distinct from the sign-in address.
-2. **Tier-2 pre-fill data check.** Prompt ready in
-   `outputs/tier2-prefill-data-check-prompt.md`, to be run in the **Connector**
-   repo: the deployed adapter's location list excludes address and phone on
-   purpose, so a narrowly-scoped `get_location_detail` verb is needed. This now
-   only decides whether we can PRE-FILL those boxes, not whether we ask. It does
-   NOT gate the signup-email cutover.
-3. **Population A pass in `nudge-abandoned-onboarding`,** over `inbound_signup`
-   rows with no matching submission. Blocked on the Connector deploys above.
-4. **Pre-fill, Scenario B.** Server-side token resolve only, never client-side.
-5. **Voice pass.** Accuracy is done; the admin console and the outbound email
-   templates were never swept for accuracy.
+- **C1 `signup-webhook-receiver` is DEPLOYED and INERT** in the Connector. It mints the pre-bind
+  token and emails `…/{region}/{plan}?t=<token>`. Nothing calls it until step 3 above.
+- **Tier-1 pre-fill is BUILT** (this repo + one Connector migration), reviewed, green, not deployed.
+  A studio clicking their invite no longer retypes their email and lands on a pre-filled step 1.
+- **Tier 2 pre-fill (address, phone, website) is CANCELLED** on its own evidence: the fleet-wide
+  check found those fields absent or junk. The form still ASKS for them, deliberately.
+- **Studio-specific branding of the form is not possible.** The ADR-0018 fleet scan found zero
+  branding custom values anywhere, so there is nothing to pull.
 
-## Answered, recorded here so it is not re-asked
+## Answered, recorded so it is not re-asked
 
-- **Does the platform send its own signup email?** Yes, and it links to this
-  form. Gary is disabling it, sequencing above.
-- **Does the AI knowledge base read the database automatically?** Yes, and it is
-  pre-built and auto-populating. Website reading is assumed but unconfirmed.
+- **Does the platform send its own signup email?** Yes, and it links to this form. Gary is disabling
+  it as part of the cutover.
+- **Why is there still an OTP on the token path?** The token is a bearer credential sitting in an
+  inbox. It removes typing, never verification. Worst case for a forwarded link is a code mailed to
+  the legitimate studio.

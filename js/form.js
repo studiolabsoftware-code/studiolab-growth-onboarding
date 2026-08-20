@@ -21,6 +21,40 @@
   // PREVIEW_MODE allows admins to walk through the entire form without OTP,
   // auto-save, or submission. Used from the admin dashboard's preview link.
   const PREVIEW_MODE = _params.get('preview') === '1';
+  // PREBIND_TOKEN is the `?t=` on a StudioLAB Growth invite link. It identifies the studio that just
+  // signed up, so we can send their code to the address we already hold and pre-fill step 1 instead
+  // of handing them a blank form.
+  //
+  // TAB-SCOPED, and scrubbed from the address bar. It is a bearer credential: it must never reach
+  // localStorage, a log, an error message, or an outbound Referer header, and it should not sit in a
+  // URL the studio might screenshot, bookmark or paste into a support chat. sessionStorage is the
+  // deliberate middle ground - it dies with the tab, so a reload while the studio checks their mail
+  // does not silently lose the binding, but nothing survives the tab closing. The token unlocks
+  // nothing in the browser in any case: the server resolves it and returns no address at all.
+  const PREBIND_KEY = 'sl-growth-prebind';
+  let PREBIND_TOKEN = _params.get('t') || '';
+  if (PREBIND_TOKEN) {
+    try {
+      // sessionStorage, deliberately, and NOT localStorage. The token has to survive a reload:
+      // switching to the mail app to read the code is enough for mobile Safari to discard and
+      // reload the tab, and once the URL is scrubbed a reload would otherwise lose the binding
+      // silently - the studio would finish onboarding on a row with no location_id and look
+      // identical to a walk-in. sessionStorage is scoped to this tab and dies with it, never
+      // travels in a forwarded link, and is cleared the moment verification succeeds.
+      window.sessionStorage.setItem(PREBIND_KEY, PREBIND_TOKEN);
+    } catch (_e) { /* private mode, or storage disabled: the in-memory copy still works */ }
+    try {
+      const scrubbed = new URL(window.location.href);
+      scrubbed.searchParams.delete('t');
+      window.history.replaceState({}, '', scrubbed.pathname + scrubbed.search + scrubbed.hash);
+    } catch (_e) { /* a failed scrub must never block the flow */ }
+  } else {
+    try { PREBIND_TOKEN = window.sessionStorage.getItem(PREBIND_KEY) || ''; } catch (_e) { /* ignore */ }
+  }
+  function clearPrebind() {
+    PREBIND_TOKEN = '';
+    try { window.sessionStorage.removeItem(PREBIND_KEY); } catch (_e) { /* ignore */ }
+  }
   const totalSteps = () => document.querySelectorAll('.panel').length;
 
   // Edge Function endpoints.
@@ -38,9 +72,18 @@
   const CONSENT_VERSION = 'v1-2026-07-23';
 
   async function callFn(name, body) {
+    // Send the publishable key on every call. It grants nothing on its own - every one of these
+    // functions does its own auth on the body - but without SOME header the Supabase gateway rejects
+    // any function left on verify_jwt = true before our code runs. That is not hypothetical: on
+    // 2026-08-20 save-draft was found in exactly that state in production, so autosave had been
+    // failing silently. config.toml now declares the flag for all of them; this is the belt to that
+    // pair of braces, so one missed flag cannot take the form offline again.
+    const ANON = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (ANON) { headers.Authorization = 'Bearer ' + ANON; headers.apikey = ANON; }
     const resp = await fetch(FN_BASE + name, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify(body || {}),
     });
     let data = null;
@@ -2143,26 +2186,77 @@
     el.style.display = msg ? 'block' : 'none';
   }
 
+  /**
+   * With an invite token we already know the address, so the email box is pointless and asking for it
+   * is the exact friction this path removes. Done in JS rather than in the six index.html files so the
+   * markup stays one shape and a studio arriving WITHOUT a token sees no change at all.
+   */
+  function applyPrebindUi() {
+    if (!PREBIND_TOKEN) return;
+    const label = document.querySelector('label[for="authEmail"]');
+    const inp = document.getElementById('authEmail');
+    const btn = document.getElementById('authSendBtn');
+    if (inp) { inp.hidden = true; inp.required = false; }
+    // Drop the `for` while the input is hidden: a label pointing at a control that is not there is
+    // announced by screen readers as a field the studio cannot find.
+    if (label) {
+      label.textContent = "We'll send a code to the email on your account";
+      label.removeAttribute('for');
+      label.id = 'authPrebindNote';
+    }
+    if (btn) btn.textContent = 'Send my code';
+  }
+
+  /** Drop back to typing an email, for a token that has expired or was already used. */
+  function fallBackToEmailEntry(message) {
+    clearPrebind();
+    const label = document.querySelector('label[for="authEmail"], #authPrebindNote');
+    const inp = document.getElementById('authEmail');
+    const btn = document.getElementById('authSendBtn');
+    if (inp) { inp.hidden = false; inp.required = true; inp.focus(); }
+    if (label) { label.textContent = 'Your studio email address'; label.setAttribute('for', 'authEmail'); }
+    if (btn) btn.textContent = 'Get started';
+    setAuthError('authEmailErr', message);
+  }
+
   async function handleSendOtp() {
     const inp = document.getElementById('authEmail');
     const btn = document.getElementById('authSendBtn');
     if (!inp || !btn) return;
     const email = (inp.value || '').trim();
-    if (!isEmail(email)) { setAuthError('authEmailErr', 'Please enter a valid email address.'); return; }
+    // A studio who types an address is telling us they want THAT inbox, not the one on the signup
+    // record - the bookkeeper's address, or a typo at signup. Honour it and drop the token.
+    if (PREBIND_TOKEN && email) clearPrebind();
+    // With a token the address comes from the server, so there is nothing to validate here.
+    if (!PREBIND_TOKEN && !isEmail(email)) {
+      setAuthError('authEmailErr', 'Please enter a valid email address.');
+      return;
+    }
     setAuthError('authEmailErr', '');
     const orig = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Sending...';
-    const r = await callFn('send-otp', { email });
+    const r = await callFn('send-otp', PREBIND_TOKEN ? { t: PREBIND_TOKEN } : { email });
     btn.disabled = false;
     btn.innerHTML = orig;
     if (!r.ok || !r.data || !r.data.ok) {
+      // On the token path the email box is HIDDEN, so any failure we do not recover from leaves the
+      // studio staring at an error with no control to act on. Anything except a throttle therefore
+      // drops back to email entry. This deliberately also covers the case where js/form.js has
+      // shipped but the new send-otp has not: the old function does not know about `t`, returns its
+      // own 400, and without this every studio holding a live invite link would be locked out.
+      if (PREBIND_TOKEN && r.status !== 429) {
+        fallBackToEmailEntry((r.data && r.data.error) || 'That setup link is no longer valid. Enter your email address to get a code.');
+        return;
+      }
       setAuthError('authEmailErr', (r.data && r.data.error) || 'Could not send code. Please try again.');
       return;
     }
-    otpEmail = email;
+    // The real address is never sent to the browser on the token path, and we deliberately do not
+    // show a masked version of it either: a forwarded link must disclose nothing about the account.
+    otpEmail = PREBIND_TOKEN ? '' : email;
     const sentEl = document.getElementById('authSentEmail');
-    if (sentEl) sentEl.textContent = email;
+    if (sentEl) sentEl.textContent = PREBIND_TOKEN ? 'the email address on your account' : email;
     showAuthStep('code');
     setTimeout(() => {
       const codeInp = document.getElementById('authCode');
@@ -2187,10 +2281,20 @@
     const body = GENERIC_MODE
       ? { email: otpEmail, code }
       : { email: otpEmail, code, plan: PLAN, region: REGION };
+    // The server re-resolves the token itself and prefers its answer for the address, the plan and
+    // the region. Nothing here trusts this browser; the token is simply passed along.
+    if (PREBIND_TOKEN) body.t = PREBIND_TOKEN;
     const r = await callFn('verify-otp', body);
     btn.disabled = false;
     btn.innerHTML = orig;
     if (!r.ok || !r.data || !r.data.ok) {
+      // A rejected TOKEN sends them back to email entry; a rejected CODE must not, or a mistyped
+      // digit would throw away a perfectly good link.
+      if (r.data && r.data.prebind_failed) {
+        showAuthStep('email');
+        fallBackToEmailEntry((r.data && r.data.error) || 'That setup link is no longer valid.');
+        return;
+      }
       setAuthError('authCodeErr', (r.data && r.data.error) || 'Verification failed.');
       return;
     }
@@ -2200,7 +2304,16 @@
       return;
     }
 
-    storeSession(r.data.session_token, r.data.session_expires_at, otpEmail);
+    // On the pre-bind path otpEmail is deliberately empty, so take the address off the row the server
+    // just returned rather than asking for something we already resolved.
+    const sessionEmail = otpEmail || (r.data.submission && r.data.submission.contact_email) || '';
+    // The binding is secured in the row now; the token has done its job and should stop existing.
+    clearPrebind();
+    // Make the client agree with the server about which plan this studio is on. verify-otp prefers
+    // the plan on the signup record over the URL, so without this the next autosave would send the
+    // URL's plan straight back and the two would disagree about what the studio is buying.
+    if (r.data.submission && r.data.submission.plan) state.plan = r.data.submission.plan;
+    storeSession(r.data.session_token, r.data.session_expires_at, sessionEmail);
     enterForm(r.data.submission, Boolean(r.data.is_returning));
   }
 
@@ -2279,6 +2392,21 @@
 
   function handleResendOrChange() {
     showAuthStep('email');
+    // The button says "Use a different email or send a new code". On the token path the email box is
+    // hidden, so without this it offers a choice the studio cannot make: they would land back here
+    // with no input, a note about "the email on your account", and a button that re-sends to the same
+    // inbox they cannot read. Reveal the box but keep the token armed, so pressing send unchanged
+    // still uses the account address, while typing one switches to it (handleSendOtp clears the token
+    // as soon as a value is present).
+    const inp = document.getElementById('authEmail');
+    const label = document.getElementById('authPrebindNote') || document.querySelector('label[for="authEmail"]');
+    if (PREBIND_TOKEN && inp) {
+      inp.hidden = false;
+      inp.required = false;
+      // applyPrebindUi borrowed the label for its note and dropped the `for`. Give it back, or the
+      // revealed field is unlabelled for a screen reader and the copy still talks about the account.
+      if (label) { label.textContent = 'Your studio email address'; label.setAttribute('for', 'authEmail'); }
+    }
     setAuthError('authEmailErr', '');
     setAuthError('authCodeErr', '');
   }
@@ -2600,12 +2728,20 @@
     if (sessionValid(session)) {
       // Optimistically reveal the form so there's no gate flicker.
       showAuthGate(false);
+      // Pass the invite token on the hydrate call. A studio who already has a session never goes
+      // near send-otp/verify-otp, so without this their draft would never be stamped with
+      // location_id - and "already has a session" describes everyone who has started the form once,
+      // which is precisely the case that surfaced this whole slice. save-draft resolves it
+      // server-side and only fills fields the studio has left empty.
       const r = await callFn('save-draft', {
         session_token: session.token,
         payload: {},
         last_step_completed: undefined,
         finalize: false,
+        ...(PREBIND_TOKEN ? { t: PREBIND_TOKEN } : {}),
       });
+      // Used or not, it has had its one chance on this path; holding it longer serves nothing.
+      if (PREBIND_TOKEN) clearPrebind();
       if (r.ok && r.data && r.data.ok && r.data.submission) {
         // If the studio has already paid (or authorised / card saved), they
         // should not see the form's Pay-with-Stripe step again: bounce them to
@@ -2632,6 +2768,7 @@
         clearSession();
         showAuthGate(true);
         showAuthStep('email');
+        applyPrebindUi();
         goTo(1);
         return;
       }
@@ -2644,6 +2781,7 @@
     // No valid session: show gate, hide form
     showAuthGate(true);
     showAuthStep('email');
+    applyPrebindUi();
     goTo(1); // ready underneath the gate
   }
 

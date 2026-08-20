@@ -7,7 +7,8 @@
 // runs whether the row was inserted directly or evolved from a draft.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
-import { adminClient, sha256Hex } from '../_shared/supabase.ts';
+import { adminClient, growthClient, sha256Hex } from '../_shared/supabase.ts';
+import { resolvePrebind, buildSeed, type PrebindRow } from '../_shared/prebind.ts';
 import { submissionConfirmation, adminNewSubmission } from '../_shared/email-templates.ts';
 import { createGatedSender } from '../_shared/email-gated.ts';
 import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
@@ -18,7 +19,18 @@ const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guid
 
 // Whitelist of columns the client may write. Server-only fields are excluded.
 const ALLOWED_FIELDS = new Set([
-  'plan','setup_type','studio_name','legal_name','country','timezone','studio_type',
+  // 'plan' is DELIBERATELY ABSENT (removed 2026-08-20). It used to be here, and it was the reason a
+  // studio could be priced on a plan they never signed up for: the form sends plan on every autosave
+  // from the URL it was served at (js/form.js buildPayload), and create-checkout-session prices off
+  // submissions.plan. So opening /au/launch/ instead of /au/ai/ and letting the form autosave rewrote
+  // the row to Launch and charged the Launch setup fee.
+  //
+  // Nothing legitimate needs it here. There are no plan-card elements in any of the six form pages;
+  // the row's plan is set server-side, from an allow-list-validated value, by verify-otp (which now
+  // prefers the plan on the studio's actual signup record) and by claim-draft for the generic-mode
+  // plan picker. A studio changing plan gets a different draft row from those functions, never an
+  // in-place rewrite from an autosave.
+  'setup_type','studio_name','legal_name','country','timezone','studio_type',
   'address','website','support_url','first_name','last_name','contact_phone','role',
   'studiolab_email','logo_url','primary_colour','secondary_colour','sign_off',
   'email_tone','footer_notes','studio_description','from_name','reply_email',
@@ -77,7 +89,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { session_token, payload, last_step_completed, finalize } = body;
+    const { session_token, payload, last_step_completed, finalize, t: prebindToken } = body;
     if (!session_token || typeof session_token !== 'string') {
       return jsonResponse({ ok: false, error: 'Missing session token.' }, 401);
     }
@@ -109,8 +121,45 @@ Deno.serve(async (req) => {
       }, 409);
     }
 
+    // PRE-BIND SEED FOR AN ALREADY-SIGNED-IN STUDIO.
+    //
+    // The OTP path is not the only way a studio arrives from an invite link. Anyone who has already
+    // started the form carries a 90-day session, so clicking their invite hydrates the draft and
+    // returns WITHOUT ever going near send-otp / verify-otp - and without this, location_id would
+    // never be stamped for exactly those studios. That is the case that produced this whole slice:
+    // the first person to test it had already been through the flow once.
+    //
+    // No new authority: the session token has already authenticated this row, and the token only
+    // ever adds values to fields the studio has left empty (buildSeed's no-clobber rule).
+    let prebindSeed: Record<string, string> = {};
+    let prebindConflict = false;
+    if (prebindToken !== undefined && prebindToken !== null && prebindToken !== '') {
+      const prebound = await resolvePrebind(prebindToken, async (rawToken) => {
+        const { data, error } = await growthClient()
+          .rpc('resolve_signup_by_token', { p_raw_token: rawToken });
+        if (error) {
+          console.error('prebind rpc failed:', error.code ?? 'no-code', error.message ?? 'no-message');
+          throw error;
+        }
+        return data as PrebindRow[] | null;
+      });
+      if (prebound) {
+        if (row.location_id && row.location_id !== prebound.locationId) {
+          prebindConflict = true;
+          console.error('prebind: session draft already bound to a different sub-account', {
+            submission_id: row.id,
+            bound_location_id: row.location_id,
+            token_location_id: prebound.locationId,
+          });
+        } else {
+          prebindSeed = buildSeed(prebound, row);
+        }
+      }
+    }
+
     const update: Record<string, unknown> = {
       ...pickAllowed(payload || {}),
+      ...prebindSeed,
       last_saved_at: new Date().toISOString(),
     };
     if (typeof last_step_completed === 'number') update.last_step_completed = last_step_completed;
@@ -213,7 +262,8 @@ Deno.serve(async (req) => {
         });
       } catch (e) { console.error('activity log insert failed:', e); }
 
-      return jsonResponse({ ok: true, finalized: true, submission_id: saved.id, ref });
+      return jsonResponse({ ok: true,
+      ...(prebindConflict ? { location_conflict: true } : {}), finalized: true, submission_id: saved.id, ref });
     }
 
     // Strip server-only field before returning

@@ -2,6 +2,10 @@
 <html lang="en-AU">
 <head>
 <meta charset="UTF-8">
+<!-- The invite link carries a bearer token in ?t=. Older and embedded WebViews still
+     default to no-referrer-when-downgrade, which would send the full URL - token included -
+     to the font CDN in the head, before js/form.js can scrub it. -->
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#13102E">
@@ -758,7 +762,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
-<script src="/js/form.js?v=20260515u"></script>
+<script src="/js/form.js?v=20260820a"></script>
 <script src="/js/form-attachments.js?v=20260515a"></script>
 
 </div><!-- /formWrap -->

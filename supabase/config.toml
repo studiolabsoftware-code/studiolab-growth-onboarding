@@ -38,3 +38,44 @@ verify_jwt = false
 # the same posture the page's previous poller had.
 [functions.get-submission-status]
 verify_jwt = false
+
+# The public onboarding gate. js/form.js calls both of these from the studio's browser with NO
+# Authorization header at all (see callFn), so on the platform default the gateway would 401 every
+# request BEFORE our code ran and no studio could sign in. Verified against production on 2026-08-20:
+# an unauthenticated POST to send-otp returns our own 400, not a gateway 401, so this is already the
+# live setting - it was just never written down, which meant one redeploy without the flag would have
+# silently taken the live form offline. Declared here so it cannot be lost again.
+#
+# Turning the gateway check off does not make these unguarded: send-otp mails a code to an address it
+# resolves itself, and verify-otp requires that code. The pre-bind token path adds no new authority -
+# it only lets the server look up an address it already holds.
+[functions.send-otp]
+verify_jwt = false
+
+[functions.verify-otp]
+verify_jwt = false
+
+# The same reasoning as send-otp/verify-otp above, for every OTHER function js/form.js and the
+# studio-facing pages call without an Authorization header. These were all already deployed with the
+# gateway off; none of them said so, which meant one redeploy without the flag would have taken that
+# surface offline with no warning. save-draft is the autosave every mid-onboarding studio depends on.
+[functions.save-draft]
+verify_jwt = false
+
+[functions.claim-draft]
+verify_jwt = false
+
+[functions.create-checkout-session]
+verify_jwt = false
+
+[functions.resolve-pricing]
+verify_jwt = false
+
+[functions.get-studio-account]
+verify_jwt = false
+
+[functions.apply-change-request]
+verify_jwt = false
+
+[functions.validate-change-request]
+verify_jwt = false

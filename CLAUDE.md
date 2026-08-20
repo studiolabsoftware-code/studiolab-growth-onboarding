@@ -57,3 +57,31 @@ Most relevant files for any web design, copy, or brand work on Growth onboarding
 ## Session handover (HARD RULE, no exceptions)
 
 Budget the session by TASK SIZE and natural slice boundaries, not by watching a context percentage (a session cannot reliably read its own context usage; see SESSION-STARTUP-CHECK.md §4). Treat ~60% as an intent, wrap before you are deep, not a gauge to watch. At each slice or task boundary decide deliberately: wrap here, or start exactly one more small slice. When wrapping, or the instant Gary asks, STOP all work immediately and emit a ready-to-paste HANDOVER PROMPT as a single fenced code block, then start a fresh session. Do not push toward the limit or rely on auto-compaction; the handover takes priority over finishing the current step. Full rule: StudioLAB-Shared/EXECUTION-ROUTING-STANDARD.md.
+
+## Green gate (added 2026-08-20 — this repo previously had none)
+
+There is no npm test harness here and no `deno.json`; the Edge Functions are plain Deno with
+`https://esm.sh` imports. That is why the gate is three commands rather than one, and why it is
+written down: a session that does not know these exist will ship auth changes with nothing run.
+
+```bash
+# 1. Type-check every function you touched (catches what a browser never will).
+deno check supabase/functions/<function>/index.ts
+
+# 2. Run the unit tests. Deno's runner needs nothing installed and nothing committed but the tests.
+deno test supabase/functions/_shared/prebind.test.ts
+
+# 3. The form is a plain script, so at minimum parse it.
+node --check js/form.js
+```
+
+**Put testable logic in `supabase/functions/_shared/`, not in an `index.ts`.** The entrypoints cannot
+be imported under `deno test` without a Deno runtime and live env vars, so anything embedded in one is
+effectively untestable. `_shared/prebind.ts` is the pattern: pure functions plus an injected
+dependency, with the entrypoint reduced to wiring.
+
+**`js/form.js` ships via GitHub Pages on any push to `main`,** including a push that only touches an
+unrelated file. It is on a different rail from the Edge Functions, so a change that spans both must
+deploy the functions FIRST and push afterwards, or studios run new client code against old server
+code. Bump the `?v=` cache-buster in all six `au|us/{launch,scale,ai}/index.html` files plus
+`setup/index.html` whenever `form.js` changes.

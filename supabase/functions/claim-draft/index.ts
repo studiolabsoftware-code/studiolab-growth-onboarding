@@ -12,6 +12,9 @@ const ALLOWED_PLANS  = new Set(['launch', 'scale', 'ai']);
 const ALLOWED_REGIONS = new Set(['AU', 'US']);
 
 function isValidEmail(v: string): boolean {
+  // `%`, `*` and `\\` are never legitimate in an address and are all LIKE/PostgREST metacharacters.
+  // Defence in depth behind the .eq() lookups below.
+  if (/[%*\\]/.test(String(v))) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
@@ -35,7 +38,7 @@ Deno.serve(async (req) => {
     const verifiedHash = 'verified:' + (await sha256Hex(verified_token));
     const { data: marker } = await sb.from('studio_otps')
       .select('*')
-      .ilike('email', normEmail)
+      .eq('email', normEmail)
       .eq('code_hash', verifiedHash)
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
@@ -52,7 +55,7 @@ Deno.serve(async (req) => {
     const { data: existing } = await sb
       .from('submissions')
       .select('*')
-      .ilike('contact_email', normEmail)
+      .eq('contact_email', normEmail)
       .eq('plan', plan)
       .eq('region', region)
       .maybeSingle();

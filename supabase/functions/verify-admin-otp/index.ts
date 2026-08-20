@@ -22,6 +22,9 @@ import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 const MAX_ATTEMPTS = 5;
 
 function isValidEmail(v: string): boolean {
+  // `%`, `*` and `\\` are never legitimate in an address and are all LIKE/PostgREST metacharacters.
+  // Defence in depth behind the .eq() lookups below.
+  if (/[%*\\]/.test(String(v))) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
@@ -39,7 +42,7 @@ Deno.serve(async (req) => {
     // 1. Allowlist check
     const { data: adminRow } = await sb.from('admin_users')
       .select('id, email, role, name')
-      .ilike('email', normEmail)
+      .eq('email', normEmail)
       .eq('is_active', true)
       .maybeSingle();
     if (!adminRow) {
@@ -52,7 +55,7 @@ Deno.serve(async (req) => {
     // to fail just because they typed the second-newest one.
     const { data: otpRows } = await sb.from('studio_otps')
       .select('*')
-      .ilike('email', normEmail)
+      .eq('email', normEmail)
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
