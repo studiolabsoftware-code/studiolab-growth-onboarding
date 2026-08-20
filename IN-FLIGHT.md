@@ -32,20 +32,24 @@ Last updated: 2026-08-20
 
 ## Next slices
 
-1. **Reshape the form to Gary's scope: capture only what StudioLAB does not
-   already have, then checkout.** Stated 2026-08-20. The knowledge base is gone,
-   so what remains to decide is which of the remaining fields we already hold.
-   `outputs/onboarding-prefill-scenario-b-plan.md` has the verified tiers:
-   tier 1 (name, email, company, plan, region) we hold today; tier 2 (address,
-   phone, website, timezone, business email) needs a 10-minute check against two
-   or three real sub-accounts before it can be trusted; tier 3 (branding, logo,
-   voice, legal IDs, custom domain, SMS intent, consent) has to be asked. Do the
-   tier-2 check first, it decides how much more comes out of the form.
-2. **Population A pass in `nudge-abandoned-onboarding`,** over `inbound_signup`
+1. **Reshape the form to Gary's scope: capture what StudioLAB does not already
+   have, then checkout.** Decided 2026-08-20. Already done: the knowledge base is
+   gone, and the timezone field is gone (StudioLAB holds it and it carries through
+   to the platform). Address, phone, website and business email STAY mandatory:
+   the platform's copies are optional there and not format-guaranteed, and ours
+   feed invoices, the legal email footer and carrier registration. The business
+   email is deliberately distinct from the sign-in address.
+2. **Tier-2 pre-fill data check.** Prompt ready in
+   `outputs/tier2-prefill-data-check-prompt.md`, to be run in the **Connector**
+   repo: the deployed adapter's location list excludes address and phone on
+   purpose, so a narrowly-scoped `get_location_detail` verb is needed. This now
+   only decides whether we can PRE-FILL those boxes, not whether we ask. It does
+   NOT gate the signup-email cutover.
+3. **Population A pass in `nudge-abandoned-onboarding`,** over `inbound_signup`
    rows with no matching submission. Blocked on the Connector deploys above.
-3. **Pre-fill, Scenario B.** Server-side token resolve only, never client-side.
-4. **Voice pass.** Accuracy is done. `kb.html` is gone, but the admin console and
-   the outbound email templates were never swept for accuracy.
+4. **Pre-fill, Scenario B.** Server-side token resolve only, never client-side.
+5. **Voice pass.** Accuracy is done; the admin console and the outbound email
+   templates were never swept for accuracy.
 
 ## Answered, recorded here so it is not re-asked
 
