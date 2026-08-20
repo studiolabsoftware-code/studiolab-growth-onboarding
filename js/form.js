@@ -210,7 +210,13 @@
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   }
 
-  // ── Country and timezone smart defaults ───────────────────────────────────
+  // ── Country smart defaults ────────────────────────────────────────────────
+  //
+  // The timezone field was removed on 2026-08-20: StudioLAB already holds the
+  // studio's timezone in its settings and it carries through to the platform,
+  // so asking again was one more box for something we know. The helpers below
+  // still look the select up and no-op when it is absent, which keeps them
+  // correct if a future variant reintroduces it.
   // The URL determines the studio's region. Pre-select country accordingly and
   // filter the timezone select so only that country's options appear. Studios
   // can change country to switch the timezone list.
@@ -1361,7 +1367,6 @@
       business_email: businessEmail,
       business_email_is_personal_domain: businessEmail ? isPersonalEmailDomain(businessEmail) : null,
       country: getCountryValue() || null,
-      timezone: valOrNull('timezone'),
       studio_type: valOrNull('studioType'),
       // Structured address (Phase 1) + denormalised single-line for backward
       // compatibility with existing email templates and admin views.
@@ -2314,7 +2319,7 @@
       if (el && v != null && v !== '') el.value = v;
     };
     [
-      'studioName','legalName','country','timezone','studioType','address','website',
+      'studioName','legalName','country','studioType','address','website',
       'firstName','lastName','contactPhone','contactRole',
       'col1t','col2t','fromName','replyEmail','emailDomain',
       'smsTone',

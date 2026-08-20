@@ -251,6 +251,17 @@ add({
   replace: ' Your AI chat is set up from your StudioLAB data, so there is nothing to confirm afterwards.',
 });
 
+// The business email is not the sign-in email, and studios were not told that.
+// The account was created with whichever address signed up; this is the address
+// the studio actually wants families and the platform to use. Gary flagged the
+// two are often different, so the field now says so rather than leaving a
+// studio to assume we already have it.
+add({
+  id: 'Business email: say why we are asking', routes: 'all', count: 1,
+  find: '<span class="field-note" id="businessEmailNote">Used on your business profile, invoices, and SMS sender registration.</span>',
+  replace: '<span class="field-note" id="businessEmailNote">Your studio&#39;s main contact address, which is often not the one you signed up with. It goes on your invoices and your business profile, and on text-enabled plans it is used to register your number.</span>',
+});
+
 // D1: the done screen is reachable only by the spam honeypot and by "save for
 // later", and both rewrite its text. Align the defaults anyway and say so in
 // the markup, so the next reader does not chase a contradiction that no studio
