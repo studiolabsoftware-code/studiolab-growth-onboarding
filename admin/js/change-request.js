@@ -48,15 +48,6 @@
       ['sms_tone', 'SMS tone notes'],
     ]},
     { group: 'AI knowledge base', plan: ['ai'], items: [
-      ['kb_profile', 'Studio profile'],
-      ['kb_classes', 'Classes & timetable'],
-      ['kb_pricing', 'Pricing'],
-      ['kb_policies', 'Policies'],
-      ['kb_events', 'Upcoming events'],
-      ['kb_restricted', 'Restricted topics'],
-      ['kb_tone', 'AI tone'],
-      ['voice_hours', 'Voice agent hours'],
-      ['voice_escalate', 'Voice escalation rules'],
     ]},
   ];
 

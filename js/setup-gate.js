@@ -63,12 +63,15 @@
   //
   // Order matters:
   //   1. Active / complete -> account.html (their handover landing).
-  //   2. AI + paid, KB not finished -> kb.html (the one place where the
-  //      form-style flow still has work to do post-payment).
-  //   3. Any non-draft status -> account.html (the canonical portal for
+  //   2. Any non-draft status -> account.html (the canonical portal for
   //      submitted studios, paid or not; renderNotPaidYet handles the
   //      "still need to pay" case inside the page).
-  //   4. Otherwise -> per-plan form (genuine new draft).
+  //   3. Otherwise -> per-plan form (genuine new draft).
+  //
+  // Dominate AI used to have a step 2 that sent paid studios to /kb.html until
+  // their knowledge base was finished. StudioLAB Growth builds and populates
+  // the knowledge base itself, so there is no post-payment work left and AI
+  // routes exactly like every other plan.
   const PAID_STATUSES = new Set(['paid', 'authorised', 'card_saved']);
   const POST_SUBMIT_STATUSES = new Set([
     'submitted', 'in_review', 'changes_requested', 'setup_in_progress',
@@ -78,13 +81,6 @@
     if (!submission) return destinationUrl(plan, region);
     const status = submission.status || 'draft';
     if (status === 'active' || status === 'complete') return '/account.html';
-    if (
-      plan === 'ai'
-      && PAID_STATUSES.has(submission.payment_status)
-      && !submission.kb_completed_at
-    ) {
-      return '/kb.html';
-    }
     if (POST_SUBMIT_STATUSES.has(status)) return '/account.html';
     return destinationUrl(plan, region);
   }

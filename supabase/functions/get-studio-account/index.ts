@@ -1,7 +1,7 @@
 // Studio account view — used by /account.html post-payment to render the
 // studio's submission summary, status, invoices, and a portal-thread link.
 // Auth: studio's session_token in localStorage (same anchor used by
-// save-draft / get-kb-status). Anon-callable (deployed --no-verify-jwt).
+// save-draft / get-submission-status). Anon-callable (verify_jwt = false).
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
@@ -26,7 +26,6 @@ Deno.serve(async (req) => {
         'amount_paid_cents, currency, tax_amount_cents, ' +
         'invoice_hosted_url, invoice_pdf_url, ' +
         'submitted_at, last_saved_at, session_expires_at, activated_at, ' +
-        'kb_completed_at, ' +
         'email_notifications_enabled, unsubscribe_token, ' +
         // Self-edit surface — the additional fields below are read back so
         // the studio sees its current values when entering edit mode.
@@ -162,7 +161,6 @@ Deno.serve(async (req) => {
         invoice_pdf_url: submission.invoice_pdf_url,
         submitted_at: submission.submitted_at,
         activated_at: submission.activated_at,
-        kb_completed_at: submission.kb_completed_at,
         email_notifications_enabled: submission.email_notifications_enabled !== false,
         unsubscribe_token: submission.unsubscribe_token,
         // Self-edit surface

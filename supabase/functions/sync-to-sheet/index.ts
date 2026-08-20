@@ -21,7 +21,6 @@ const SHEET_FIELDS = [
   'logo_url','primary_colour','secondary_colour','sign_off','email_tone','footer_notes','studio_description',
   'from_name','reply_email','custom_domain','email_domain','dns_access',
   'sms_type','area_code','port_number','sms_tone','lead_sources',
-  'kb_profile','kb_classes','kb_pricing','kb_price_quoting','kb_policies','kb_events','kb_faqs','kb_restricted','kb_tone','voice_hours','voice_escalate',
   'extra_notes',
 ];
 

@@ -17,8 +17,10 @@ const ALLOWED = new Set([
   'primary_colour','secondary_colour','sign_off','email_tone','footer_notes','studio_description',
   'from_name','reply_email','email_domain','dns_access',
   'sms_type','area_code','port_number','sms_tone',
-  'kb_profile','kb_classes','kb_pricing','kb_policies','kb_events','kb_restricted','kb_tone',
-  'voice_hours','voice_escalate','extra_notes',
+  // kb_* and voice_* are deliberately absent: StudioLAB Growth builds and
+  // populates the AI knowledge base itself, so those columns are not ours to
+  // change on a studio's behalf.
+  'extra_notes',
 ]);
 
 Deno.serve(async (req) => {

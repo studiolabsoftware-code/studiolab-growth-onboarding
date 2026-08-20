@@ -34,7 +34,7 @@ const ALLOWED_FIELDS = new Set([
   'consent_send_on_behalf','consent_captured_at','consent_version',
   'extra_notes',
   // The kb_* and voice_* columns are deliberately NOT writable here. They have
-  // exactly one owner, save-kb (plus scrape-and-extract, service-role), and the
+  // no owner at all now: StudioLAB Growth builds the knowledge base itself, and the
   // onboarding form has no inputs for them. While they were allowed, the form
   // sent every one as null on each save, which nulled the scraped knowledge
   // base whenever a Dominate AI studio cancelled at Stripe and returned to the

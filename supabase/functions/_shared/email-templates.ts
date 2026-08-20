@@ -234,21 +234,6 @@ export interface SubmissionRowLike {
   consent_captured_at?: string | null;
   consent_version?: string | null;
 
-  kb_greeting?: string | null;
-  kb_assistant_persona_type?: string | null;
-  kb_assistant_persona_name?: string | null;
-  kb_profile?: string | null;
-  kb_classes?: string | null;
-  kb_pricing?: string | null;
-  kb_price_quoting?: string | null;
-  kb_policies?: string | null;
-  kb_events?: string | null;
-  kb_faqs?: string | null;
-  kb_restricted?: string | null;
-  kb_tone?: string | null;
-  voice_hours?: string | null;
-  voice_escalate?: string | null;
-
   extra_notes?: string | null;
   plan?: string | null;
   setup_type?: string | null;
@@ -366,26 +351,8 @@ export function submissionDigestHtml(sub: SubmissionRowLike, attachments?: Attac
     ])));
   }
 
-  if (isAi) {
-    const persona = sub.kb_assistant_persona_type === 'named' && sub.kb_assistant_persona_name
-      ? `Named: ${sub.kb_assistant_persona_name}`
-      : 'Studio name';
-    sections.push(sectionWrap('AI knowledge base', rowsTable([
-      ['Assistant persona', persona],
-      ['AI tone', sub.kb_tone],
-      ['Voice agent hours', sub.voice_hours],
-    ])
-      + longField('Greeting', sub.kb_greeting)
-      + longField('Studio profile', sub.kb_profile)
-      + longField('Classes & timetable', sub.kb_classes)
-      + longField('Pricing', sub.kb_pricing)
-      + longField('Pricing guardrail', sub.kb_price_quoting)
-      + longField('Policies', sub.kb_policies)
-      + longField('Events', sub.kb_events)
-      + longField('FAQs', sub.kb_faqs)
-      + longField('Restricted topics', sub.kb_restricted)
-      + longField('Voice escalation', sub.voice_escalate)));
-  }
+  // No AI knowledge-base section. StudioLAB Growth builds and populates it
+  // itself, facts and rules both, so there is nothing collected here to report.
 
   if (sub.extra_notes) {
     sections.push(sectionWrap('Additional notes', longField('Notes', sub.extra_notes)));
@@ -683,18 +650,6 @@ export function setupChecklistNudge(opts: {
     ${cta('Open my setup checklist', opts.accountUrl)}
     <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">If a tile doesn't apply to you (e.g. you don't have a TikTok account), just tick "I don't have this yet" inside the tile and we'll take it from there.</p>`;
   return { subject, html: layout({ previewText: `${count} setup ${count === 1 ? 'tile' : 'tiles'} on your StudioLAB Growth account still need a quick action.`, body }) };
-}
-
-export function kbAbandonmentNudge(opts: { studioName: string; resumeUrl: string }): { subject: string; html: string } {
-  const subject = `Your AI is almost ready, ${opts.studioName}`;
-  const body = `
-    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">Just one step left</h1>
-    <p style="margin:0 0 14px;">Hi ${escape(opts.studioName)},</p>
-    <p style="margin:0 0 14px;">Your payment is sorted and we have already pulled the content from your website into your AI knowledge base. The last thing we need from you is a quick five-minute review so your assistant sounds exactly like your studio.</p>
-    <p style="margin:0 0 14px;">Once you confirm the knowledge base, our team can finish wiring up your AI chat and voice assistant. Until then, we have hit pause on the build.</p>
-    ${cta('Finish my knowledge base', opts.resumeUrl)}
-    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">If you have already finished this and are still seeing reminders, please ignore this email and we will sort it on our end.</p>`;
-  return { subject, html: layout({ previewText: 'Your AI knowledge base is waiting on a final five-minute review.', body }) };
 }
 
 // ---------------------------------------------------------------------------

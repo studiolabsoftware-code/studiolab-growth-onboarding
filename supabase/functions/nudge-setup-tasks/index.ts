@@ -6,7 +6,7 @@
 // the shoulder, not a chase.
 //
 // Invoked by a scheduled job (Supabase pg_cron or external scheduler).
-// CRON_SECRET as Bearer header required, matching nudge-abandoned-kb.
+// CRON_SECRET as Bearer header required, matching the other cron jobs.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';

@@ -25,9 +25,6 @@ verify_jwt = false
 [functions.ops-reminders]
 verify_jwt = false
 
-[functions.nudge-abandoned-kb]
-verify_jwt = false
-
 [functions.nudge-setup-tasks]
 verify_jwt = false
 
@@ -35,4 +32,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.cleanup-attachments]
+verify_jwt = false
+
+# Anon-callable from payment-confirm.html with only the studio's session token,
+# the same posture the page's previous poller had.
+[functions.get-submission-status]
 verify_jwt = false

@@ -1407,24 +1407,9 @@
 
       lead_sources: isScalePlus ? collectLeads() : null,
 
-      // The knowledge base is NOT collected here. It lives in kb.html (all 21
-      // inputs) and is written by save-kb; the website scrape writes the same
-      // columns. This form has no kb-* or voice* inputs at all, so the old
-      // lines here read nothing and sent kb_profile..voice_escalate as null on
-      // every save. Those columns are in save-draft's allow-list, so the nulls
-      // were written.
-      //
-      // That was reachable, and it destroyed data. On Dominate AI the pay
-      // button fires scrape-and-extract, which populates the kb_* columns while
-      // status is still 'draft'. A studio who then cancels at Stripe lands back
-      // on this step with the form live, and the next autoSave overwrote the
-      // scraped knowledge base with nulls. save-draft's post-submit guard did
-      // not help: it only refuses once status leaves 'draft', and this whole
-      // window is inside 'draft'. The KB page then skips re-scraping because
-      // kb_scrape_status is already 'complete', so the studio saw empty fields
-      // where their pre-fill should have been.
-      //
-      // Do not reinstate these keys unless the inputs actually exist here.
+      // No kb_* or voice_* keys here on purpose. StudioLAB Growth builds and
+      // populates the AI knowledge base itself, facts and rules both, so we do
+      // not capture it, do not store it, and have nothing to hand over.
 
       extra_notes: valOrNull('extraNotes'),
 
@@ -1642,32 +1627,14 @@
   function renderPostPaymentPaybar() {
     const bar = document.getElementById('payBar');
     if (!bar) return;
-    const kbHref = PREVIEW_MODE ? '/kb.html?preview=1' : '/kb.html';
-    const kbBtn = PLAN === 'ai'
-      ? '<a class="btn btn-ok paybar-pay paybar-paid-cta" id="paybar-kb-link" href="' + kbHref + '">Go to your knowledge base →</a>'
-      : '';
-    const subtitle = PLAN === 'ai'
-      ? 'Your knowledge base is now your working document. Open it any time.'
-      : 'Your submission is in the queue. Our team will be in touch shortly.';
+    const subtitle = 'Your submission is in the queue. Our team will be in touch shortly.';
     bar.classList.add('paybar-paid');
     bar.innerHTML = ''
       + '<div class="paybar-info">'
       +   '<div class="paybar-label paybar-paid-label"><span class="paybar-paid-tick" aria-hidden="true">✓</span> Payment received (preview)</div>'
       +   '<div class="paybar-paid-sub">' + subtitle + '</div>'
       + '</div>'
-      + '<div class="paybar-actions">'
-      +   kbBtn
       + '</div>';
-    // Stash the current URL so the KB page knows where to send the studio
-    // when they save-and-close. Works for both preview and production
-    // because the KB link is always inside the form's final review step.
-    const kbLink = document.getElementById('paybar-kb-link');
-    if (kbLink) {
-      kbLink.addEventListener('click', () => {
-        try { sessionStorage.setItem('sl-kb-return', window.location.href); }
-        catch (_) { /* ignore */ }
-      });
-    }
   }
 
   function openPayModal() {
@@ -1833,20 +1800,6 @@
       if (!saveR.ok || !saveR.data || saveR.data.ok === false) {
         throw new Error((saveR.data && saveR.data.error) || 'Could not save before payment.');
       }
-      // Dominate AI: kick off the website scrape + KB pre-fill in parallel
-      // with the Stripe checkout-session creation. Fire-and-forget — the
-      // function flips kb_scrape_status to 'pending' immediately so the
-      // post-payment KB page can show a "Reading your website…" state and
-      // poll until results land. Studios without a website on file are
-      // tolerated server-side (status -> 'skipped'); they get an "Add your
-      // website" callout on the KB page instead.
-      if (PLAN === 'ai') {
-        try {
-          callFn('scrape-and-extract', { session_token: session.token })
-            .catch((e) => console.warn('scrape dispatch failed (non-blocking):', e));
-        } catch (e) { console.warn('scrape dispatch failed (non-blocking):', e); }
-      }
-
       const co = await callFn('create-checkout-session', {
         session_token: session.token,
         discount_code: pricingState.discountCode || null,
@@ -1884,9 +1837,7 @@
     const pricing = pricingState.pricing || {};
     const total = formatMoney(pricing.total_with_tax_cents || 0, pricing.currency || 'AUD');
     const productName = pricing.product_name || 'StudioLAB Growth setup';
-    const postPayCopy = PLAN === 'ai'
-      ? 'You would now be redirected to /kb.html to set up your AI knowledge base.'
-      : 'Your setup would be queued and our team would email you shortly with next steps.';
+    const postPayCopy = 'Your setup would be queued and our team would email you shortly with next steps.';
 
     const restore = () => {
       card.innerHTML = originalHTML;
@@ -2368,8 +2319,7 @@
       'col1t','col2t','fromName','replyEmail','emailDomain',
       'smsTone',
       'googleBusinessUrl','bookingUrl',
-      'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
-      'voiceHours','voiceEscalate','extraNotes',
+      'extraNotes',
       // Business details (Phase 1).
       'tradingName','businessType','ein','abn','acn','businessEmail',
       'addressStreet','addressCity','addressRegion','addressPostcode',
@@ -2416,10 +2366,6 @@
     // Restore yn states
     if (sub.custom_domain != null) {
       const btn = document.querySelector('[data-yn="dns"][data-val="' + (sub.custom_domain ? 'true' : 'false') + '"]');
-      if (btn) handleYn(btn);
-    }
-    if (sub.kb_price_quoting != null) {
-      const btn = document.querySelector('[data-yn="quotePrice"][data-val="' + (sub.kb_price_quoting ? 'true' : 'false') + '"]');
       if (btn) handleYn(btn);
     }
     // SMS intent yes/no. Programmatically settable so a future token pre-fill
@@ -2474,9 +2420,6 @@
       contactRole: 'role', col1t: 'primary_colour', col2t: 'secondary_colour',
       signOff: 'sign_off', fromName: 'from_name', replyEmail: 'reply_email',
       emailDomain: 'email_domain', smsTone: 'sms_tone',
-      'kb-profile': 'kb_profile', 'kb-classes': 'kb_classes', 'kb-pricing': 'kb_pricing',
-      'kb-policies': 'kb_policies', 'kb-events': 'kb_events', 'kb-restricted': 'kb_restricted',
-      'kb-tone': 'kb_tone', voiceHours: 'voice_hours', voiceEscalate: 'voice_escalate',
       extraNotes: 'extra_notes',
       googleBusinessUrl: 'google_business_url', bookingUrl: 'booking_url',
       // Business details (Phase 1).
@@ -2660,19 +2603,15 @@
       });
       if (r.ok && r.data && r.data.ok && r.data.submission) {
         // If the studio has already paid (or authorised / card saved), they
-        // should not see the form's Pay-with-Stripe step again — bounce them
-        // to the account view which is the real post-payment landing.
-        // The /kb.html exception still applies for Dominate AI studios who
-        // need to finish their knowledge base before the account page is
-        // useful.
+        // should not see the form's Pay-with-Stripe step again: bounce them to
+        // the account view, which is the real post-payment landing for every
+        // plan. Dominate AI used to detour to /kb.html to build a knowledge
+        // base; StudioLAB Growth builds and populates that itself now, so
+        // there is nothing left for the studio to do after paying.
         const ps = r.data.submission.payment_status;
         const isPaid = ps === 'paid' || ps === 'authorised' || ps === 'card_saved';
         if (isPaid) {
-          if (r.data.submission.plan === 'ai' && !r.data.submission.kb_completed_at) {
-            window.location.replace('/kb.html');
-          } else {
-            window.location.replace('/account.html');
-          }
+          window.location.replace('/account.html');
           return;
         }
         hydrateFromSubmission(r.data.submission);

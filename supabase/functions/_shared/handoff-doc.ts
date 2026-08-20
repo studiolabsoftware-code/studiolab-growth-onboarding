@@ -42,17 +42,6 @@ interface Submission {
   port_number?: string | null;
   sms_tone?: string | null;
   lead_sources?: unknown;
-  kb_profile?: string | null;
-  kb_classes?: string | null;
-  kb_pricing?: string | null;
-  kb_price_quoting?: boolean | null;
-  kb_policies?: string | null;
-  kb_events?: string | null;
-  kb_faqs?: unknown;
-  kb_restricted?: string | null;
-  kb_tone?: string | null;
-  voice_hours?: string | null;
-  voice_escalate?: string | null;
   extra_notes?: string | null;
   region?: string | null;
   created_at?: string | null;
@@ -83,15 +72,6 @@ function fmtList(v: unknown): string {
     try { const p = JSON.parse(v); return Array.isArray(p) ? p.join(', ') : v; } catch { return v; }
   }
   return '';
-}
-function fmtFaqs(v: unknown): string {
-  let arr = v;
-  if (typeof v === 'string') {
-    try { arr = JSON.parse(v); } catch { return v; }
-  }
-  if (!Array.isArray(arr) || !arr.length) return '';
-  // deno-lint-ignore no-explicit-any
-  return (arr as any[]).map((f) => `Q: ${f.q || f.question || ''}\nA: ${f.a || f.answer || ''}`).join('\n\n');
 }
 
 function val(v: unknown): string {
@@ -186,27 +166,12 @@ function buildSections(sub: Submission): Section[] {
     });
   }
 
-  if (isAi) {
-    sections.push({
-      title: '6. AI Knowledge Base',
-      fields: [
-        field('Studio profile', 'kb_profile'),
-        field('Classes & timetable', 'kb_classes'),
-        field('Pricing', 'kb_pricing'),
-        fieldFn('AI can quote prices', 'kb_price_quoting', (s) => fmtBool(s.kb_price_quoting)),
-        field('Policies', 'kb_policies'),
-        field('Events', 'kb_events'),
-        fieldFn('FAQs', 'kb_faqs', (s) => fmtFaqs(s.kb_faqs)),
-        field('Restricted topics', 'kb_restricted'),
-        field('AI tone', 'kb_tone'),
-        field('Voice agent hours', 'voice_hours'),
-        field('Voice escalation', 'voice_escalate'),
-      ],
-    });
-  }
+  // There is no knowledge-base section any more. StudioLAB Growth builds and
+  // populates the AI knowledge base itself, facts and rules both, from the
+  // studio's own data, so there is nothing for the setup team to transcribe.
 
   sections.push({
-    title: '7. Notes',
+    title: '6. Notes',
     fields: [field('Additional notes', 'extra_notes')],
   });
 

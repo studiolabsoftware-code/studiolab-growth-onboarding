@@ -32,21 +32,20 @@ Last updated: 2026-08-20
 
 ## Next slices
 
-1. **Retire the knowledge-base capture.** Gary confirmed 2026-08-20 that the
-   platform's AI knowledge base now reads the StudioLAB database automatically
-   and is pre-built and auto-populating. He believes it reads the studio website
-   too but wants to confirm that separately, so treat the website half as
-   assumed, not established. If both hold, this touches: `kb.html` (21 inputs),
-   `save-kb`, `get-kb-status`, `copy-kb-for-ghl`, `nudge-abandoned-kb`,
-   `scrape-and-extract`, the AI route's step-1 copy ("we scan your website and
-   pre-fill your AI knowledge base"), `account.html`'s AI stages, and the
-   post-payment redirect to `/kb.html`. Scope it before touching anything.
+1. **Reshape the form to Gary's scope: capture only what StudioLAB does not
+   already have, then checkout.** Stated 2026-08-20. The knowledge base is gone,
+   so what remains to decide is which of the remaining fields we already hold.
+   `outputs/onboarding-prefill-scenario-b-plan.md` has the verified tiers:
+   tier 1 (name, email, company, plan, region) we hold today; tier 2 (address,
+   phone, website, timezone, business email) needs a 10-minute check against two
+   or three real sub-accounts before it can be trusted; tier 3 (branding, logo,
+   voice, legal IDs, custom domain, SMS intent, consent) has to be asked. Do the
+   tier-2 check first, it decides how much more comes out of the form.
 2. **Population A pass in `nudge-abandoned-onboarding`,** over `inbound_signup`
-   rows with no matching submission. Blocked on item 2 above.
-3. **Pre-fill, Scenario B.** Plan in `outputs/onboarding-prefill-scenario-b-plan.md`.
-4. **Voice pass.** Accuracy is done. The door and step 1 both open with "Welcome
-   to StudioLAB Growth"; `kb.html`, the admin console and outbound email
-   templates were never swept for accuracy at all.
+   rows with no matching submission. Blocked on the Connector deploys above.
+3. **Pre-fill, Scenario B.** Server-side token resolve only, never client-side.
+4. **Voice pass.** Accuracy is done. `kb.html` is gone, but the admin console and
+   the outbound email templates were never swept for accuracy.
 
 ## Answered, recorded here so it is not re-asked
 

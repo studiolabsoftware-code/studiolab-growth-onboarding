@@ -98,7 +98,10 @@ add({
   replace: 'This form takes about 10 minutes and it saves as you go. $1 after payment',
 });
 add({
+  // Superseded by the knowledge-base retirement below, which rewrote this
+  // sentence again. Kept so a fresh checkout still applies both in order.
   id: 'C2 step 1 turnaround, AI', routes: ['au/ai', 'us/ai'], count: 1,
+  doneWhen: 'once your AI chat and voice agents are set up and tested',
   find: 'Your account typically goes live 7 to 10 business days after we review and approve the knowledge base.',
   replace: 'Most studios are live within 7 to 10 business days, once we have reviewed and approved your knowledge base.',
 });
@@ -121,7 +124,10 @@ add({
   replace: 'Both optional. Tell us whether you want text messaging, and share your Google Business listing so we can set your review requests up correctly.',
 });
 add({
+  // Its tail sentence was rewritten again by the knowledge-base retirement
+  // below, so match on the part that survived both edits.
   id: 'C3 step 4 description, AI', routes: ['au/ai', 'us/ai'], count: 1,
+  doneWhen: 'share your Google Business listing so we can set your review requests up correctly',
   find: 'Optional setup for SMS automations, missed-call text-back, lead-source tracking, and AI chat on your Dominate AI plan. Add what is useful and skip the rest.',
   replace: 'Both optional. Tell us whether you want text messaging, and share your Google Business listing so we can set your review requests up correctly. Your AI chat is set up from the knowledge base you confirm after payment.',
 });
@@ -176,7 +182,9 @@ add({
   replace: DFY_DESC,
 });
 add({
+  // Superseded by the knowledge-base retirement below. Same reason as above.
   id: 'DFY card description (AI)', routes: ['au/ai', 'us/ai'], count: 1,
+  doneWhen: 'plus your AI chat and voice agent setup and testing',
   find: 'Our team configures your entire account. You provide the information, we handle everything else. Typically 5 to 7 business days.',
   replace: AI_DESC,
 });
@@ -184,6 +192,63 @@ add({
   id: 'Guided card description', routes: 'all', count: 1,
   find: 'You configure your own account using our step-by-step checklist, with support available if you get stuck. Typically 3 to 5 business days.',
   replace: GUIDED_DESC,
+});
+
+// The AI knowledge base is no longer ours. StudioLAB Growth builds and
+// populates it itself, facts and rules both, from the studio's own data. We do
+// not capture it, scrape for it, or hand it over, so every promise about
+// building it with them comes out.
+add({
+  id: 'KB retired: AI intro line', routes: ['au/ai', 'us/ai'], count: 1,
+  find: "Both answer from a knowledge base you'll build with us, so the AI never invents anything about your studio.",
+  replace: 'Both answer from your own studio data, already in StudioLAB, so the AI never invents anything about your studio.',
+});
+add({
+  id: 'KB retired: AI form-length line', routes: ['au/ai', 'us/ai'], count: 1,
+  find: /This form takes about 10 minutes and it saves as you go\. (Straight|Right) after payment we scan your website and pre-fill your AI knowledge base for you, then you confirm it, tweak anything that isn't quite right, and you're done\./,
+  replace: "This form takes about 10 minutes and it saves as you go. There is nothing to fill in afterwards: your AI already knows your studio from your StudioLAB data.",
+});
+add({
+  id: 'KB retired: AI turnaround line', routes: ['au/ai', 'us/ai'], count: 1,
+  find: 'Most studios are live within 7 to 10 business days, once we have reviewed and approved your knowledge base.',
+  replace: 'Most studios are live within 7 to 10 business days, once your AI chat and voice agents are set up and tested.',
+});
+add({
+  id: 'KB retired: AI prep-list website line', routes: ['au/ai', 'us/ai'], count: 1,
+  find: "        <li>Your studio's website URL, which we scan the moment you pay and pre-fill your AI knowledge base from it. No website yet? You can still add one on the next screen, or fill the knowledge base in by hand.</li>\n",
+  replace: "        <li>Your studio's website URL, so your setup team can see how you present yourself today</li>\n",
+});
+add({
+  id: 'KB retired: AI card heading', routes: ['au/ai', 'us/ai'], count: 1,
+  find: 'Your AI knowledge base, pre-filled from your website',
+  replace: 'Your AI already knows your studio',
+});
+add({
+  id: 'KB retired: AI card body 1', routes: ['au/ai', 'us/ai'], count: 1,
+  find: 'The most important part of Dominate AI is your knowledge base. Class info, pricing, policies, FAQs, voice agent rules: everything the AI is allowed to say to your families.',
+  replace: 'Your class info, pricing, policies and schedule already live in StudioLAB, and that is where your AI reads them from. It stays current on its own as your timetable and fees change.',
+});
+add({
+  id: 'KB retired: AI card body 2', routes: ['au/ai', 'us/ai'], count: 1,
+  find: 'The moment you hit pay we scan your website and pre-fill the whole thing for you. You review the result on the next screen, edit anything we got wrong, and confirm. Five to ten focused minutes instead of an hour. Setup begins as soon as you pay; the AI chat widget and voice agent activate once we\'ve reviewed your confirmed knowledge base.',
+  replace: 'It also holds its own rules about what it will and will not say, including never confirming pricing to a family. There is nothing for you to write or approve. Setup begins as soon as you pay, and your AI chat widget and voice agent activate once they are configured and tested.',
+});
+add({
+  id: 'KB retired: AI done-screen copy', routes: ['au/ai', 'us/ai'], count: 1,
+  find: "We've got everything we need to get your Dominate AI setup underway. Our team will review your knowledge base, send you a summary for approval, then activate your AI chat and voice agents.",
+  replace: "We've got everything we need to get your Dominate AI setup underway. Our team will configure and test your AI chat and voice agents, then let you know the moment they are live.",
+});
+add({
+  id: 'KB retired: AI setup card desc', routes: ['au/ai', 'us/ai'], count: 1,
+  find: 'Everything in Done-For-You, plus your knowledge base build, AI chat and voice agent setup and testing, and a live walkthrough.',
+  replace: 'Everything in Done-For-You, plus your AI chat and voice agent setup and testing, and a live walkthrough.',
+});
+
+add({
+  id: 'KB retired: step 4 AI tail', routes: ['au/ai', 'us/ai'], count: 1,
+  doneWhen: 'set up from your StudioLAB data, so there is nothing to confirm',
+  find: ' Your AI chat is set up from the knowledge base you confirm after payment.',
+  replace: ' Your AI chat is set up from your StudioLAB data, so there is nothing to confirm afterwards.',
 });
 
 // D1: the done screen is reachable only by the spam honeypot and by "save for
@@ -201,9 +266,13 @@ add({
   replace: '<span class="done-detail-val" id="done-timeline">Most studios are live within 7 to 10 business days</span>',
 });
 add({
+  // The find string is a substring of the replacement, so an `includes` check
+  // can never tell "already applied" from "not yet". Anchor on the preceding
+  // markup instead, which the replacement removes, making the match one-shot.
   id: 'D1 done-screen provenance comment', routes: 'all', count: 1,
-  find: '<div class="done-screen" id="doneScreen"',
+  find: '\n<div class="done-screen" id="doneScreen"',
   replace: [
+    '',
     '<!-- Reached only by js/form.js showDone() (spam-honeypot branch) and',
     '     showSavedForLater(). BOTH rewrite the title, description and timeline',
     '     below, so this text is a fallback that no studio sees on the normal',
@@ -211,6 +280,8 @@ add({
     '     anyway; do not treat it as the live success copy. -->',
     '<div class="done-screen" id="doneScreen"',
   ].join('\n'),
+  // Marks this edit as done without relying on the replacement text.
+  doneWhen: 'Reached only by js/form.js showDone()',
 });
 
 // C4: the automations line is now driven by the setup choice in js/form.js.
@@ -236,6 +307,11 @@ for (const route of ALL) {
   for (const e of edits) {
     const routes = e.routes === 'all' ? ALL : e.routes;
     if (!routes.includes(route)) continue;
+
+    // Some edits leave their own find string intact (a comment inserted above
+    // the markup it anchors on), so matching is not proof of "not yet done".
+    // doneWhen is the authoritative signal where one is given.
+    if (e.doneWhen && html.includes(e.doneWhen)) { skipped++; continue; }
 
     const isRe = e.find instanceof RegExp;
     const hits = isRe
@@ -263,6 +339,7 @@ for (const route of ALL) {
     html = isRe
       ? html.replace(new RegExp(e.find.source, 'g'), e.replace)
       : html.split(e.find).join(e.replace);
+    if (process.env.VERBOSE) console.log(`    applied ${route}: ${e.id}`);
     applied++;
   }
 

@@ -39,6 +39,48 @@ never a claim about state, so the unproven `admin-mark-active` path cannot make
 the door lie. Verified in production: no submission has ever reached
 `status='active'`.
 
+## 2026-08-20: the AI knowledge base is retired, entirely
+
+Gary confirmed StudioLAB Growth builds and populates the AI knowledge base
+itself, from the studio's own data, and that it holds its own rules (including
+never confirming pricing to a family). Facts and rules both. Nothing on our side
+feeds it, so the whole capture pipeline was dead weight rather than something to
+shrink.
+
+Removed: `kb.html`, `js/kb.js`, `css/kb.css`, the `save-kb`, `get-kb-status`,
+`copy-kb-for-ghl`, `scrape-and-extract`, `add-website-and-scrape` and
+`nudge-abandoned-kb` functions (deleted from the platform, all now 404), four
+`_shared/kb-*.ts` modules, the KB section of the handoff document and of the
+submission digest email, the admin KB panel and its "Copy KB as Markdown"
+button, the KB fields from the studio and admin change-request surfaces and from
+`apply-change-request`'s allow-list and `sync-to-sheet`'s column list, and the
+`nudge-abandoned-kb-daily` cron.
+
+The strongest evidence it was really gone: the old flow ended with a human
+opening a studio's record, clicking a button, and pasting Markdown into the
+platform by hand. Nobody is pasting anything now.
+
+`get-kb-status` was doing double duty as the post-payment poller under a
+misleading name, so it was replaced by `get-submission-status` rather than
+simply deleted, and `payment-confirm.html` now points at that. Dominate AI
+studios go straight from payment to `account.html` like every other plan; the
+`/kb.html` detours in `payment-confirm.html`, `js/setup-gate.js` and
+`js/form.js` are gone, as is the website scrape that fired on the pay button.
+
+Copy on both AI routes rewritten: the AI answers from studio data already in
+StudioLAB, it stays current on its own, it holds its own rules including never
+confirming pricing, and there is nothing for the studio to write or approve.
+
+Safe because production had never used it: no studio has ever completed a
+knowledge base, no scrape has ever run, and the only paid studio is on Launch.
+
+Two things worth remembering. `scripts/apply-copy-fixes.js` had an edit whose
+find string was a substring of its own replacement, so it re-applied on every
+run and duplicated a comment block four times before it was caught; edits like
+that now carry an explicit `doneWhen`. And a full `deno check` sweep across
+every function in a tight loop reports false errors and times out; check the
+functions actually touched, plus their consumers, individually.
+
 ## 2026-08-20: escalation to a human, and standing ops reminders
 
 Gary's point: chasing the studio by email cannot solve an email problem. The

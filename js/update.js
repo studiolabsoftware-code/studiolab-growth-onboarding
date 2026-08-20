@@ -54,16 +54,10 @@
     sms_tone:           { label: 'SMS tone notes', type: 'text' },
 
     // AI KB
-    kb_profile:         { label: 'Studio locations, hours and contact', type: 'textarea' },
-    kb_classes:         { label: 'Classes and timetable', type: 'textarea' },
-    kb_pricing:         { label: 'Tuition fees and pricing', type: 'textarea' },
-    kb_policies:        { label: 'Studio policies', type: 'textarea' },
-    kb_events:          { label: 'Upcoming events', type: 'textarea' },
-    kb_restricted:      { label: 'Restricted topics', type: 'textarea' },
-    kb_tone:            { label: 'AI tone and personality', type: 'textarea' },
-    voice_hours:        { label: 'Voice agent activation hours', type: 'text' },
-    voice_escalate:     { label: 'When the AI should escalate', type: 'textarea' },
 
+    // No knowledge-base fields here. StudioLAB Growth builds and populates
+    // the AI knowledge base itself, facts and rules both, so there is nothing
+    // for a studio to request a change to on our side.
     extra_notes:        { label: 'Additional notes', type: 'textarea' },
   };
 

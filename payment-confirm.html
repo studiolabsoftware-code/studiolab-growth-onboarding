@@ -131,7 +131,7 @@
     const max = 45; // ~90 seconds at 2s per tick. Webhook typically lands in <10s.
     const tick = async () => {
       tries++;
-      const r = await callFn('get-kb-status', { session_token: session.token });
+      const r = await callFn('get-submission-status', { session_token: session.token });
       if (!r.ok || !r.data || r.data.ok === false) {
         if (r.status === 401) { showBadSession(); return; }
         if (tries >= max) {
@@ -147,10 +147,10 @@
       const s = r.data.submission || {};
       const paid = s.payment_status === 'paid' || s.payment_status === 'authorised' || s.payment_status === 'card_saved';
       if (paid) {
-        if (s.plan === 'ai') {
-          window.location.href = '/kb.html';
-          return;
-        }
+        // Every plan lands on the account page now. Dominate AI used to detour
+        // through /kb.html to build a knowledge base; StudioLAB Growth builds
+        // and populates that itself, so there is nothing left for the studio to
+        // fill in after paying.
         // Success — bounce to the studio account page so they land on a
         // real, navigable view of their account (status, invoices,
         // messages, what happens next) rather than dead-ending here.

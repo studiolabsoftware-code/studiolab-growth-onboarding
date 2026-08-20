@@ -94,7 +94,7 @@ export async function loadStudioEmailPrefs(
  * under it.
  *
  * Exported so paths that send via sendEmail directly (notify-new-message,
- * nudge-abandoned-kb, quote-reminders use mailgun.ts directly with
+ * quote-reminders uses mailgun.ts directly with
  * custom headers and bypass the gated sender) can inject the footer
  * without going through sendIfAllowed.
  */
