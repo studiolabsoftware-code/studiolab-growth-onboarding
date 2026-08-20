@@ -7,12 +7,22 @@ Last updated: 2026-08-20
 
 ## Waiting on Gary, in this order
 
-1. **Deploy the tier-1 pre-fill.** `bash supabase/manual/deploy-prefill.sh`, THEN push `main`.
-   Order matters: `js/form.js` ships via GitHub Pages on any push, so pushing first runs new client
-   code against a `send-otp` that has never heard of the invite token. The script gates on the
-   Connector's resolver RPC and refuses to deploy without it. Smoke steps are in the script's
-   closing note; use a private window and a plus-alias, or you will smoke against your own existing
-   draft and the no-clobber rule will correctly write nothing.
+1. **Deploy the tier-1 pre-fill. TWO commands, in this order.**
+
+   a. In the Growth Connector repo: `bash supabase/manual/apply-prefill-resolver.sh`. This creates
+      the RPC that turns an invite token into a studio identity. Step (b) gates on being able to
+      CALL it, not merely see it, so run this first or (b) will refuse.
+   b. Here: `bash supabase/manual/deploy-prefill.sh`. **Most urgent line in this file** - it carries
+      the LIKE-injection fix, which is live in production until this runs.
+
+   Smoke steps are in (b)'s closing note; use a private window and a plus-alias, or you will smoke
+   against your own existing draft and the no-clobber rule will correctly write nothing.
+
+   **The client already shipped ahead of the server, verified live 2026-08-20.** Live `js/form.js`
+   reads `?t=`, while `send-otp` is still v38 / 2026-05-17 and `verify-otp` v35 / 2026-05-14. The
+   push-order warning in (b) is therefore already spent: there is no third step. Nobody is locked
+   out - `fallBackToEmailEntry` was written for exactly this - but every studio clicking an invite
+   link today burns a click on an error first.
 2. **Take the `email_event` ledger live** (Growth Connector repo):
    `bash supabase/manual/deploy-mailgun-event-webhook.sh`, then its smoke, then point Mailgun at it.
 3. **The signup cutover, inside StudioLAB Growth.** Rotate `SIGNUP_WEBHOOK_SECRET`, audit every
