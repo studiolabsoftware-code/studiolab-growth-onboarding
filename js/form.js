@@ -1266,7 +1266,6 @@
       contact_email: val('contactEmail'),
       contact_phone: valOrNull('contactPhone'),
       role: valOrNull('contactRole'),
-      studiolab_email: valOrNull('slEmail'),
 
       logo_url: state.logoUrl,
       primary_colour: valOrNull('col1t'),
@@ -1294,11 +1293,6 @@
       sms_setup_requested: isScalePlus ? state.yn.sms : null,
       sms_tone: isScalePlus ? valOrNull('smsTone') : null,
 
-      // Social and business handles. Launch collects these in the optional
-      // future-proof expander; Scale and AI collect them in the socials card
-      // alongside the SMS step. Form skips silently if the inputs don't exist.
-      tiktok_handle: valOrNull('tiktokHandle'),
-      youtube_url:   valOrNull('youtubeUrl'),
       lead_sources: isScalePlus ? collectLeads() : null,
 
       kb_profile: isAi ? valOrNull('kb-profile') : null,
@@ -1315,11 +1309,13 @@
 
       extra_notes: valOrNull('extraNotes'),
 
-      // Optional future-proof URLs (Launch only). Form skips them silently
-      // if the inputs don't exist on the current plan.
+      // Public reference links the studio can share without connecting an
+      // account. facebook_url / instagram_handle / tiktok_handle / youtube_url
+      // are RETIRED from the form (social connection is studio-done OAuth, so a
+      // pasted handle drove nothing); their columns are retained for the
+      // Connector read contract. Form skips a field silently if the input
+      // doesn't exist on the current plan (bookingUrl is Launch only).
       google_business_url: valOrNull('googleBusinessUrl'),
-      facebook_url:        valOrNull('facebookUrl'),
-      instagram_handle:    valOrNull('instagramHandle'),
       booking_url:         valOrNull('bookingUrl'),
 
       // Optional brand-reference screenshot for hex matching.
@@ -2247,8 +2243,7 @@
       'firstName','lastName','contactPhone','contactRole',
       'col1t','col2t','fromName','replyEmail','emailDomain',
       'smsTone',
-      'googleBusinessUrl','facebookUrl','instagramHandle','bookingUrl',
-      'tiktokHandle','youtubeUrl',
+      'googleBusinessUrl','bookingUrl',
       'kb-profile','kb-classes','kb-pricing','kb-policies','kb-events','kb-restricted','kb-tone',
       'voiceHours','voiceEscalate','extraNotes',
       // Business details (Phase 1).
@@ -2359,9 +2354,7 @@
       'kb-policies': 'kb_policies', 'kb-events': 'kb_events', 'kb-restricted': 'kb_restricted',
       'kb-tone': 'kb_tone', voiceHours: 'voice_hours', voiceEscalate: 'voice_escalate',
       extraNotes: 'extra_notes',
-      googleBusinessUrl: 'google_business_url', facebookUrl: 'facebook_url',
-      instagramHandle: 'instagram_handle', bookingUrl: 'booking_url',
-      tiktokHandle: 'tiktok_handle', youtubeUrl: 'youtube_url',
+      googleBusinessUrl: 'google_business_url', bookingUrl: 'booking_url',
       // Business details (Phase 1).
       tradingName: 'trading_name', businessType: 'business_type',
       ein: 'ein', ssnLast4: 'ssn_last4', abn: 'abn', acn: 'acn',
