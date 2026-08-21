@@ -62,7 +62,7 @@
   <header class="hero">
     <span class="pill">Neverland Studios · Pricing model</span>
     <h1>Multi-class discounts, explained simply</h1>
-    <p>This model replaces the old unlimited-style outcome. Families still get rewarded for higher commitment, but the discount is applied to the student's full eligible tuition total, not to individual class lines.</p>
+    <p>This model compares Neverland's current flat-discount-plus-cap structure with a cleaner recommended multi-class curve. The recommendation keeps the percentages simple for families while removing the old unlimited-style outcome.</p>
   </header>
 
   <section class="card">
@@ -80,8 +80,8 @@
       </div>
       <div class="step green">
         <strong>8+ classes</strong>
-        <div class="big"><span id="extraLabel">5%</span></div>
-        <p>Each extra class only adds a small amount to the family total.</p>
+        <div class="big"><span id="extraLabel">30-45%</span></div>
+        <p>The discount increases in clean 5% steps, with a simple high-commitment tier from 11 classes onward.</p>
       </div>
     </div>
 
@@ -91,12 +91,16 @@
         <input id="classFee" type="number" value="170" step="5">
       </div>
       <div>
-        <label for="extraPct">8+ extra class pays</label>
-        <input id="extraPct" type="number" value="5" step="0.5">
-      </div>
-      <div>
         <label for="termWeeks">Term weeks</label>
         <input id="termWeeks" type="number" value="10" step="1">
+      </div>
+      <div>
+        <label for="currentDiscount">Current discount</label>
+        <input id="currentDiscount" type="number" value="12" step="0.5">
+      </div>
+      <div>
+        <label for="currentCap">Current cap</label>
+        <input id="currentCap" type="number" value="940" step="5">
       </div>
     </div>
   </section>
@@ -124,27 +128,29 @@
 
   <section class="card">
     <h2>Two live examples</h2>
-    <p>Change the class fee or the high-end extra-class percentage above and these examples update automatically.</p>
+    <p>Change the class fee, current discount, or current cap above and these examples update automatically.</p>
     <div class="grid2" id="examples" style="margin-top:12px"></div>
   </section>
 
   <section class="card">
-    <h2>Class-count table</h2>
-    <p>This shows the actual discount percentage applied to the whole eligible tuition total.</p>
+    <h2>Current vs recommended</h2>
+    <p>This is the main comparison: where families sit now, and where they land under the clean recommended discount curve.</p>
     <div style="overflow-x:auto">
       <table>
         <thead>
           <tr>
             <th>Classes</th>
             <th class="num">Gross tuition</th>
-            <th class="num">Discount applied to total</th>
-            <th class="num">Family pays</th>
-            <th class="num">Extra vs previous class</th>
+            <th class="num">Current model</th>
+            <th class="num">Recommended %</th>
+            <th class="num">Recommended total</th>
+            <th class="num">Change vs current</th>
           </tr>
         </thead>
         <tbody id="classRows"></tbody>
       </table>
     </div>
+    <p class="small">Current model = current flat multi-class discount applied from 2+ classes, capped at the current cap. Recommended model = clean whole-stack discount by class count.</p>
   </section>
 
   <section class="card">
@@ -171,7 +177,7 @@
 
   <section class="card">
     <h2>Internal setup values</h2>
-    <p>Use these percentages in the platform's per-student class-count discount fields.</p>
+    <p>Use these clean percentages in the platform's per-student class-count discount fields.</p>
     <details>
       <summary>Show setup fields</summary>
       <div style="overflow-x:auto">
@@ -188,82 +194,90 @@
 <script>
 const fmt=n=>'$'+(Math.round(n*100)/100).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmt0=n=>'$'+Math.round(n).toLocaleString('en-AU');
-const pct=n=>(Math.round(n*1000)/1000).toLocaleString('en-AU',{maximumFractionDigits:3})+'%';
+const pct=n=>(Math.round(n*10)/10).toLocaleString('en-AU',{maximumFractionDigits:1})+'%';
 
-function paidUnits(classes, extraPct){
-  if(classes<=5) return classes;
-  if(classes===6) return 5.4;
-  if(classes===7) return 5.6;
-  return 5.6+(classes-7)*(extraPct/100);
-}
-
-function discountFor(classes, extraPct){
+function recommendedDiscount(classes){
   if(classes<=5) return 0;
-  return (1-paidUnits(classes, extraPct)/classes)*100;
+  if(classes===6) return 10;
+  if(classes===7) return 20;
+  if(classes===8) return 30;
+  if(classes===9) return 35;
+  if(classes===10) return 40;
+  return 45;
 }
 
-function model(classes, fee, extraPct, weeks){
+function recommendedTotal(classes, fee){
   const gross=classes*fee;
-  const pays=paidUnits(classes, extraPct)*fee;
-  const discount=discountFor(classes, extraPct);
-  return {classes,gross,pays,discount,weekly:pays/weeks};
+  return gross*(1-recommendedDiscount(classes)/100);
 }
 
-function renderExamples(fee, extraPct, weeks){
-  const examples=[7,8].map(classes=>model(classes,fee,extraPct,weeks));
+function currentTotal(classes, fee, currentDiscount, currentCap){
+  const gross=classes*fee;
+  if(classes<2) return gross;
+  return Math.min(gross*(1-currentDiscount/100), currentCap);
+}
+
+function model(classes, fee, currentDiscount, currentCap, weeks){
+  const gross=classes*fee;
+  const current=currentTotal(classes, fee, currentDiscount, currentCap);
+  const recommended=recommendedTotal(classes, fee);
+  const discount=recommendedDiscount(classes);
+  return {classes,gross,current,recommended,discount,weekly:recommended/weeks,difference:recommended-current};
+}
+
+function renderExamples(fee, currentDiscount, currentCap, weeks){
+  const examples=[7,8].map(classes=>model(classes,fee,currentDiscount,currentCap,weeks));
   document.getElementById('examples').innerHTML=examples.map(ex=>{
-    const explanation=ex.classes===7
-      ? `At ${ex.classes} classes, the platform applies ${pct(ex.discount)} to the full eligible tuition total.`
-      : `At ${ex.classes} classes, the total behaves like the extra class only added ${fmt(fee*extraPct/100)}.`;
+    const direction=ex.difference>0?'higher than':ex.difference<0?'lower than':'the same as';
     return `<div class="example">
       <h3>${ex.classes} classes at ${fmt0(fee)} each</h3>
       <div class="metrics">
         <div class="metric"><div class="k">Gross tuition</div><div class="v">${fmt0(ex.gross)}</div></div>
-        <div class="metric"><div class="k">Discount</div><div class="v">${pct(ex.discount)}</div></div>
-        <div class="metric"><div class="k">Family pays</div><div class="v">${fmt(ex.pays)}</div></div>
+        <div class="metric"><div class="k">Current model</div><div class="v">${fmt(ex.current)}</div></div>
+        <div class="metric"><div class="k">Recommended</div><div class="v">${fmt(ex.recommended)}</div></div>
       </div>
-      <p style="margin-top:10px">${explanation} Weekly equivalent: ${fmt(ex.weekly)}.</p>
+      <p style="margin-top:10px">Recommended uses a clean ${pct(ex.discount)} whole-stack discount. That is ${fmt(Math.abs(ex.difference))} ${direction} the current model for the term. Weekly equivalent: ${fmt(ex.weekly)}.</p>
     </div>`;
   }).join('');
 }
 
-function renderClassRows(fee, extraPct, weeks){
-  let previous=null;
+function renderClassRows(fee, currentDiscount, currentCap, weeks){
   const rows=[];
   for(let classes=1;classes<=12;classes++){
-    const ex=model(classes,fee,extraPct,weeks);
-    const extra=previous==null?null:ex.pays-previous;
+    const ex=model(classes,fee,currentDiscount,currentCap,weeks);
+    const diffClass=ex.difference>0?'color:var(--green);font-weight:800':ex.difference<0?'color:var(--pink);font-weight:800':'color:var(--muted)';
     rows.push(`<tr>
       <td>${classes}</td>
       <td class="num">${fmt0(ex.gross)}</td>
+      <td class="num">${fmt(ex.current)}</td>
       <td class="num">${pct(ex.discount)}</td>
-      <td class="num"><strong>${fmt(ex.pays)}</strong></td>
-      <td class="num">${extra==null?'—':fmt(extra)}</td>
+      <td class="num"><strong>${fmt(ex.recommended)}</strong></td>
+      <td class="num" style="${diffClass}">${ex.difference>=0?'+':'-'}${fmt(Math.abs(ex.difference))}</td>
     </tr>`);
-    previous=ex.pays;
   }
   document.getElementById('classRows').innerHTML=rows.join('');
 }
 
-function renderSetupRows(extraPct){
+function renderSetupRows(){
   const rows=[];
   for(let classes=2;classes<=19;classes++){
-    rows.push(`<tr><td>For${classes}Units</td><td class="num">${pct(discountFor(classes, extraPct))}</td></tr>`);
+    rows.push(`<tr><td>For${classes}Units</td><td class="num">${pct(recommendedDiscount(classes))}</td></tr>`);
   }
   document.getElementById('setupRows').innerHTML=rows.join('');
 }
 
 function render(){
   const fee=Number(document.getElementById('classFee').value)||0;
-  const extraPct=Number(document.getElementById('extraPct').value)||0;
   const weeks=Number(document.getElementById('termWeeks').value)||10;
-  document.getElementById('extraLabel').textContent=pct(extraPct);
-  renderExamples(fee, extraPct, weeks);
-  renderClassRows(fee, extraPct, weeks);
-  renderSetupRows(extraPct);
+  const currentDiscount=Number(document.getElementById('currentDiscount').value)||0;
+  const currentCap=Number(document.getElementById('currentCap').value)||0;
+  document.getElementById('extraLabel').textContent='30-45%';
+  renderExamples(fee, currentDiscount, currentCap, weeks);
+  renderClassRows(fee, currentDiscount, currentCap, weeks);
+  renderSetupRows();
 }
 
-['classFee','extraPct','termWeeks'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+['classFee','termWeeks','currentDiscount','currentCap'].forEach(id=>document.getElementById(id).addEventListener('input',render));
 render();
 </script>
 </body>
