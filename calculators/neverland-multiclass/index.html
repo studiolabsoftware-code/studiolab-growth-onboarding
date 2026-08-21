@@ -35,6 +35,14 @@
   label{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.35px;text-transform:uppercase;margin-bottom:5px}
   input{font:inherit;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);padding:9px 10px;width:130px}
   input:focus{outline:none;border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo2)}
+  .btn{font:inherit;border:1px solid var(--indigo);border-radius:9px;background:var(--indigo);color:#fff;font-weight:800;padding:9px 12px;cursor:pointer}
+  .btn:hover{background:#352c6b}
+  .btn.secondary{background:#fff;color:var(--indigo)}
+  .btn.secondary:hover{background:var(--indigo2)}
+  .tier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin-top:12px}
+  .tier-input{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px}
+  .tier-input input{width:100%;margin-top:5px}
+  .tier-input label{margin:0}
   .example{border:1px solid var(--line);border-radius:11px;background:#fff;padding:14px}
   .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
   .metric{background:#faf9fd;border:1px solid #efedf6;border-radius:9px;padding:9px}
@@ -62,7 +70,7 @@
   <header class="hero">
     <span class="pill">Neverland Studios · Pricing model</span>
     <h1>Multi-class discounts, explained simply</h1>
-    <p>This model compares Neverland's current flat-discount-plus-cap structure with a cleaner recommended multi-class curve. The recommendation keeps the percentages simple for families while removing the old unlimited-style outcome.</p>
+    <p>This model compares Neverland's current flat-discount-plus-cap structure with a cleaner recommended multi-class curve. The recommendation is pre-populated with simple whole-number percentages for families, while still allowing decimals when Neverland wants to test exact calculations.</p>
   </header>
 
   <section class="card">
@@ -80,8 +88,8 @@
       </div>
       <div class="step green">
         <strong>8+ classes</strong>
-        <div class="big"><span id="extraLabel">30-45%</span></div>
-        <p>The discount increases in clean 5% steps, with a simple high-commitment tier from 11 classes onward.</p>
+        <div class="big"><span id="extraLabel">29-67%</span></div>
+        <p>The discount increases gradually so each extra class still carries a small additional commitment.</p>
       </div>
     </div>
 
@@ -102,6 +110,19 @@
         <label for="currentCap">Current cap</label>
         <input id="currentCap" type="number" value="940" step="5">
       </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Recommended discount model</h2>
+    <p>These are the pre-populated recommendation values. They are whole numbers for clean family-facing communication, but you can enter decimals to test the exact platform impact.</p>
+    <div class="tier-grid" id="tierInputs"></div>
+    <details>
+      <summary>Show 13 to 19 class setup values</summary>
+      <div class="tier-grid" id="advancedTierInputs"></div>
+    </details>
+    <div class="controls">
+      <button class="btn" id="resetRecommended" type="button">Reset to recommended</button>
     </div>
   </section>
 
@@ -150,7 +171,7 @@
         <tbody id="classRows"></tbody>
       </table>
     </div>
-    <p class="small">Current model = current flat multi-class discount applied from 2+ classes, capped at the current cap. Recommended model = clean whole-stack discount by class count.</p>
+    <p class="small">Current model = current flat multi-class discount applied from 2+ classes, capped at the current cap. Recommended model = editable whole-stack discount by class count, pre-filled with the recommended values.</p>
   </section>
 
   <section class="card">
@@ -194,16 +215,13 @@
 <script>
 const fmt=n=>'$'+(Math.round(n*100)/100).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmt0=n=>'$'+Math.round(n).toLocaleString('en-AU');
-const pct=n=>(Math.round(n*10)/10).toLocaleString('en-AU',{maximumFractionDigits:1})+'%';
+const pct=n=>(Math.round(n*100)/100).toLocaleString('en-AU',{maximumFractionDigits:2})+'%';
+const DEFAULT_RECOMMENDED=[0,0,0,0,0,10,20,29,37,42,47,51,55,58,60,62,64,66,67];
+let recommendedTiers=[...DEFAULT_RECOMMENDED];
 
 function recommendedDiscount(classes){
-  if(classes<=5) return 0;
-  if(classes===6) return 10;
-  if(classes===7) return 20;
-  if(classes===8) return 30;
-  if(classes===9) return 35;
-  if(classes===10) return 40;
-  return 45;
+  const index=Math.max(1,Math.min(classes,19))-1;
+  return recommendedTiers[index]||0;
 }
 
 function recommendedTotal(classes, fee){
@@ -243,7 +261,7 @@ function renderExamples(fee, currentDiscount, currentCap, weeks){
 
 function renderClassRows(fee, currentDiscount, currentCap, weeks){
   const rows=[];
-  for(let classes=1;classes<=12;classes++){
+  for(let classes=1;classes<=13;classes++){
     const ex=model(classes,fee,currentDiscount,currentCap,weeks);
     const diffClass=ex.difference>0?'color:var(--green);font-weight:800':ex.difference<0?'color:var(--pink);font-weight:800':'color:var(--muted)';
     rows.push(`<tr>
@@ -266,18 +284,51 @@ function renderSetupRows(){
   document.getElementById('setupRows').innerHTML=rows.join('');
 }
 
+function tierField(classes){
+  const value=recommendedTiers[classes-1];
+  return `<div class="tier-input">
+    <label for="tier${classes}">${classes} classes</label>
+    <input id="tier${classes}" class="recommendedTier" type="number" min="0" max="100" step="any" value="${value}" data-classes="${classes}">
+  </div>`;
+}
+
+function renderTierInputs(){
+  document.getElementById('tierInputs').innerHTML=[6,7,8,9,10,11,12].map(tierField).join('');
+  document.getElementById('advancedTierInputs').innerHTML=[13,14,15,16,17,18,19].map(tierField).join('');
+  document.querySelectorAll('.recommendedTier').forEach(input=>{
+    input.addEventListener('input',event=>{
+      const classes=Number(event.target.dataset.classes);
+      const value=Number(event.target.value);
+      recommendedTiers[classes-1]=Number.isFinite(value)?Math.max(0,Math.min(100,value)):0;
+      render();
+    });
+  });
+}
+
+function updateRangeLabel(){
+  const min=recommendedDiscount(8);
+  const max=recommendedDiscount(19);
+  document.getElementById('extraLabel').textContent=`${pct(min)}-${pct(max)}`;
+}
+
 function render(){
   const fee=Number(document.getElementById('classFee').value)||0;
   const weeks=Number(document.getElementById('termWeeks').value)||10;
   const currentDiscount=Number(document.getElementById('currentDiscount').value)||0;
   const currentCap=Number(document.getElementById('currentCap').value)||0;
-  document.getElementById('extraLabel').textContent='30-45%';
+  updateRangeLabel();
   renderExamples(fee, currentDiscount, currentCap, weeks);
   renderClassRows(fee, currentDiscount, currentCap, weeks);
   renderSetupRows();
 }
 
 ['classFee','termWeeks','currentDiscount','currentCap'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+document.getElementById('resetRecommended').addEventListener('click',()=>{
+  recommendedTiers=[...DEFAULT_RECOMMENDED];
+  renderTierInputs();
+  render();
+});
+renderTierInputs();
 render();
 </script>
 </body>
