@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Neverland Studios · Multi-Class Discount Calculator</title>
+<style>
+  :root{
+    --indigo900:#13102E; --indigo700:#2A2358; --indigo500:#4A3F8A; --indigo100:#ECEAF6;
+    --magenta:#E8197F; --magenta100:#FDE7F2;
+    --ink:#1d1b2e; --muted:#6b6880; --line:#e6e4ef; --line2:#f0eff6;
+    --bg:#f6f5fa; --card:#ffffff; --good:#0f9d6b; --good100:#e4f6ee;
+    --warn:#c9871d; --warn100:#fdf2dd; --bad:#d23b53; --bad100:#fbe6ea;
+    --excl:#8a6d00; --excl100:#fff7d6; --exclbd:#ecdca0;
+    --radius:14px; --shadow:0 1px 2px rgba(20,16,46,.04),0 6px 20px rgba(20,16,46,.05);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 20px 90px}
+  header.app{margin-bottom:18px}
+  .brand h1{font-size:20px;margin:8px 0 2px;letter-spacing:-.2px}
+  .brand p{margin:0;color:var(--muted);font-size:13px;max-width:760px}
+  .pill{display:inline-block;background:var(--indigo100);color:var(--indigo700);font-weight:600;
+    font-size:11px;padding:3px 9px;border-radius:999px;letter-spacing:.3px;text-transform:uppercase}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+  .card + .card{margin-top:16px}
+  .card h2{font-size:14px;margin:0 0 2px;letter-spacing:.1px}
+  .card h2 .num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;
+    background:var(--indigo500);color:#fff;font-size:11px;font-weight:700;margin-right:8px;vertical-align:1px}
+  .card .sub{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .ctl{display:flex;flex-direction:column;gap:5px}
+  .ctl label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  select,input[type=text],input[type=number]{font:inherit;padding:8px 10px;border:1px solid var(--line);
+    border-radius:9px;background:#fff;color:var(--ink);outline:none}
+  select:focus,input:focus{border-color:var(--indigo500);box-shadow:0 0 0 3px var(--indigo100)}
+  input[type=range]{accent-color:var(--magenta)}
+  .seg{display:inline-flex;background:var(--indigo100);border-radius:10px;padding:3px}
+  .seg button{border:0;background:transparent;font:inherit;font-weight:600;color:var(--indigo700);
+    padding:7px 14px;border-radius:8px;cursor:pointer}
+  .seg button.on{background:#fff;color:var(--indigo900);box-shadow:var(--shadow)}
+  .btn{border:0;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;padding:9px 14px}
+  .btn.primary{background:var(--magenta);color:#fff}.btn.primary:hover{background:#cf1370}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--indigo700)}.btn.ghost:hover{border-color:var(--indigo500)}
+  .btn.sm{padding:6px 10px;font-size:12.5px}.btn.tiny{padding:3px 9px;font-size:12px;border-radius:8px}
+  table{border-collapse:collapse;width:100%}
+  th,td{text-align:left;padding:7px 9px;font-size:13px}
+  thead th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--line);font-weight:700}
+  tbody tr{border-bottom:1px solid var(--line2)}
+  .num-cell{text-align:right;font-variant-numeric:tabular-nums}
+  /* discount grid */
+  .disc-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+  .disc-grid .cell{background:var(--indigo100);border-radius:10px;padding:8px;text-align:center}
+  .disc-grid .cell .cc{font-size:10.5px;color:var(--indigo700);font-weight:700}
+  .disc-grid .cell input{width:100%;text-align:center;margin-top:5px;border-color:#d9d6ec;padding:6px 4px}
+  .disc-grid .cell.capped{background:var(--magenta100)}
+  /* builder layout */
+  .builder{display:grid;grid-template-columns:1.55fr .95fr;gap:18px}
+  @media(max-width:900px){.builder{grid-template-columns:1fr}.disc-grid{grid-template-columns:repeat(3,1fr)}}
+  .gridtools{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .gridtools input[type=text]{flex:1;min-width:160px}
+  .catblock{margin-bottom:12px}
+  .catblock h4{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--indigo700);margin:0 0 7px;font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .ch{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 10px;cursor:pointer;
+    font-size:12.5px;line-height:1.25;transition:.08s;user-select:none;min-width:0}
+  .ch:hover{border-color:var(--indigo500)}
+  .ch .nm{font-weight:600;display:block}
+  .ch .fe{color:var(--muted);font-size:11px}
+  .ch.on{background:var(--indigo500);border-color:var(--indigo500);color:#fff}
+  .ch.on .fe{color:#d9d4f2}
+  .ch.excl{background:var(--excl100);border-color:var(--exclbd)}
+  .ch.excl .fe{color:var(--excl)}
+  .ch.excl.on{background:var(--excl);border-color:var(--excl);color:#fff}
+  .ch.excl.on .fe{color:#fbeec0}
+  .ch .tag{font-size:8.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;margin-left:5px;opacity:.85}
+  .prtools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .addrow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .pricetbl{border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .pricetbl th{background:#faf9fd}
+  .pricetbl td{border-bottom:1px solid var(--line2);vertical-align:middle}
+  .pricetbl tr:last-child td{border-bottom:0}
+  .pricetbl input{width:96px;text-align:right}
+  .pricetbl input.qty{width:84px}
+  .pricetbl .pre{color:var(--muted);margin-right:2px}
+  .pricetbl .rm{color:var(--bad);cursor:pointer;font-weight:700;border:0;background:none;font-size:16px;line-height:1}
+  .pricetbl tbody tr.hasqty{background:var(--indigo100)}
+  /* summary panel */
+  .panel{position:sticky;top:16px;align-self:start;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .panel .ph{background:var(--indigo900);color:#fff;padding:12px 14px}
+  .panel .ph .big{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+  .panel .ph .lab{font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.75}
+  .panel .pb{padding:12px 14px;background:#fff}
+  .panel .line{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;font-size:13px}
+  .panel .line .v{font-variant-numeric:tabular-nums;font-weight:600}
+  .panel .line.tot{border-top:1px dashed var(--line);margin-top:6px;padding-top:8px;font-size:14px}
+  .panel .line.tot .v{font-size:17px}
+  .sellist{max-height:150px;overflow:auto;margin:4px 0 8px;border:1px solid var(--line2);border-radius:9px}
+  .sellist .it{display:flex;justify-content:space-between;gap:8px;padding:5px 9px;font-size:12px;border-bottom:1px solid var(--line2)}
+  .sellist .it:last-child{border-bottom:0}
+  .sellist .it.x{background:var(--excl100)}
+  .sellist .it .rm{color:var(--bad);cursor:pointer;font-weight:700;border:0;background:none;font-size:14px;line-height:1}
+  .badge{display:block;text-align:center;font-size:12.5px;font-weight:700;padding:8px 10px;border-radius:9px;margin-top:8px}
+  .badge.good{background:var(--good100);color:var(--good)}
+  .badge.bad{background:var(--bad100);color:var(--bad)}
+  .badge.neutral{background:var(--indigo100);color:var(--indigo700)}
+  .kpi{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
+  .kpi .k{flex:1;min-width:130px;background:#faf9fd;border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+  .kpi .k .lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+  .kpi .k .val{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .tbl-wrap{overflow-x:auto}
+  .callout{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 4px}
+  .callout .co{flex:1;min-width:170px;border:1px solid var(--line);border-radius:11px;padding:12px 14px;background:#faf9fd}
+  .callout .co .t{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+  .callout .co .n{font-size:22px;font-weight:800;color:var(--magenta);margin-top:3px}
+  .callout .co .d{font-size:12px;color:var(--muted);margin-top:2px}
+  .presets{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .muted{color:var(--muted)}.small{font-size:12px}
+  .savedrow td{font-size:12.5px}
+  .savedrow input.nm{border:1px solid transparent;background:transparent;font-weight:600;padding:3px 6px;border-radius:7px;width:150px}
+  .savedrow input.nm:hover{border-color:var(--line)}
+  /* client-facing summary */
+  .summary-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:stretch}
+  .story-rail{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stage{border:1px solid var(--line);border-radius:12px;padding:13px;background:#faf9fd;min-height:136px;display:flex;flex-direction:column;justify-content:space-between}
+  .stage .top{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+  .stage .num{font-size:28px;line-height:1;font-weight:850;color:var(--indigo900);margin:10px 0 8px}
+  .stage .copy{font-size:12px;color:var(--muted)}
+  .stage.hot{border-color:#f2b8d7;background:var(--magenta100)}
+  .stage.hot .num{color:var(--magenta)}
+  .stage.good{border-color:#b7e5d3;background:var(--good100)}
+  .stage.good .num{color:var(--good)}
+  .example-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+  .example-card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:13px}
+  .example-card h3{font-size:13px;margin:0 0 8px}
+  .stackbar{height:22px;border-radius:7px;overflow:hidden;background:var(--line2);display:flex;margin:10px 0}
+  .stackbar span{display:block;height:100%}
+  .stackbar .full{background:var(--indigo500)}
+  .stackbar .transition{background:var(--magenta)}
+  .stackbar .tiny{background:var(--good)}
+  .mini-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+  .mini-metrics .m{background:#faf9fd;border:1px solid var(--line2);border-radius:9px;padding:8px}
+  .mini-metrics .m .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.35px;color:var(--muted);font-weight:700}
+  .mini-metrics .m .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+  .platform-note{border:1px solid var(--line);border-radius:12px;background:#fff;padding:13px}
+  .platform-note .code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--indigo100);color:var(--indigo700);border-radius:7px;padding:2px 5px;font-size:11px}
+  .explain-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+  .explain-box{border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px}
+  .explain-box.strong{border-color:#b7e5d3;background:var(--good100)}
+  .explain-box.warn{border-color:#f1d49b;background:var(--warn100)}
+  .explain-box h3{font-size:13px;margin:0 0 8px}
+  .formula{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+  .formula span{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;font-weight:700}
+  .copy-bank{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .copy-box{border:1px solid var(--line);border-radius:12px;background:#fff;padding:13px}
+  .copy-box h3{font-size:13px;margin:0 0 8px}
+  .copy-box p{font-size:12.5px;color:var(--muted);margin:0 0 9px}
+  .copy-box .quote{border-left:3px solid var(--magenta);padding:8px 0 8px 10px;color:var(--ink);font-size:13px;background:#faf9fd}
+  @media(max-width:900px){.summary-grid,.example-grid,.story-rail,.explain-grid,.copy-bank{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="app">
+    <span class="pill">Neverland Studios · Session Pricing</span>
+    <div class="brand">
+      <h1>Neverland Multi-Class Pricing Model</h1>
+      <p>A Neverland-specific view of the proposed session-based pricing structure: low class counts stop receiving discount, committed students are still rewarded, and the high end replaces unlimited enrolment with a tiny extra commitment per class.</p>
+    </div>
+  </header>
+
+  <!-- 1 CLIENT SUMMARY -->
+  <div class="card">
+    <h2><span class="num">1</span>Client Summary · What Changes</h2>
+    <p class="sub">This is the simple story: the platform uses a whole-enrolment percentage by eligible class count, but the high-end result behaves like each extra class only adds a small amount.</p>
+    <div class="summary-grid">
+      <div>
+        <div class="story-rail">
+          <div class="stage">
+            <div>
+              <div class="top">1-5 classes</div>
+              <div class="num">0%</div>
+              <div class="copy">Families pay normal class fees. The discount is removed for low-load enrolments.</div>
+            </div>
+          </div>
+          <div class="stage hot">
+            <div>
+              <div class="top">6-7 classes</div>
+              <div class="num">10-20%</div>
+              <div class="copy">The reward starts only once the student is making a meaningful commitment.</div>
+            </div>
+          </div>
+          <div class="stage good">
+            <div>
+              <div class="top">8+ classes</div>
+              <div class="num"><span id="summaryExtraPct">5%</span></div>
+              <div class="copy">Each extra class adds only a small amount, instead of becoming unlimited.</div>
+            </div>
+          </div>
+        </div>
+        <div class="row" style="align-items:flex-end;margin-top:12px">
+          <div class="ctl"><label>Example class fee</label><input type="number" id="summaryRate" value="170" step="5" style="width:120px"/></div>
+          <div class="ctl"><label>8+ extra class pays</label><input type="number" id="summaryExtra" value="5" step="0.5" style="width:120px"/></div>
+          <button class="btn primary sm" id="applyCoreCurve">Apply Neverland curve</button>
+        </div>
+      </div>
+      <div class="platform-note">
+        <div class="pill" style="margin-bottom:8px">How the platform applies it</div>
+        <p class="hint" style="margin:0 0 8px">The platform counts the student's eligible classes, selects the matching per-student unit field, then applies one percentage across the eligible session tuition stack.</p>
+        <div class="hint"><span class="code">For6Units = 10</span> and <span class="code">For7Units = 20</span>. From <span class="code">For8Units</span> onward, the percentages are equivalent whole-stack discounts that make each additional class add about <span id="platformExtraAmount">$8.50</span> at the example fee.</div>
+      </div>
+    </div>
+    <div class="example-grid" id="liveExamples"></div>
+    <div class="explain-grid">
+      <div class="explain-box strong">
+        <h3>What the platform calculates</h3>
+        <div class="formula">
+          <span>All eligible tuition</span>
+          <span>×</span>
+          <span>Class-count discount %</span>
+          <span>=</span>
+          <span>Family term fee</span>
+        </div>
+        <p class="hint" style="margin-bottom:0">The discount percentage applies to the whole eligible tuition stack for that student. At 8 classes, <b>29.375%</b> is applied to all 8 eligible class charges. It is not 95% off the 8th class only inside the platform.</p>
+      </div>
+      <div class="explain-box warn">
+        <h3>What the family experiences</h3>
+        <p class="hint" style="margin:0">The high-end tiers are designed so the total payable behaves like each additional class adds only a very small amount. That is a marketing explanation of the outcome, not the calculation method.</p>
+        <p class="hint" style="margin-bottom:0">Example: 8 × $170 = $1,360 gross. The platform applies a 29.375% whole-stack discount, so the family pays $960.50. That is the same total as saying the 8th class only added $8.50.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">2</span>Studio Marketing Direction</h2>
+    <p class="sub">Use plain outcome language publicly. Keep the internal percentage table for fee setup and staff explanation, not as the main parent-facing story.</p>
+    <div class="copy-bank">
+      <div class="copy-box">
+        <h3>Recommended wording</h3>
+        <p class="quote">Multi-class discounts are applied to a student's eligible tuition once they reach the higher class-count tiers. Families taking one to five classes pay normal class fees. From six classes onward, the discount increases, and from eight classes onward each extra class only adds a small amount to the term fee.</p>
+        <p class="quote">This rewards committed dancers while keeping every class enrolment intentional.</p>
+      </div>
+      <div class="copy-box">
+        <h3>Avoid this wording</h3>
+        <p class="quote">Your 8th, 9th and 10th classes are 95% off.</p>
+        <p class="hint">That sounds like a marginal discount on individual class lines. The platform does not calculate it that way. It applies one class-count discount percentage across the student's eligible tuition.</p>
+      </div>
+      <div class="copy-box">
+        <h3>Fee guide version</h3>
+        <p class="quote">The multi-class discount is based on the total number of eligible classes a student takes in the term. Once the student reaches a discount tier, the tier percentage is applied to their eligible tuition total.</p>
+      </div>
+      <div class="copy-box">
+        <h3>Staff explanation</h3>
+        <p class="quote">Tell families the total term fee reduces as their class count increases. Do not describe individual classes as being 95% off; describe the high-end tiers as a small additional commitment per extra class.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1 SETTINGS -->
+  <div class="card">
+    <h2><span class="num">3</span>Settings</h2>
+    <p class="sub">Location keeps the old cap available as a comparison point. Term weeks drives the weekly split (term fee ÷ weeks).</p>
+    <div class="row" style="align-items:flex-end">
+      <div class="ctl"><label>Location / Cap</label>
+        <div class="seg" id="locSeg"><button data-loc="east" class="on">East · $940</button><button data-loc="north">North · $980</button></div></div>
+      <div class="ctl"><label>Term length</label>
+        <div class="seg" id="weekSeg"><button data-wk="10" class="on">10 weeks</button><button data-wk="9">9 weeks</button></div></div>
+      <div class="ctl"><label>Unlimited cap (editable)</label><input type="number" id="capInput" value="940" step="5" style="width:120px"/></div>
+      <div class="ctl"><label>Their current discount % <span style="font-weight:400;text-transform:none;letter-spacing:0">(flat, 2+ cls, then cap)</span></label><input type="number" id="currFlat" value="12" step="0.5" style="width:120px"/></div>
+    </div>
+    <p class="hint" style="margin-top:8px">“Their current structure” = a flat <b id="cfLab">12%</b> multi-class discount that is never charged above the old cap. This is the baseline every comparison and the revenue scale measure against. The Neverland curve above is the proposed replacement.</p>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--indigo500)"></i> Selected class</span>
+      <span><i class="sw" style="background:var(--excl100);border:1px solid var(--exclbd)"></i> Excluded (no discount, billed full, on top)</span>
+      <span><i class="sw" style="background:var(--good100)"></i> At / under cap</span>
+      <span><i class="sw" style="background:var(--bad100)"></i> Over cap</span>
+    </div>
+  </div>
+
+  <!-- 2 BUILDER -->
+  <div class="card">
+    <h2><span class="num">4</span>Build an Enrolment by Price &amp; Quantity</h2>
+    <p class="sub">Set how many classes a student takes in each price band. Total classes drive the multi-class discount; the dollar values build the gross. This isn't about matching exact classes, it's a combination of price tiers to see where a student lands. Add a custom price if you need one, and save combinations to compare below.</p>
+    <div class="builder">
+      <div>
+        <div class="prtools">
+          <span class="hint" style="margin:0">Quick examples:</span>
+          <button class="btn ghost tiny" data-ex="a">4 × $217 + 1 × $211</button>
+          <button class="btn ghost tiny" data-ex="b">6 × $189</button>
+          <button class="btn ghost tiny" data-ex="c">1 × $206 + 1 × $211</button>
+        </div>
+        <table class="pricetbl">
+          <thead><tr><th>Class price</th><th class="num-cell">No. of classes</th><th class="num-cell">Line total</th><th></th></tr></thead>
+          <tbody id="priceRows"></tbody>
+        </table>
+        <div class="addrow">
+          <button class="btn ghost sm" id="addPrice">+ Add price band</button>
+          <button class="btn ghost sm" id="clearQty">Clear quantities</button>
+          <button class="btn primary sm" id="saveSel">Save as scenario</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph">
+          <div class="lab">Term total (<span id="pWeeks">10</span>wk) · recommended</div>
+          <div class="big" id="pTerm">$0.00</div>
+          <div class="lab" style="margin-top:6px"><span id="pWeekly">$0.00</span> / week · <span id="pCount">0</span> classes</div>
+        </div>
+        <div class="pb">
+          <div class="sellist" id="selList"></div>
+          <div class="line"><span>Tuition (gross)</span><span class="v" id="pGross">$0.00</span></div>
+          <div class="line"><span>Multi-class discount</span><span class="v" id="pDisc" style="color:var(--magenta)">0.0%</span></div>
+          <div class="line tot"><span>Term total · recommended</span><span class="v" id="pTerm2">$0.00</span></div>
+          <div id="pBadge"></div>
+          <div id="pCompare"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 3 DISCOUNT TIERS (moved up under the builder so edits + example update together) -->
+  <div class="card">
+    <h2><span class="num">5</span>Neverland Model · Multi-Class Discount Tiers</h2>
+    <p class="sub">This is the Neverland model that prices the examples above: one percentage applied to the summed eligible tuition, keyed by class count. Edit any cell and the student example in section 4 updates instantly. The small label under each tier shows their <b>current</b> flat-discount-plus-cap equivalent for comparison.</p>
+    <div class="disc-grid" id="discGrid"></div>
+  </div>
+
+  <!-- 4 CURRENT VS RECOMMENDED -->
+  <div class="card">
+    <h2><span class="num">6</span>Current vs Recommended Model — by class count</h2>
+    <p class="sub">Two structures side by side at the reference rate. <b>Current</b> is their existing charging (flat <b id="cfLab3">12%</b> for 2+ classes, then capped). <b>Recommended</b> is the model you build in section 3 (the editable tiers). The right-hand columns show, per student, how the recommended model compares to current and to the cap.</p>
+    <div class="row" style="align-items:flex-end">
+      <div class="ctl"><label>Reference class (heavy students' typical rate)</label><select id="refSelect"></select></div>
+      <button class="btn primary sm" id="applyRec">Load current structure →</button>
+      <span class="hint" style="align-self:center">Loads the current flat-discount-plus-cap equivalent into the editable model, so you can compare it against the proposed Neverland curve.</span>
+    </div>
+
+    <div id="capContext" class="hint" style="margin-top:10px"></div>
+
+    <div class="callout" id="lowCallout"></div>
+
+    <div class="tbl-wrap" style="margin-top:6px">
+      <table id="recTable">
+        <thead><tr>
+          <th>Classes</th><th class="num-cell">Full tuition</th><th class="num-cell">Current %</th>
+          <th class="num-cell">Current term</th><th class="num-cell">Rec %</th><th class="num-cell">Rec term</th>
+          <th class="num-cell">Rec vs current</th><th class="num-cell">Rec vs cap</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 5 REVENUE SCALE -->
+  <div class="card">
+    <h2><span class="num">7</span>Revenue Scale: What You Had vs What You Could Have</h2>
+    <p class="sub">Studio-wide comparison of their <b>current</b> structure (flat <span id="cfLab2">12%</span> + cap) against the <b>recommended</b> structure (section 3), using one editable average class fee. It shows what they collect now, what they'd collect on the recommended structure, the change in student spend per week, and the net revenue gain per year. Reshape the recommended tiers and the gain moves with them.</p>
+    <div class="row" style="align-items:flex-end;margin-bottom:6px">
+      <div class="ctl"><label>Total students</label><input type="number" id="revTotal" value="2500" step="50" style="width:110px"/></div>
+      <div class="ctl"><label>Average class fee (assumption)</label><input type="number" id="revAvg" value="200" step="5" style="width:130px"/></div>
+      <div class="ctl"><label>Terms / year</label><input type="number" id="revTerms" value="4" step="1" style="width:80px"/></div>
+      <button class="btn ghost sm" id="revBalance">Scale take-up to total</button>
+    </div>
+    <div class="tbl-wrap">
+      <table id="revTable">
+        <thead><tr>
+          <th>Classes</th><th class="num-cell">Students</th>
+          <th class="num-cell">Current /term</th><th class="num-cell">Rec %</th><th class="num-cell">Rec /term</th>
+          <th class="num-cell">Student /week Δ</th><th class="num-cell">Current rev/yr</th><th class="num-cell">Rec rev/yr</th><th class="num-cell">Gain/yr</th>
+        </tr></thead>
+        <tbody></tbody><tfoot></tfoot>
+      </table>
+    </div>
+    <div class="kpi" id="revKpi" style="margin-top:14px"></div>
+  </div>
+
+  <!-- 6 SAVED SCENARIOS (moved down — reference, not the live entry point) -->
+  <div class="card">
+    <h2><span class="num">8</span>Saved Scenarios</h2>
+    <p class="sub">Combinations you've saved from the builder. Load any one back into section 2 to keep working on it.</p>
+    <div class="tbl-wrap">
+      <table id="savedTable">
+        <thead><tr>
+          <th>Combination</th><th class="num-cell">Cls</th><th class="num-cell">Gross</th>
+          <th class="num-cell">Rec %</th><th class="num-cell">Rec term</th><th class="num-cell">/week</th>
+          <th class="num-cell">Current term</th><th class="num-cell">Gain</th><th class="num-cell">Vs cap</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="small muted" style="margin-top:18px">Built for Neverland Studios · seeded from the 2026 NVL fee schedule (10-week term basis). All values editable. AUD.</p>
+</div>
+
+<script>
+/* ---------- DATA ---------- */
+const CLASSES=[
+ ["Pixie","Toddler (30 min)","2",144,false],["Pixie","Preschool (45 min)","3-4",167,true],
+ ["Ballet","Mini Open Ballet (45 min)","5-6",172,true],["Ballet","Grade 1 RAD","7",178,false],
+ ["Ballet","Grade 2 RAD","8",178,false],["Ballet","Grade 3 RAD","9",189,false],
+ ["Ballet","Grade 4 RAD","10",189,false],["Ballet","Grade 5 RAD","11",189,false],
+ ["Ballet","Int Found RAD","12-13",206,false],["Ballet","Intermediate RAD","13-14",206,false],
+ ["Ballet","Int Found & Int Ballet Skills","12-14",206,false],["Ballet","Int Found & Int Pointe (30min)","12-14",106,false],
+ ["Ballet","Int Foundation Pointe EAST (30min)","12-13",106,false],["Ballet","Advanced Found RAD","14-15",217,false],
+ ["Ballet","Advanced 1 RAD","16-17",217,false],["Ballet","Advanced 2 RAD","17-18",217,false],
+ ["Ballet","Adv F & Adv Ballet Skills & Pointe (1hr)","15-16",217,false],["Ballet","Int/Adv Open Lyrical/Tech","14+",217,false],
+ ["Ballet","PBT / Yoga","12+",206,false],
+ ["Jazz","Foundation 1 GDQ (45 min)","5",172,true],["Jazz","Foundation 2 GDQ (45 min)","6",172,true],
+ ["Jazz","Foundation 3 GDQ","7",178,false],["Jazz","Foundation 4 GDQ","8",178,false],
+ ["Jazz","Development 1 GDQ","9",189,false],["Jazz","Development 2 GDQ","10",189,false],
+ ["Jazz","Development 3 GDQ","11",189,false],["Jazz","Development 4 GDQ","12",189,false],
+ ["Jazz","Extension 1 GDQ","13",206,false],["Jazz","Extension 2 GDQ","14",206,false],
+ ["Jazz","Extension 3 GDQ","15",206,false],["Jazz","Advanced 1 GDQ","16",217,false],
+ ["Jazz","Advanced 2 GDQ","17",217,false],["Jazz","Advanced 3 GDQ","18",217,false],
+ ["Jazz","Int Open Jazz","12-14",206,false],["Jazz","Senior Jazz","14-16",211,false],
+ ["Jazz","Adv Open Jazz","16+",217,false],["Jazz","Experienced Adult Dance","Adult",211,false],
+ ["Acro Arts","Acro Arts lvl PRIM-1 (45min)","5-8",189,true],["Acro Arts","Acro Arts lvl 1-2 (45min)","5-8",189,true],
+ ["Acro Arts","Acro Arts lvl 2-3","6-9",206,false],["Acro Arts","Acro Arts lvl 3-4","8-10",206,false],
+ ["Acro Arts","Acro Arts lvl 4-5","9-12",206,false],["Acro Arts","Acro Arts lvl 5-6","12+",211,false],
+ ["Acro Arts","Acro Arts lvl 6, 7, 8 & PRO","14+",211,false],
+ ["Hip Hop","5-8 Hip Hop (45 min)","5-6",178,true],["Hip Hop","7-8 Hip Hop (45min)","7-8",178,false],
+ ["Hip Hop","8-10 Hip Hop","8-10",189,false],["Hip Hop","10-12 Hip Hop","10-12",189,false],
+ ["Hip Hop","Intermediate Hip Hop","12-14",206,false],["Hip Hop","Senior Hip Hop","14-16",211,false],
+ ["Hip Hop","Advanced Hip Hop","16+",217,false],
+ ["Contemporary","Junior Contemporary","9-12",189,false],["Contemporary","Intermediate Contemporary","12-14",206,false],
+ ["Contemporary","Senior Contemporary","14-16",211,false],["Contemporary","Advanced Contemporary","16+",217,false],
+ ["Extend","Troupes","N/A",167,false],["Extend","Squads","N/A",167,false],["Extend","Crews","N/A",167,false],
+ ["Musical Theatre","Mini Open Musical Theatre (45m)","5-9",178,true],["Musical Theatre","Jnr Open Musical Theatre","9-12",189,false]
+];
+const C=CLASSES.map((c,i)=>({id:i,cat:c[0],name:c[1],age:c[2],term:c[3],excluded:c[4]}));
+const CATS=[...new Set(C.map(c=>c.cat))];
+const NT=19; // The legacy platform stores per-student class discount tiers from 2..19 units
+
+function coreNetCurve(extraPayPct=5){
+  const extra=extraPayPct/100;
+  const arr=[];
+  for(let n=1;n<=NT;n++){
+    if(n<=5){arr.push(0);continue;}
+    let paidUnits;
+    if(n===6) paidUnits=5+0.40;
+    else if(n===7) paidUnits=5+0.40+0.20;
+    else paidUnits=5+0.40+0.20+((n-7)*extra);
+    arr.push(Math.round((1-paidUnits/n)*100000)/1000);
+  }
+  return arr;
+}
+
+const DEFAULT_TIERS=coreNetCurve(5);
+
+const state={
+  loc:'east', weeks:10, cap:940,
+  tiers:[...DEFAULT_TIERS],
+  refId:C.findIndex(c=>c.name==='Senior Jazz'),
+  step:5,
+  summaryRate:170,
+  extraPayPct:5,
+  currFlat:12,            // their CURRENT structure: flat multi-class discount %, then hard cap
+  priceRows:[{price:217,qty:4},{price:211,qty:1},{price:206,qty:0},{price:189,qty:0},{price:178,qty:0},{price:167,qty:0},{price:144,qty:0},{price:106,qty:0}],
+  saved:[],
+  rev:{total:2500,terms:4,avg:200,dist:[800,520,360,270,200,130,100,55,40,25]}
+};
+// Single average class fee assumption (editable). Replace with the studio's real average once known.
+
+const fmt=n=>'$'+(Math.round(n*100)/100).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0=n=>'$'+Math.round(n).toLocaleString('en-AU');
+const pct=n=>(Math.round(n*10)/10)+'%';
+const clsById=id=>C.find(c=>c.id===id);
+const tierPct=n=>n<1?0:state.tiers[Math.min(n,NT)-1]||0;
+
+function coreNetPayableUnits(n, extraPayPct=state.extraPayPct){
+  if(n<=5) return n;
+  if(n===6) return 5.4;
+  if(n===7) return 5.6;
+  return 5.6+(n-7)*(extraPayPct/100);
+}
+function coreNetPayable(n, rate=state.summaryRate, extraPayPct=state.extraPayPct){
+  return coreNetPayableUnits(n, extraPayPct)*rate;
+}
+function coreNetDiscountFor(n, extraPayPct=state.extraPayPct){
+  if(n<=5) return 0;
+  return (1-coreNetPayableUnits(n, extraPayPct)/n)*100;
+}
+
+/* ---------- CLIENT SUMMARY ---------- */
+function renderSummary(){
+  const rate=state.summaryRate||0, extra=state.extraPayPct||0;
+  document.getElementById('summaryRate').value=rate;
+  document.getElementById('summaryExtra').value=extra;
+  document.getElementById('summaryExtraPct').textContent=pct(extra);
+  document.getElementById('platformExtraAmount').textContent=fmt(rate*extra/100);
+  const examples=[
+    {n:7,title:'Example 1 · 7 equal-price classes',note:'Shows why the 20% platform discount matches the marginal explanation.'},
+    {n:8,title:'Example 2 · 8 equal-price classes',note:'Shows the first high-end class adding only the small extra commitment.'}
+  ];
+  document.getElementById('liveExamples').innerHTML=examples.map(ex=>{
+    const n=ex.n, gross=n*rate, paid=coreNetPayable(n,rate,extra), d=coreNetDiscountFor(n,extra);
+    const full=Math.min(5,n), transition=n>=7?0.6:n===6?0.4:0, tiny=Math.max(0,n-7)*(extra/100);
+    const totalUnits=full+transition+tiny || 1;
+    const addText=n===7
+      ? `5 full + 6th at 40% + 7th at 20% = ${fmt(paid)}`
+      : `8th class adds ${fmt(rate*extra/100)}, so total becomes ${fmt(paid)}`;
+    return `<div class="example-card">
+      <h3>${ex.title}</h3>
+      <div class="stackbar" aria-hidden="true">
+        <span class="full" style="width:${full/totalUnits*100}%"></span>
+        <span class="transition" style="width:${transition/totalUnits*100}%"></span>
+        <span class="tiny" style="width:${tiny/totalUnits*100}%"></span>
+      </div>
+      <div class="mini-metrics">
+        <div class="m"><div class="l">Gross</div><div class="v">${fmt0(gross)}</div></div>
+        <div class="m"><div class="l">Platform %</div><div class="v">${pct(d)}</div></div>
+        <div class="m"><div class="l">Family pays</div><div class="v">${fmt(paid)}</div></div>
+      </div>
+      <p class="hint" style="margin-bottom:0">${addText}. ${ex.note}</p>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- CALC (price × quantity) ---------- */
+function calcRows(rows){
+  const n=rows.reduce((s,x)=>s+(+x.qty||0),0);
+  const gross=rows.reduce((s,x)=>s+(+x.price||0)*(+x.qty||0),0);
+  const dPct=tierPct(n), discounted=gross*(1-dPct/100);
+  const termTotal=discounted, weekly=termTotal/state.weeks;
+  const capNeed=gross>0?Math.max(0,(1-state.cap/gross)*100):0;
+  const currDisc=n>=2?state.currFlat:0;
+  const currTerm=gross>0?Math.min(gross*(1-currDisc/100),state.cap):0;
+  const currWeekly=currTerm/state.weeks, gain=termTotal-currTerm;
+  return {rows,n,gross,dPct,discounted,termTotal,weekly,capNeed,currDisc,currTerm,currWeekly,gain};
+}
+
+/* ---------- PRICE-BAND COMPOSER ---------- */
+function renderPriceRows(){
+  const tb=document.getElementById('priceRows'); tb.innerHTML='';
+  state.priceRows.forEach((row,i)=>{
+    const line=(+row.price||0)*(+row.qty||0);
+    const tr=document.createElement('tr'); if((+row.qty||0)>0) tr.className='hasqty';
+    tr.innerHTML=`<td><span class="pre">$</span><input type="number" min="0" step="1" value="${row.price}" data-pr="price" data-i="${i}"/></td>
+      <td class="num-cell"><input class="qty" type="number" min="0" step="1" value="${row.qty}" data-pr="qty" data-i="${i}"/></td>
+      <td class="num-cell">${fmt0(line)}</td>
+      <td class="num-cell"><button class="rm" data-del="${i}">&times;</button></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('input[data-pr]').forEach(inp=>inp.addEventListener('input',e=>{
+    const i=+e.target.dataset.i,k=e.target.dataset.pr; state.priceRows[i][k]=parseFloat(e.target.value)||0;
+    [...tb.children].forEach((tr,j)=>{const rw=state.priceRows[j];if(!rw)return;
+      tr.children[2].textContent=fmt0((+rw.price||0)*(+rw.qty||0)); tr.classList.toggle('hasqty',(+rw.qty||0)>0);});
+    renderPanel();
+  }));
+  tb.querySelectorAll('button[data-del]').forEach(b=>b.addEventListener('click',e=>{
+    state.priceRows.splice(+e.target.dataset.del,1); renderPriceRows(); renderPanel();
+  }));
+}
+
+/* ---------- PANEL ---------- */
+function renderPanel(){
+  const r=calcRows(state.priceRows);
+  document.getElementById('pWeeks').textContent=state.weeks;
+  document.getElementById('pTerm').textContent=fmt(r.termTotal);
+  document.getElementById('pTerm2').textContent=fmt(r.termTotal);
+  document.getElementById('pWeekly').textContent=fmt(r.weekly);
+  document.getElementById('pCount').textContent=r.n;
+  document.getElementById('pGross').textContent=fmt(r.gross);
+  document.getElementById('pDisc').textContent=pct(r.dPct)+(r.n>1?'  −'+fmt(r.gross-r.discounted):'');
+  const sl=document.getElementById('selList');
+  const active=r.rows.filter(x=>(+x.qty||0)>0);
+  sl.innerHTML=active.length?'':'<div class="it muted">Set a quantity against a price band.</div>';
+  active.forEach(x=>{
+    const d=document.createElement('div'); d.className='it';
+    d.innerHTML=`<span>${x.qty} × ${fmt0(x.price)}</span><span>${fmt0(x.qty*x.price)}</span>`;
+    sl.appendChild(d);
+  });
+  const bd=document.getElementById('pBadge');
+  if(r.gross<=0){bd.innerHTML='';}
+  else if(r.termTotal>=state.cap-0.5){bd.innerHTML=`<div class="badge good">${fmt0(r.termTotal-state.cap)} above the ${state.loc==='east'?'East':'North'} cap (${fmt0(state.cap)})</div>`;}
+  else{bd.innerHTML=`<div class="badge neutral">${fmt0(state.cap-r.termTotal)} under the ${state.loc==='east'?'East':'North'} cap (${fmt0(state.cap)})</div>`;}
+  const cmp=document.getElementById('pCompare');
+  if(r.gross<=0){cmp.innerHTML='';}
+  else{
+    const g=r.gain, gc=g>0?'var(--good)':g<0?'var(--bad)':'var(--muted)';
+    cmp.innerHTML=`<div class="line" style="margin-top:8px"><span>Current structure (${pct(state.currFlat)} + cap)</span><span class="v">${fmt(r.currTerm)}</span></div>
+      <div class="line"><span>Gain vs current</span><span class="v" style="color:${gc}">${(g>0?'+':'')+fmt(g)}/term</span></div>`;
+  }
+}
+
+/* ---------- SAVED ---------- */
+function comboLabel(rows){return rows.filter(x=>(+x.qty||0)>0).map(x=>`${x.qty}×${fmt0(x.price)}`).join(' + ')||'—';}
+function renderSaved(){
+  const tb=document.querySelector('#savedTable tbody'); tb.innerHTML='';
+  if(!state.saved.length){tb.innerHTML='<tr><td colspan="10" class="muted small" style="padding:12px">No saved scenarios yet. Build a combination above and hit “Save as scenario”.</td></tr>';return;}
+  state.saved.forEach((s,si)=>{
+    const r=calcRows(s.rows);
+    const over=r.termTotal>state.cap+0.5;
+    const g=r.gain, gc=g>0?'var(--good)':g<0?'var(--bad)':'var(--muted)';
+    const tr=document.createElement('tr'); tr.className='savedrow';
+    tr.innerHTML=`<td><input class="nm" value="${s.name}" data-si="${si}"/><div class="muted" style="font-size:11px;padding:0 6px">${comboLabel(s.rows)}</div></td>
+      <td class="num-cell">${r.n}</td>
+      <td class="num-cell">${fmt0(r.gross)}</td>
+      <td class="num-cell">${pct(r.dPct)}</td>
+      <td class="num-cell" style="font-weight:600">${fmt0(r.termTotal)}</td>
+      <td class="num-cell">${fmt(r.weekly)}</td>
+      <td class="num-cell muted">${fmt0(r.currTerm)}</td>
+      <td class="num-cell" style="font-weight:600;color:${gc}">${(g>0?'+':'')+fmt0(g)}</td>
+      <td class="num-cell" style="color:${over?'var(--good)':'var(--muted)'}">${over?'+'+fmt0(r.termTotal-state.cap):'−'+fmt0(state.cap-r.termTotal)}</td>
+      <td class="num-cell"><button class="btn ghost tiny" data-load="${si}">Load</button> <button class="btn ghost tiny" data-del="${si}" style="color:var(--bad)">✕</button></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('input.nm').forEach(i=>i.addEventListener('change',e=>{state.saved[+e.target.dataset.si].name=e.target.value;}));
+  tb.querySelectorAll('button[data-load]').forEach(b=>b.addEventListener('click',e=>{
+    state.priceRows=state.saved[+e.target.dataset.load].rows.map(x=>({...x})); renderPriceRows(); renderPanel();
+    document.getElementById('priceRows').scrollIntoView({behavior:'smooth',block:'center'});
+  }));
+  tb.querySelectorAll('button[data-del]').forEach(b=>b.addEventListener('click',e=>{state.saved.splice(+e.target.dataset.del,1);renderSaved();}));
+}
+
+/* ---------- RECOMMENDATION (reproduces their CURRENT charging) ---------- */
+const capTarget=()=>state.cap;                                   // current structure caps at exactly the cap
+const capDisc=(n,rate)=>{const g=rate*n;return g>state.cap?Math.max(0,1-state.cap/g):0;};
+function recCurve(){
+  // Current-equivalent tiers = the % structure that reproduces their current charging:
+  // a flat currFlat% for 2+ classes, rising to the cap-matching % once tuition would exceed the cap.
+  // This is the anchor (where they are now). The live Neverland model is what you vary against it.
+  const rate=clsById(state.refId).term, cf=state.currFlat/100, arr=[];
+  for(let n=1;n<=NT;n++){
+    if(n<2){ arr.push(0); continue; }
+    arr.push(Math.round(Math.max(cf, capDisc(n,rate))*1000)/10);
+  }
+  for(let i=1;i<NT;i++) if(arr[i]<arr[i-1]) arr[i]=arr[i-1];
+  return arr;
+}
+function renderRec(){
+  const rate=clsById(state.refId).term, rec=recCurve();
+  const capReachN=(()=>{for(let n=2;n<=NT;n++)if(rate*n>state.cap)return n;return null;})();
+  const ctx=document.getElementById('capContext');
+  ctx.innerHTML=`The current-equivalent tiers show their existing charging — a flat ${pct(state.currFlat)} discount for 2+ classes, never charged above the ${fmt0(state.cap)} cap — converted into per-class-count percentages for comparison. ${capReachN?`At the reference rate (${clsById(state.refId).name}, ${fmt0(rate)}), tuition first passes the old cap at <b>${capReachN} classes</b>.`:''} The editable Neverland model is yours to change: the right-hand columns show where your tiers land against current.`;
+  // callouts: 2 & 3 class — current vs your live model
+  const lc=document.getElementById('lowCallout');
+  const mk=(n)=>{
+    const g=rate*n, curr=n<2?g:Math.min(g*(1-state.currFlat/100),state.cap);
+    const lp=tierPct(n), live=g*(1-lp/100), diff=live-curr;
+    return `<div class="co"><div class="t">${n}-class · current ${pct(state.currFlat)} → rec ${pct(lp)}</div><div class="n">${fmt0(live)}</div>
+      <div class="d">current ${fmt0(curr)} · <b style="color:${diff>=0?'var(--good)':'var(--bad)'}">${(diff>=0?'+':'')+fmt0(diff)}/term</b> per student</div></div>`;
+  };
+  lc.innerHTML=mk(2)+mk(3)+`<div class="co"><div class="t">Cap reached at</div><div class="n">${capReachN||'—'} cls</div><div class="d">first class count where tuition exceeds the cap</div></div>`;
+  // table: recommended (=current) vs your live model
+  const tb=document.querySelector('#recTable tbody'); tb.innerHTML='';
+  for(let n=1;n<=NT;n++){
+    const g=rate*n, rc=rec[n-1];
+    const curr = n<2 ? g : Math.min(g*(1-state.currFlat/100), state.cap);
+    const lp=tierPct(n), live=g*(1-lp/100), vsCurr=live-curr, vsCap=live-state.cap;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${n===NT?n+'+':n}</td>
+      <td class="num-cell muted">${fmt0(g)}</td>
+      <td class="num-cell">${pct(rc)}</td>
+      <td class="num-cell">${fmt0(curr)}</td>
+      <td class="num-cell" style="font-weight:700;color:var(--magenta)">${pct(lp)}</td>
+      <td class="num-cell" style="font-weight:600">${fmt0(live)}</td>
+      <td class="num-cell" style="color:${vsCurr<-0.5?'var(--bad)':vsCurr>0.5?'var(--good)':'var(--muted)'}">${(vsCurr>=0?'+':'−')+fmt0(Math.abs(vsCurr))}</td>
+      <td class="num-cell" style="color:${vsCap<-0.5?'var(--warn)':'var(--good)'}">${(vsCap>=0?'+':'−')+fmt0(Math.abs(vsCap))}</td>`;
+    tb.appendChild(tr);
+  }
+}
+
+/* ---------- DISCOUNT GRID ---------- */
+function renderDiscGrid(){
+  const g=document.getElementById('discGrid'); g.innerHTML='';
+  const rate=clsById(state.refId).term, rec=recCurve();
+  let capCC=99;
+  for(let cc=1;cc<=NT;cc++){const gr=rate*cc,t=gr*(1-tierPct(cc)/100);if(t<=state.cap&&gr>state.cap){capCC=cc;break;}}
+  for(let i=0;i<NT;i++){
+    const cc=i+1, cell=document.createElement('div');
+    const diff=Math.abs((state.tiers[i]||0)-rec[i])>0.05;
+    cell.className='cell'+(cc===capCC?' capped':'');
+    cell.innerHTML=`<div class="cc">${cc===NT?cc+'+':cc} cls</div><input type="number" min="0" max="90" step="0.5" value="${state.tiers[i]}" data-i="${i}"/>`+
+      `<div style="font-size:9.5px;margin-top:4px;color:${diff?'var(--magenta)':'var(--muted)'}">current ${pct(rec[i])}</div>`;
+    g.appendChild(cell);
+  }
+  g.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',e=>{
+    let v=Math.max(0,Math.min(90,parseFloat(e.target.value)||0)); const i=+e.target.dataset.i;
+    state.tiers[i]=v; renderAll();
+  }));
+}
+
+/* ---------- REVENUE ---------- */
+function renderRevenue(){
+  const rev=state.rev, tb=document.querySelector('#revTable tbody'), tf=document.querySelector('#revTable tfoot');
+  tb.innerHTML='';tf.innerHTML='';
+  let sumStu=0,currT=0,modT=0,wnum=0;
+  const avg=rev.avg||0, NB=rev.dist.length;
+  for(let i=0;i<NB;i++){
+    const cc=i+1,stu=rev.dist[i]||0,gross=avg*cc;
+    const currFee = cc<2 ? gross : Math.min(gross*(1-state.currFlat/100), state.cap);   // current: flat % then cap
+    const mp=tierPct(cc), modFee=gross*(1-mp/100);                                       // recommended model
+    const swd=(modFee-currFee)/state.weeks;
+    const crev=stu*currFee*rev.terms, mrev=stu*modFee*rev.terms, gain=mrev-crev;
+    sumStu+=stu;currT+=stu*currFee;modT+=stu*modFee;wnum+=stu*(modFee-currFee)/state.weeks;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${cc===NB?cc+'+':cc}</td>
+      <td class="num-cell"><input type="number" data-rev="dist" data-i="${i}" value="${stu}" step="10" style="width:80px;text-align:right"/></td>
+      <td class="num-cell muted">${fmt0(currFee)}</td>
+      <td class="num-cell">${pct(mp)}</td>
+      <td class="num-cell">${fmt0(modFee)}</td>
+      <td class="num-cell" style="color:${swd<0?'var(--bad)':swd>0?'var(--good)':'inherit'}">${(swd>0?'+':'')+fmt(swd)}</td>
+      <td class="num-cell muted">${fmt0(crev)}</td><td class="num-cell">${fmt0(mrev)}</td>
+      <td class="num-cell" style="font-weight:700;color:${gain<0?'var(--bad)':gain>0?'var(--good)':'inherit'}">${(gain>0?'+':'')+fmt0(gain)}</td>`;
+    tb.appendChild(tr);
+  }
+  const currYr=currT*rev.terms,modYr=modT*rev.terms,dYr=modYr-currYr,avgWk=sumStu?wnum/sumStu:0;
+  tf.innerHTML=`<tr style="border-top:2px solid var(--line)"><td style="font-weight:700">Total</td>
+    <td class="num-cell" style="font-weight:700">${sumStu.toLocaleString('en-AU')}</td><td></td><td></td><td></td>
+    <td class="num-cell" style="font-weight:700">avg ${(avgWk>0?'+':'')+fmt(avgWk)}/wk</td>
+    <td class="num-cell" style="font-weight:700">${fmt0(currYr)}</td><td class="num-cell" style="font-weight:700">${fmt0(modYr)}</td>
+    <td class="num-cell" style="font-weight:800;color:${dYr<0?'var(--bad)':'var(--good)'}">${(dYr>0?'+':'')+fmt0(dYr)}</td></tr>`;
+  document.getElementById('revKpi').innerHTML=`
+    <div class="k"><div class="lab">Studio revenue · current (what they do now)</div><div class="val">${fmt0(currYr)}</div></div>
+    <div class="k"><div class="lab">Studio revenue · recommended structure</div><div class="val">${fmt0(modYr)}</div></div>
+    <div class="k"><div class="lab">Avg student spend / week change</div><div class="val" style="color:${avgWk<0?'var(--bad)':'var(--good)'}">${(avgWk>0?'+':'')+fmt(avgWk)}</div></div>
+    <div class="k" style="border-color:var(--magenta)"><div class="lab">Net revenue gain / yr</div><div class="val" style="color:${dYr<0?'var(--bad)':'var(--good)'}">${(dYr>0?'+':'')+fmt0(dYr)}</div></div>`;
+  tb.querySelectorAll('input[data-rev]').forEach(inp=>inp.addEventListener('change',e=>{
+    const i=+e.target.dataset.i; state.rev.dist[i]=parseFloat(e.target.value)||0; renderRevenue();
+  }));
+  document.getElementById('revTotal').value=rev.total; document.getElementById('revTerms').value=rev.terms;
+  document.getElementById('revAvg').value=rev.avg;
+}
+
+function renderRefSelect(){
+  const sel=document.getElementById('refSelect');
+  if(!sel.options.length) sel.innerHTML=C.filter(c=>!c.excluded).map(c=>`<option value="${c.id}">${c.name} · ${fmt0(c.term)}</option>`).join('');
+  sel.value=state.refId;
+}
+function renderAll(){
+  document.getElementById('capInput').value=state.cap;
+  document.getElementById('currFlat').value=state.currFlat;
+  document.getElementById('cfLab').textContent=pct(state.currFlat);
+  document.getElementById('cfLab2').textContent=pct(state.currFlat);
+  document.getElementById('cfLab3').textContent=pct(state.currFlat);
+  renderSummary();renderPriceRows();renderPanel();renderSaved();renderRefSelect();renderRec();renderDiscGrid();renderRevenue();
+}
+
+/* ---------- WIRING ---------- */
+document.getElementById('locSeg').addEventListener('click',e=>{const b=e.target.closest('button[data-loc]');if(!b)return;
+  document.querySelectorAll('#locSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  state.loc=b.dataset.loc;state.cap=state.loc==='east'?940:980;renderAll();});
+document.getElementById('weekSeg').addEventListener('click',e=>{const b=e.target.closest('button[data-wk]');if(!b)return;
+  document.querySelectorAll('#weekSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  state.weeks=+b.dataset.wk;renderAll();});
+document.getElementById('capInput').addEventListener('change',e=>{state.cap=parseFloat(e.target.value)||0;renderAll();});
+document.getElementById('currFlat').addEventListener('change',e=>{state.currFlat=Math.max(0,Math.min(90,parseFloat(e.target.value)||0));renderAll();});
+document.getElementById('addPrice').addEventListener('click',()=>{state.priceRows.push({price:200,qty:0});renderPriceRows();renderPanel();});
+document.getElementById('clearQty').addEventListener('click',()=>{state.priceRows.forEach(r=>r.qty=0);renderPriceRows();renderPanel();});
+document.getElementById('saveSel').addEventListener('click',()=>{
+  const r=calcRows(state.priceRows); if(r.n<=0)return;
+  state.saved.push({name:'Combo '+(state.saved.length+1),rows:state.priceRows.filter(x=>(+x.qty||0)>0).map(x=>({...x}))});renderSaved();});
+const STD_BANDS=[217,211,206,189,178,167,144,106];
+function setExample(map){state.priceRows=STD_BANDS.map(p=>({price:p,qty:map[p]||0}));renderPriceRows();renderPanel();}
+document.querySelectorAll('[data-ex]').forEach(b=>b.addEventListener('click',e=>{
+  const ex=e.target.dataset.ex;
+  if(ex==='a')setExample({217:4,211:1});
+  else if(ex==='b')setExample({189:6});
+  else if(ex==='c')setExample({206:1,211:1});
+}));
+document.getElementById('refSelect').addEventListener('change',e=>{state.refId=+e.target.value;renderAll();});
+document.getElementById('applyRec').addEventListener('click',()=>{state.tiers=recCurve();renderAll();
+  document.getElementById('discGrid').scrollIntoView({behavior:'smooth',block:'center'});});
+document.getElementById('revTotal').addEventListener('change',e=>{state.rev.total=parseFloat(e.target.value)||0;renderRevenue();});
+document.getElementById('revAvg').addEventListener('change',e=>{state.rev.avg=parseFloat(e.target.value)||0;renderRevenue();});
+document.getElementById('revTerms').addEventListener('change',e=>{state.rev.terms=parseFloat(e.target.value)||0;renderRevenue();});
+document.getElementById('revBalance').addEventListener('click',()=>{const cur=state.rev.dist.reduce((s,x)=>s+x,0);
+  if(cur>0){const f=state.rev.total/cur;state.rev.dist=state.rev.dist.map(x=>Math.round(x*f));}renderRevenue();});
+document.getElementById('summaryRate').addEventListener('change',e=>{state.summaryRate=Math.max(0,parseFloat(e.target.value)||0);renderSummary();});
+document.getElementById('summaryExtra').addEventListener('change',e=>{state.extraPayPct=Math.max(0,Math.min(40,parseFloat(e.target.value)||0));renderSummary();});
+document.getElementById('applyCoreCurve').addEventListener('click',()=>{
+  state.tiers=coreNetCurve(state.extraPayPct);
+  renderAll();
+  document.getElementById('discGrid').scrollIntoView({behavior:'smooth',block:'center'});
+});
+
+/* ---------- SEED ---------- */
+const mkRows=map=>[217,211,206,189,178,167,144,106].map(p=>({price:p,qty:map[p]||0}));
+state.saved=[
+ {name:'2 senior',rows:mkRows({211:2})},
+ {name:'3 senior',rows:mkRows({211:2,206:1})},
+ {name:'5 heavy',rows:mkRows({217:4,211:1})},
+ {name:'6 dev',rows:mkRows({189:6})},
+ {name:'8 competitive',rows:mkRows({217:5,211:2,206:1})}
+];
+state.tiers=[...DEFAULT_TIERS];   // open on the Neverland recommended tier set; user edits from here
+renderAll();
+</script>
+</body>
+</html>
