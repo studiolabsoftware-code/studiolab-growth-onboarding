@@ -1,45 +1,44 @@
 # IN-FLIGHT: Growth Onboarding
 
-Live state only. Completed work and resolved decisions live in `IN-FLIGHT-HISTORY.md`. Verify
-anything here against git and the live database rather than trusting the file alone.
-
-Last updated: 2026-08-21
+Live state only. Completed work lives in `IN-FLIGHT-HISTORY.md`. Verify anything here against the
+live database, not this file. Last updated: 2026-08-21.
 
 ## Waiting on Gary
 
-1. **Deploy the LIKE-wildcard sweep.** `bash supabase/manual/deploy-like-wildcard-sweep.sh`.
-   Applies migration 049, then redeploys 25 functions, urgent three first. Takes a few minutes:
-   two of the changed files are in `_shared/`, and Supabase bundles shared sources at DEPLOY time,
-   so a shared fix reaches a function only when that function is itself redeployed.
-   The two that carry a live defect: `_shared/pricing.ts`, where posting `%` as a discount code on
-   the PUBLIC checkout path matched whatever code was in the table, and `inbound-message`, where the
-   From header of an inbound email could match an admin row and file the message as sent by them.
+1. **Run the end-to-end smoke.** Nothing else should ship until this passes: everything below is
+   deployed and NOTHING has been exercised by a real click. From the Growth Connector repo,
+   `bash supabase/manual/smoke-c1-receiver.sh <you>+smoke1@gmail.com`, then open the invite in a
+   PRIVATE window. Expect: no email box, "We'll send a code to the email on your account", then a
+   step 1 pre-filled with "Smoke Test Dance Academy". Then check the Review queue shows it Linked.
 
 2. **Take the `email_event` ledger live** (Growth Connector repo):
    `bash supabase/manual/deploy-mailgun-event-webhook.sh`, then its smoke, then point Mailgun at it.
 
-3. **The signup cutover, inside StudioLAB Growth.** Rotate `SIGNUP_WEBHOOK_SECRET`, audit every
-   automation that sends an onboarding email on sub-account creation, then flip both switches in one
-   sitting: point the automation's webhook at `signup-webhook-receiver` and disable the platform's
-   own onboarding emails. Never do the second without the audit. Runbook:
+3. **The signup cutover, inside StudioLAB Growth. THIS is go-live.** Rotate
+   `SIGNUP_WEBHOOK_SECRET`, audit every automation that emails on sub-account creation, then flip
+   both switches in one sitting: point the automation's webhook at `signup-webhook-receiver` and
+   disable the platform's own onboarding emails. Never the second without the audit. Runbook:
    `outputs/signup-email-cutover-runbook.md`.
 
-## Deployed 2026-08-21, smoke still unrun
+## Deployed and verified live 2026-08-21, but NOT yet exercised end to end
 
 - **Tier-1 pre-fill is LIVE.** `send-otp` v39, `verify-otp` v36, plus `save-draft`,
   `get-studio-account` and `apply-change-request` off the gateway block. The LIKE-injection that let
-  an unauthenticated caller read every submission is closed in production.
+  an unauthenticated caller read every submission is closed.
 - **C3 is LIVE** (Connector): both operator read RPCs now return `location_id`, and
   `onboarding-read` is redeployed. The Review drawer, which had answered 400 on every open since
   2026-06-25, works for the first time.
-- **The end-to-end smoke has not been run.** Do it with a synthetic invite and a plus-alias you have
-  never used, in a private window. Steps are in `deploy-prefill.sh`'s closing note.
+- **The LIKE-wildcard sweep is LIVE.** Migration 049's three constraints are VALIDATED and all 25
+  functions redeployed (verified against the catalog, not the script's own output).
+- **A leftover `SMOKE20260820181621` row sits in `growth_manager.inbound_signup`,** status `invited`,
+  token still inside its 90-day window. That means the invite email already in Gary's inbox from the
+  2026-08-20 run-through still resolves, and can stand in if Mailgun misbehaves during the smoke.
 
 ## The submissions table is deliberately EMPTY
 
-All five rows were test data and were deleted on 2026-08-21, along with three test invoices, the
-99%-off test discount code, and a dormant admin account. **No real studio has ever completed this
-form.** An empty Review queue is the truth, not a bug, and a smoke test needs synthetic data.
+All five rows were test data, deleted 2026-08-21 with three test invoices, the 99%-off test code and
+a dormant admin account. **No real studio has ever completed this form.** An empty Review queue is
+the truth, not a bug, and any smoke needs synthetic data.
 
 ## Open decisions for Gary
 
@@ -55,9 +54,8 @@ form.** An empty Review queue is the truth, not a bug, and a smoke test needs sy
 
 ## Known, deliberately NOT fixed
 
-- The Supabase JS SDK loads from a CDN at a floating major version with no SRI and no CSP on the six
-  form pages.
-- `send-otp` has no per-IP cap, so a link holder can mail a studio a code every 60 seconds.
+- The Supabase JS SDK loads from a CDN at a floating major, no SRI, no CSP, on the six form pages.
+- `send-otp` has no per-IP cap: a link holder can mail a studio a code every 60 seconds.
 
 ## Scenario B, live state only (settled decisions moved to `IN-FLIGHT-HISTORY.md` 2026-08-21)
 
