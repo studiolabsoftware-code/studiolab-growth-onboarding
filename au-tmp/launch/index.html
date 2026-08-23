@@ -194,7 +194,12 @@
           <label for="studioType">Studio type</label>
           <select id="studioType">
             <option value="">Select</option>
-            <option>Dance Studio</option>
+            <!-- Defaulted to Dance Studio 2026-08-24: the overwhelming majority of studios on this
+                 form are dance, so the common case costs zero clicks and everyone else changes it.
+                 Safe against a returning studio because hydrateFromSubmission's setVal only assigns
+                 when the stored value is non-empty, so a saved choice still wins and a studio who
+                 never picked one keeps this default rather than being blanked. -->
+            <option selected>Dance Studio</option>
             <option>Yoga / Pilates</option>
             <option>Gymnastics</option>
             <option>Martial Arts</option>
