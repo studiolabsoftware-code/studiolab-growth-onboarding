@@ -5,22 +5,21 @@ live database, not this file. Last updated: 2026-08-21.
 
 ## Waiting on Gary
 
-1. **Run the end-to-end smoke.** Nothing else should ship until this passes: everything below is
-   deployed and NOTHING has been exercised by a real click. From the Growth Connector repo,
-   `bash supabase/manual/smoke-c1-receiver.sh <you>+smoke1@gmail.com`, then open the invite in a
-   PRIVATE window. Expect: no email box, "We'll send a code to the email on your account", then a
-   step 1 pre-filled with "Smoke Test Dance Academy". Then check the Review queue shows it Linked.
+1. **Take the `email_event` ledger live** (Growth Connector repo). Do this BEFORE the cutover: today
+   a bounced invite is silently invisible, and the failure it prevents is a studio signing up, never
+   receiving their link, and nobody finding out. `MAILGUN_WEBHOOK_SIGNING_KEY` is NOT in the vault
+   yet, so fetch it from Mailgun first (Settings, API keys, "HTTP webhook signing key" - the
+   account-level one, not a sending key). Then
+   `bash supabase/manual/deploy-mailgun-event-webhook.sh` (prompts for it, no echo), then
+   `bash supabase/manual/smoke-mailgun-event-webhook.sh`, then point Mailgun at the endpoint.
 
-2. **Take the `email_event` ledger live** (Growth Connector repo):
-   `bash supabase/manual/deploy-mailgun-event-webhook.sh`, then its smoke, then point Mailgun at it.
-
-3. **The signup cutover, inside StudioLAB Growth. THIS is go-live.** Rotate
+2. **The signup cutover, inside StudioLAB Growth. THIS is go-live.** Rotate
    `SIGNUP_WEBHOOK_SECRET`, audit every automation that emails on sub-account creation, then flip
    both switches in one sitting: point the automation's webhook at `signup-webhook-receiver` and
    disable the platform's own onboarding emails. Never the second without the audit. Runbook:
    `outputs/signup-email-cutover-runbook.md`.
 
-## Deployed and verified live 2026-08-21, but NOT yet exercised end to end
+## Deployed, verified live, and PROVEN by a real click
 
 - **Tier-1 pre-fill is LIVE.** `send-otp` v39, `verify-otp` v36, plus `save-draft`,
   `get-studio-account` and `apply-change-request` off the gateway block. The LIKE-injection that let
@@ -30,9 +29,10 @@ live database, not this file. Last updated: 2026-08-21.
   2026-06-25, works for the first time.
 - **The LIKE-wildcard sweep is LIVE.** Migration 049's three constraints are VALIDATED and all 25
   functions redeployed (verified against the catalog, not the script's own output).
-- **A leftover `SMOKE20260820181621` row sits in `growth_manager.inbound_signup`,** status `invited`,
-  token still inside its 90-day window. That means the invite email already in Gary's inbox from the
-  2026-08-20 run-through still resolves, and can stand in if Mailgun misbehaves during the smoke.
+- **The end-to-end smoke PASSED 2026-08-24** and was cleaned up. A real click proved the whole
+  chain: signup webhook, Mailgun invite, token resolve, OTP, pre-filled form, server-side
+  `location_id` stamp, the widened read RPCs, and the console drawer (which had failed on every open
+  since 2026-06-25). Both tables are empty again.
 
 ## The submissions table is deliberately EMPTY
 
