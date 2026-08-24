@@ -1,23 +1,23 @@
 # IN-FLIGHT: Growth Onboarding
 
 Live state only. Completed work lives in `IN-FLIGHT-HISTORY.md`. Verify anything here against the
-live database, not this file. Last updated: 2026-08-21.
+live database, not this file. Last updated: 2026-08-24.
 
 ## Waiting on Gary
 
-1. **Take the `email_event` ledger live** (Growth Connector repo). Do this BEFORE the cutover: today
-   a bounced invite is silently invisible, and the failure it prevents is a studio signing up, never
-   receiving their link, and nobody finding out. `MAILGUN_WEBHOOK_SIGNING_KEY` is NOT in the vault
-   yet, so fetch it from Mailgun first (Settings, API keys, "HTTP webhook signing key" - the
-   account-level one, not a sending key). Then
-   `bash supabase/manual/deploy-mailgun-event-webhook.sh` (prompts for it, no echo), then
-   `bash supabase/manual/smoke-mailgun-event-webhook.sh`, then point Mailgun at the endpoint.
+**The signup cutover, inside StudioLAB Growth. THIS is go-live, and the only thing left.**
+`SIGNUP_WEBHOOK_SECRET` is ROTATED and verified (2026-08-24); the value sits in the Connector's
+gitignored `supabase/manual/.rotated-signup-secret`, never printed to a transcript. Remaining: audit
+every automation emailing on sub-account creation (KEEP the login-credentials email, disable the
+welcome one), then flip both switches in one sitting. Never the second without the audit. The
+executable pack (endpoint, payload contract, exact plan/region vocabulary) is in the PRIVATE repo:
+`Growth Connector/docs/signup-email-cutover-pack.md`. THIS repo is public, so
+`outputs/signup-email-cutover-runbook.md` is only a pointer plus the non-sensitive half.
 
-2. **The signup cutover, inside StudioLAB Growth. THIS is go-live.** Rotate
-   `SIGNUP_WEBHOOK_SECRET`, audit every automation that emails on sub-account creation, then flip
-   both switches in one sitting: point the automation's webhook at `signup-webhook-receiver` and
-   disable the platform's own onboarding emails. Never the second without the audit. Runbook:
-   `outputs/signup-email-cutover-runbook.md`.
+**Silent-hold hazard.** An unmapped `plan`/`region` makes the receiver answer `200 {held:true}`,
+writing NO row and sending NO email. With platform emails off that is a total silent failure, and
+`missed-signup-sweep` cannot catch it (a hold records nothing). Confirm an `invited` row in
+`inbound_signup` BEFORE switching anything off.
 
 ## Deployed, verified live, and PROVEN by a real click
 
@@ -25,10 +25,10 @@ live database, not this file. Last updated: 2026-08-21.
   `get-studio-account` and `apply-change-request` off the gateway block. The LIKE-injection that let
   an unauthenticated caller read every submission is closed.
 - **C3 is LIVE** (Connector): both operator read RPCs now return `location_id`, and
-  `onboarding-read` is redeployed. The Review drawer, which had answered 400 on every open since
+  `onboarding-read` is redeployed. The Review drawer, which had 400'd on every open since
   2026-06-25, works for the first time.
 - **The LIKE-wildcard sweep is LIVE.** Migration 049's three constraints are VALIDATED and all 25
-  functions redeployed (verified against the catalog, not the script's own output).
+  functions redeployed (verified against the catalog, not the script's output).
 - **The end-to-end smoke PASSED 2026-08-24** and was cleaned up. A real click proved the whole
   chain: signup webhook, Mailgun invite, token resolve, OTP, pre-filled form, server-side
   `location_id` stamp, the widened read RPCs, and the console drawer (which had failed on every open
