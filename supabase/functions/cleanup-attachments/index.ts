@@ -4,7 +4,10 @@
 // that fails, the row is marked with `delete_attempted_at` + a reason
 // and the next cron run retries.
 //
-// Auth: service-role only (pg_cron passes the Vault-stored key).
+// Auth: CRON_SECRET (what pg_cron presents) or the service-role key (a manual
+// re-run). It was service-role only, read from a Vault entry that turned out to
+// contain the literal 'YOUR-SERVICE-ROLE-KEY', so this sweep had never actually
+// run since it was written. See migration 051.
 //
 // Idempotency: rows already marked `delete_attempted_at` are picked up
 // again only if `expires_at` is still in the past. Successful deletes
@@ -14,12 +17,13 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { isServiceRoleCaller } from '../_shared/caller.ts';
+import { isCronCaller } from '../_shared/cron-auth.ts';
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
 
   try {
-    if (!(await isServiceRoleCaller(req))) {
+    if (!isCronCaller(req) && !(await isServiceRoleCaller(req))) {
       return jsonResponse({ ok: false, error: 'Service-role auth required.' }, 401);
     }
 

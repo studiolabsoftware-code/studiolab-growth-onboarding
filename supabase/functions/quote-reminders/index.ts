@@ -29,6 +29,7 @@
 import { corsHeaders, preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { isServiceRoleCaller } from '../_shared/caller.ts';
+import { isCronCaller } from '../_shared/cron-auth.ts';
 import { getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
 import { loadStudioEmailPrefs, unsubscribeUrl, injectUnsubscribeFooter } from '../_shared/studio-email.ts';
@@ -53,11 +54,13 @@ Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
 
   try {
-    // Auth gate: only the service role can run this. pg_cron passes
-    // service_role_key in the Authorization header; manual re-runs from
-    // the admin's machine use the same key. See _shared/caller.ts for the
-    // two-path verification logic (exact env match OR role-claim JWT check).
-    if (!(await isServiceRoleCaller(req))) {
+    // Auth gate. pg_cron presents CRON_SECRET; a manual re-run from an admin's
+    // machine presents the service-role key. It used to accept ONLY the latter,
+    // read from the Vault entry `studiolab_service_role_key` — which held the
+    // literal string 'YOUR-SERVICE-ROLE-KEY' from 2026-05-14 until it was found
+    // on 2026-08-26. This function's nightly job had therefore never once run.
+    // See migration 051.
+    if (!isCronCaller(req) && !(await isServiceRoleCaller(req))) {
       return jsonResponse({ ok: false, error: 'Service-role auth required.' }, 401);
     }
 

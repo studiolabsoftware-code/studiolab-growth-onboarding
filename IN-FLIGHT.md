@@ -22,14 +22,14 @@ replay. **The account is shared and the dev team works in it. This can recur.**
 - `stripe-webhook` live is **v49 (2026-05-18)**; commit `e4f8ce2` (unsubscribe link) landed 2 min
   after. Michelle's receipt may lack it. Redeploy as its own slice.
 
-## Two MORE crons are dead: the vault holds PLACEHOLDER text
+## All five crons run now. The vault held PLACEHOLDER text for three months.
 
-`studiolab_service_role_key` is the literal `YOUR-SERVICE-ROLE-KEY` (019's example lines were run
-verbatim, 2026-05-14). So `quote-reminders-daily` and `cleanup-attachments-daily` have NEVER reached
-a function: pg_net logs "Couldn't resolve host name" while `cron.job_run_details` says 'succeeded'.
-No harm yet: `quotes` and `submission_attachments` are empty. 050 fixed the URL and added
-`studiolab_cron_secret`. **Next: repoint both at CRON_SECRET (code change + redeploy).** Migrations
-apply BY HAND here; `migration list` Remote is empty for all 50, so `db push` replays everything.
+`studiolab_service_role_key` is the literal `YOUR-SERVICE-ROLE-KEY` (019's example lines run
+verbatim, 2026-05-14), so `quote-reminders` and `cleanup-attachments` had NEVER reached a function:
+pg_net logged "Couldn't resolve host name" while `cron.job_run_details` said 'succeeded'. No harm
+done, both tables were empty. 050 and 051 repointed every job at `studiolab_cron_secret`; all five
+are proven with a live 200. Nothing reads the service-role secret now. Migrations apply BY HAND
+here; `migration list` Remote is empty for all 51, so `db push` would replay everything.
 
 ## The AU/US routing hole is OPEN
 

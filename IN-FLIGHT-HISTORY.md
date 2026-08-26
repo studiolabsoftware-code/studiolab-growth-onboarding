@@ -271,3 +271,33 @@ for all 50, so `supabase db push` would try to replay every one against the live
 NOT fixed, deliberately: `quote-reminders` and `cleanup-attachments` still read the placeholder
 service-role key and remain dead. Repointing them at `CRON_SECRET` is a code change plus redeploy
 for both, so it is its own slice.
+
+## 2026-08-26 (later still): the two dead crons repointed, all five now proven
+
+Follow-on slice to 050. `quote-reminders` and `cleanup-attachments` both accepted only
+`isServiceRoleCaller`, reading the Vault entry that held `YOUR-SERVICE-ROLE-KEY`, so neither had run
+since it was written. Both now accept `isCronCaller || isServiceRoleCaller`, matching
+`stripe-webhook-health`. `config.toml` already carried `verify_jwt = false` for both, so no gateway
+change was needed.
+
+Migration `051` reschedules both jobs against `studiolab_project_url` + `studiolab_cron_secret`,
+keeping their existing cadences (22:15 and 22:30 UTC). It opens with a guard that raises if either
+secret is missing or still looks like a placeholder, so it cannot quietly recreate the fault it
+fixes, and it drops the `case ... else 'skipped'` wrapper for the same reason 050 did.
+
+Old jobs 3 and 4 were unscheduled and replaced by 8 and 9; `cron.job` now holds exactly five jobs
+with no duplicates. First successful runs of either function, ever:
+
+    quote-reminders     {"ok":true,"stats":{"nudged":0,"warned":0,"cancelled":0,"errors":[]},"stripe_mode":"live"}
+    cleanup-attachments {"ok":true,"stats":{"deleted":0,"storage_failed":0,"row_failed":0,"errors":[]}}
+
+Both are honest no-ops: `quotes` and `submission_attachments` were re-confirmed empty immediately
+before invoking, which is also why running the real sweep rather than a dry run was safe (neither
+function has a dry-run mode).
+
+Rejection still verified on all three: `quote-reminders` and `cleanup-attachments` answer 401 to an
+absent and a wrong bearer, `stripe-webhook-health` answers 403. Gate green throughout: `deno check`
+on both functions, 45 `_shared` tests, `node --check`.
+
+`studiolab_service_role_key` is deliberately left as the placeholder. Nothing reads it any more, and
+repairing it would mean handling the project's highest-privilege key for no benefit.
