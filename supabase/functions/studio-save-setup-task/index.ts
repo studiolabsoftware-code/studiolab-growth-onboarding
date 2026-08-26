@@ -42,7 +42,7 @@ const SURFACE_FIELDS: Record<SurfaceKey, string[]> = {
   sms_a2p:    ['privacy_policy_url', 'terms_url', 'industry_vertical',
                'business_description', 'opt_in_method', 'opt_in_description',
                'opt_in_screenshot_url', 'sample_sms_1', 'sample_sms_2',
-               'estimated_monthly_volume', 'sender_id', 'notes'],
+               'estimated_monthly_volume', 'notes'],
   whatsapp:   ['enabled', 'display_name', 'business_category',
                'verification_doc_url', 'notes'],
 };

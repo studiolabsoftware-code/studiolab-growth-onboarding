@@ -1318,6 +1318,8 @@
     show('einField', isUS && bt && !isSoleProp);
     show('abnField', isAU);
     show('acnField', isAU && isPtyLtd);
+    // The email advice depends on country + business type, so it has to follow.
+    applyBusinessEmailWarning();
   }
 
   function applyBusinessEmailWarning() {
@@ -1325,7 +1327,27 @@
     const note = document.getElementById('businessEmailNote');
     if (!input || !note) return;
     const v = (input.value || '').trim();
-    if (v && isPersonalEmailDomain(v)) {
+    const personal = !!v && isPersonalEmailDomain(v);
+
+    // A US sole trader with no EIN registers SMS as a Sole Proprietor brand, and
+    // that path REQUIRES a public-domain address: Gmail and Yahoo are accepted,
+    // a company or Google Workspace address is REJECTED. So the usual
+    // business-domain advice is exactly backwards for them, and a studio who
+    // followed it would have their registration refused. Verified against the
+    // platform's own brand-registration guidance, 2026-08-26.
+    const country = (getCountryValue() || REGION_DEFAULT_COUNTRY[REGION] || '').toUpperCase();
+    if (country === 'US' && val('businessType') === 'sole_prop') {
+      if (v && !personal) {
+        note.textContent = 'Heads up: as a sole trader, SMS registration needs a public email address (Gmail, Yahoo, Outlook). A company or Google Workspace address is rejected on that path.';
+        note.classList.add('field-warn');
+      } else {
+        note.textContent = 'A public address (Gmail, Yahoo) is the right one here. Sole trader SMS registration requires it.';
+        note.classList.remove('field-warn');
+      }
+      return;
+    }
+
+    if (personal) {
       note.textContent = 'Heads up: Google, Meta, and US SMS regulators require a business-domain email (e.g. you@yourstudio.com) to register your account. You can fix this later in your portal, but expect to be asked for it.';
       note.classList.add('field-warn');
     } else {

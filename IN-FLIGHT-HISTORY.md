@@ -541,3 +541,54 @@ no-email path. Test row deleted, one row left in the table.
 `sync-to-sheet` is separately broken and has been for a while: it 500s with
 `SHEETS_WEBAPP_URL or SHEETS_SHARED_SECRET missing`. Only visible on non-draft rows, so today's
 draft test skipped past it.
+
+## 2026-08-26 (research): A2P, CNAM and alphanumeric sender IDs, and what it changed in the code
+
+Researched the platform's Trust Center against Gary's two markets. Findings that mattered:
+
+**The "simplified" A2P path is the revamped Trust Center**: a guided wizard with field checks and a
+submission review, and once the BRAND is approved the CAMPAIGN is auto-submitted. It is guided, not
+self-verifying; every submission still goes to vendor review, 3 to 7 business days.
+
+**Two brand types, and which one a studio falls into changes what they need.** Standard (Low/High
+Volume) needs a Tax ID (EIN in the US, Company Number/ACN in AU) and verifies by a 6-digit OTP to
+the EMAIL address. Sole Proprietor is US/Canada only, for individuals with NO Tax ID and one
+employee, verifies by text to a PERSONAL mobile (not a platform/CPaaS number, must reply YES), and
+is limited to one phone number per campaign.
+
+**Sole Proprietor registration REQUIRES a public-domain email.** Gmail and Yahoo are accepted;
+Google Workspace and company email are REJECTED. `js/form.js` warned the exact opposite at every
+studio, so a US sole trader who followed our advice would have had their registration refused.
+`applyBusinessEmailWarning` is now conditional on country + business type and flips its advice for
+that case, and `applyBusinessTypeConditionals` calls it so the advice updates when either changes.
+
+**CNAM is not CNAME.** CNAME is the email sending domain (5 DNS records: 2 TXT, 2 MX, 1 CNAME, on a
+subdomain). CNAM is Caller ID Name, and it is **US phone numbers only**, needs an EIN or DUNS, caps
+at 15 characters and takes 48 to 72 hours to propagate. There is no Australian equivalent, and no
+SHAKEN/STIR in Australia either. **The whole Trust Center left column is a US-market feature set**,
+so Scale and Dominate AI genuinely deliver a thinner voice/SMS trust story in AU. Note the
+interaction: a US sole trader with no EIN qualifies for the simplest A2P path and is exactly the
+studio who CANNOT register CNAM.
+
+**Alphanumeric sender IDs are not supported by the phone layer.** Open feature request since April
+2020, still unaddressed, no official reply. More importantly they are ONE-WAY: no number sits behind
+them, so no replies come back and opt-out has to run through an unsubscribe link. That would break
+the lead inbox, missed-call text-back, AI over SMS, and the STOP language already in our A2P sample
+messages. Since 1 July 2026 an unregistered alphanumeric ID to an AU mobile displays as
+"Unverified", which is worse than sending from the number.
+
+**Gary's decision: raw phone numbers, alphanumeric not worth chasing.** So the
+`sender_id` field ("Preferred SMS Sender ID (AU only)") is removed from the `sms_a2p` tile and from
+`studio-save-setup-task`'s allow-list, because collecting a preference we cannot honour sets a false
+expectation. `setup_tasks` held zero rows with that key, so nothing was orphaned. The tile's
+`whatWeDo` copy also claimed an "AU SMS sender ID system" that does not exist; rewritten to say AU
+messages send from the studio's own number.
+
+### Still open on this surface
+
+- `sms_a2p` is one tile covering two different regulatory regimes. AU studios see US framing.
+- No carrier outcome state: the task flow has no `rejected` and no rejection reason, and carrier
+  rejection is common.
+- `ssn_last` is a column nothing writes (`save-draft` refuses it deliberately). Dead PII, drop it.
+- AU sole traders holding only an ABN may fall in a gap: Standard needs a Company Number, and Sole
+  Proprietor is US/Canada only. Needs confirming against a live account.
