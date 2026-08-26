@@ -397,3 +397,45 @@ are enough to work from, and it is not repeated here for the same reason. **It r
 history and the repo is public, so treat it as disclosed.** Also
 caught before commit: the region-guard tests originally hard-coded her real mobile. They now use
 fictional +64 numbers, with a comment saying why.
+
+## 2026-08-26 (correction): the routing belongs at signup, and I built it in the wrong place
+
+Gary's correction, and it was right. There are TWO commercial lines, Australia and everyone else,
+and the studio's country arrives with the signup API payload, well before any form. So the routing
+decision belongs at the signup seam. What I built first was a checkout-time BLOCK inferred from
+phone dial codes and postcodes: the wrong mechanism, in the wrong place, producing a dead end that
+told a paying studio to email us.
+
+**The real bug was in the Connector.** `resolveFormRoute` looked region up in `REGION_ALIASES`,
+which held only `au/aus/australia` and `us/usa/america/united states`. Anything else missed, the
+function returned null, and BOTH callers HOLD with zero side effects: no token, no row, no invite,
+no email, `200 {held:true}`. So at cutover a New Zealand studio would sign up, pay, and receive
+nothing, with no record for anyone to notice. A test pinned the behaviour:
+`expect(resolveFormRoute("nz", "launch")).toBeNull()`.
+
+That is not a third line, it is silence, and it is the same failure shape as everything else found
+today. Fixed: AU aliases resolve to `au`, EVERYTHING else resolves to `us`, and region can never
+hold a signup. Only an unmappable `plan` still holds, because we cannot guess which product a studio
+bought and a wrong-plan link is worse than a hold the platform re-fires. An ABSENT region also takes
+the US line: not-known-to-be-Australian is the definition of the everyone-else line, and routing
+someone visibly beats holding them where nobody looks.
+
+Falling back by rule must not become the new silent path, so the route now carries
+`regionSource: 'au' | 'us' | 'fallback'` and both callers log an unrecognised or absent region. That
+surfaces an alias worth adding, or a platform field sending junk. Deployed with `--no-verify-jwt`
+and probed (unsigned POST still answers our own body). 1094 tests. Connector `89a37e2`.
+
+**The Onboarding guard was then demoted to what it should always have been:** a backstop for someone
+who reaches a form directly, which is exactly how Neverland arrived. `create-checkout-session` no
+longer blocks. It REPRICES onto the everyone-else line and lets them finish, logged as
+`checkout_region_repriced` (052 updated; the earlier `checkout_blocked_region_mismatch` value is
+left in the CHECK constraint, unused, with zero rows).
+
+The correction is deliberately DOWNWARD ONLY. A non-Australian on the AU form is currently being
+OVERcharged, so correcting silently only ever reduces what they pay. The reverse, an Australian on
+the US form, would mean quietly ADDING 10% GST to a price they already saw, and charging someone
+more without telling them is not a correction: that case keeps its explicit block.
+
+STILL OPEN: `resolve-pricing` (the preview) does not derive, so a direct-link NZ studio would see
+AUD in the form and pay USD at checkout. Only reachable by bypassing the invite link, since the
+signup fix routes everyone else correctly, but it should be closed.

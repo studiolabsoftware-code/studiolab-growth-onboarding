@@ -9,7 +9,7 @@
 // guard BLOCKS checkout, so a wrong "you are not in Australia" stops a real
 // Australian studio from paying us.
 import { assert, assertEquals, assertFalse } from 'jsr:@std/assert@1';
-import { assessRegion, phoneRegionEvidence, postcodeRegionEvidence } from './region-guard.ts';
+import { assessRegion, phoneRegionEvidence, postcodeRegionEvidence, pricingCountryFor } from './region-guard.ts';
 
 // The +64 numbers below are FICTIONAL. This repository is public: use the dial code,
 // never a real studio's mobile. The postcode 0632 is a public Auckland area code.
@@ -106,4 +106,42 @@ Deno.test('one contradicting signal is enough even if the other agrees', () => {
   const r = assessRegion({ country: 'AU', contactPhone: '+61412345678', addressPostcode: '90210' });
   assert(r.mismatch);
   assertEquals(r.contradicting.source, 'postcode');
+});
+
+// ---------------------------------------------------------------- pricing line
+// Two commercial lines, Australia and everyone else. A studio who is not
+// Australian is priced on the everyone-else line rather than stopped, because a
+// dead end at the last step loses the sale. The primary routing is upstream at
+// signup; this is only the backstop for someone who reached a form directly.
+Deno.test('a non-Australian on the AU form is repriced, not blocked', () => {
+  const r = pricingCountryFor({ country: 'AU', contactPhone: '+64211234567', addressPostcode: '0632' });
+  assertEquals(r.country, 'US');
+  assert(r.corrected);
+  assertEquals(r.evidence?.source, 'phone');
+});
+
+Deno.test('the correction only ever reduces the price, never silently adds GST', () => {
+  // An Australian on the US form is NOT auto-corrected: that would quietly add
+  // 10% GST to a price they already saw. create-checkout-session blocks it
+  // explicitly instead.
+  const r = pricingCountryFor({ country: 'US', contactPhone: '+61412345678', addressPostcode: '3000' });
+  assertEquals(r.country, 'US');
+  assertFalse(r.corrected);
+});
+
+Deno.test('a genuine AU studio is priced AU, untouched', () => {
+  const r = pricingCountryFor({ country: 'AU', contactPhone: '+61412345678', addressPostcode: '3000' });
+  assertEquals(r.country, 'AU');
+  assertFalse(r.corrected);
+});
+
+Deno.test('no evidence means no correction, so AU pricing stands', () => {
+  const r = pricingCountryFor({ country: 'AU' });
+  assertEquals(r.country, 'AU');
+  assertFalse(r.corrected);
+});
+
+Deno.test('an undefined country collapses to null rather than undefined', () => {
+  assertEquals(pricingCountryFor({ country: undefined }).country, null);
+  assertEquals(pricingCountryFor({ country: null }).country, null);
 });

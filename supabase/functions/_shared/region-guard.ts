@@ -137,3 +137,41 @@ export function assessRegion(input: RegionCheckInput): RegionCheck {
   if (!contradicting) return { mismatch: false, evidence };
   return { mismatch: true, expected, evidence, contradicting };
 }
+
+/**
+ * The country this submission should actually be PRICED on.
+ *
+ * There are two commercial lines: Australia, and everyone else. The primary
+ * routing happens upstream, at signup, where the platform already knows the
+ * studio's country and the invite link points at the right pathway. This is the
+ * backstop for someone who reached a form directly, which is exactly how an
+ * Auckland studio completed the /au/ flow on 2026-08-26 and was charged
+ * Australian GST.
+ *
+ * It corrects DOWNWARD only, and deliberately so:
+ *
+ *   non-Australian on the AU form -> priced on the everyone-else line (USD, no
+ *   GST). They are currently being OVERcharged, so applying the correction
+ *   silently only ever reduces what they pay.
+ *
+ *   Australian on the US form -> NOT auto-corrected here. That direction would
+ *   silently ADD 10% GST to a price they already saw, and quietly charging
+ *   someone more is not a correction. `create-checkout-session` keeps its
+ *   existing explicit block for that case.
+ */
+export function pricingCountryFor(input: RegionCheckInput): {
+  country: string | null;
+  corrected: boolean;
+  evidence?: RegionEvidence;
+} {
+  // Normalised to `string | null` for resolvePricing. currencyForCountry treats
+  // null and undefined identically (both fall through to USD), so collapsing
+  // them changes nothing.
+  const passthrough = input.country ?? null;
+  const check = assessRegion(input);
+  if (!check.mismatch) return { country: passthrough, corrected: false };
+  if (check.expected !== 'AU') return { country: passthrough, corrected: false };
+  // 'US' is the everyone-else line, not a claim about where they are. It is what
+  // currencyForCountry maps to USD with no GST.
+  return { country: 'US', corrected: true, evidence: check.contradicting };
+}

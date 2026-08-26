@@ -10,7 +10,7 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { resolvePricing, isAustralianFreeText } from '../_shared/pricing.ts';
-import { assessRegion } from '../_shared/region-guard.ts';
+import { pricingCountryFor } from '../_shared/region-guard.ts';
 import { getAuGstTaxRateId, getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 
 type Submission = {
@@ -193,55 +193,44 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
-    // The mirror of the guard above, and the one that was missing. The form no
-    // longer asks for a country, so `country` is whatever the URL implied: every
-    // studio on /au/ is stored as 'AU' and priced in AUD with 10% GST. On
-    // 2026-08-26 an Auckland studio went through the AU flow carrying a +64
-    // phone and an Auckland postcode, and was charged Australian GST.
+    // Two commercial lines: Australia, and everyone else. The routing that
+    // matters happens upstream at signup, where the platform already knows the
+    // studio's country and the invite link points at the right pathway. This is
+    // only the backstop for someone who reached a form directly, which is how an
+    // Auckland studio completed the /au/ flow on 2026-08-26 and paid Australian
+    // GST.
     //
-    // Fires only on POSITIVE contradicting evidence, never on absence, because a
-    // false positive here stops a real Australian studio from paying us.
-    const region = assessRegion({
+    // It does NOT block. A studio who is not Australian belongs on the
+    // everyone-else line, so we price them there and let them finish. Stopping
+    // them at the last step with "email us" just loses the sale. The correction
+    // only ever reduces what they pay; see pricingCountryFor for why the
+    // opposite direction is still an explicit block above.
+    const priced = pricingCountryFor({
       country: submission.country,
       contactPhone: submission.contact_phone,
       addressPostcode: submission.address_postcode,
     });
-    if (region.mismatch) {
-      // Log it: otherwise a blocked studio is a silently lost sale. This is the
-      // team's cue to send the right link rather than wait for an email.
+    if (priced.corrected) {
       try {
         await sb.from('activity_log').insert({
           submission_id: submission.id,
-          action: 'checkout_blocked_region_mismatch',
+          action: 'checkout_region_repriced',
           actor: submission.contact_email || 'studio',
           details: {
             stored_country: submission.country,
-            expected: region.expected,
-            contradicting_source: region.contradicting.source,
-            contradicting_detail: region.contradicting.detail,
+            priced_country: priced.country,
+            evidence_source: priced.evidence?.source,
+            evidence_detail: priced.evidence?.detail,
           },
         });
       } catch (e) { console.error('activity_log insert failed:', e); }
-
-      if (region.expected === 'AU') {
-        return jsonResponse({
-          ok: false,
-          error: 'Your contact details suggest your studio is outside Australia, and this form prices in Australian dollars with Australian GST. Please email info@studiolabsoftware.com and we will send you the right link. If your details are wrong, correct them and try again.',
-          code: 'non_au_must_not_use_au_flow',
-        }, 400);
-      }
-      return jsonResponse({
-        ok: false,
-        error: 'Australian studios must use our AU onboarding form. Please email info@studiolabsoftware.com if you reached this page in error.',
-        code: 'au_must_use_au_flow',
-      }, 400);
     }
 
     // Resolve price using current catalog state.
     const pricing = await resolvePricing({
       plan: submission.plan,
       setup_type: submission.setup_type,
-      country: submission.country,
+      country: priced.country,
       discount_code: discountCodeRaw || null,
     });
     if (!pricing.ok) {

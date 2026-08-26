@@ -1,10 +1,11 @@
 -- =============================================================================
--- Allow activity_log.action = 'checkout_blocked_region_mismatch'
+-- Allow activity_log.action = 'checkout_region_repriced'
 -- =============================================================================
--- create-checkout-session now blocks a studio whose own contact details
--- contradict the region its form hard-set (a +64 phone or a non-Australian
--- postcode on the /au/ flow, or the reverse). That block is logged so a blocked
--- studio is visible to the team rather than a silently lost sale.
+-- There are two commercial lines: Australia, and everyone else. When a studio's
+-- own contact details show they are not Australian but they reached the /au/
+-- form directly, create-checkout-session prices them on the everyone-else line
+-- rather than stopping them. That correction is logged so it is visible rather
+-- than a silent change of currency.
 --
 -- activity_log.action carries a CHECK constraint listing every permitted value.
 -- Without this migration the insert fails, and because it is deliberately
@@ -31,8 +32,8 @@ begin
     raise exception 'activity_log_action_check not found; refusing to guess its shape.';
   end if;
 
-  if position('checkout_blocked_region_mismatch' in v_def) > 0 then
-    raise notice 'checkout_blocked_region_mismatch already permitted, nothing to do';
+  if position('checkout_region_repriced' in v_def) > 0 then
+    raise notice 'checkout_region_repriced already permitted, nothing to do';
     return;
   end if;
 
@@ -40,7 +41,7 @@ begin
   v_new := regexp_replace(
     v_def,
     '\]\)\)\)$',
-    ', ''checkout_blocked_region_mismatch''::text])))'
+    ', ''checkout_region_repriced''::text])))'
   );
 
   if v_new = v_def then
