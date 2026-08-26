@@ -439,3 +439,49 @@ more without telling them is not a correction: that case keeps its explicit bloc
 STILL OPEN: `resolve-pricing` (the preview) does not derive, so a direct-link NZ studio would see
 AUD in the form and pay USD at checkout. Only reachable by bypassing the invite link, since the
 signup fix routes everyone else correctly, but it should be closed.
+
+## 2026-08-26 (loose end closed): preview and checkout now derive the line from one function
+
+Two corrections from Gary first, both of which I had wrong:
+
+1. **Nobody is being "overcharged" by a crossing.** The AUD and USD catalogs carry independently set
+   rates, not a conversion. Verified in `public.products`: AI/DFY is AUD 69900 against USD 54900,
+   launch/DFY AUD 40000 against USD 29900. So landing on the wrong line is the wrong PRICE LIST, not
+   a bigger bill, and the downward-only asymmetry I built on that premise was meaningless.
+2. **Neither crossing should ever happen.** A non-Australian must never reach the AUD form and an
+   Australian must never reach the USD form. There is no acceptable direction.
+
+So `pricingCountryFor` is now SYMMETRIC: non-Australian on the AU form is priced on the everyone-else
+line, Australian on the US form is priced on the Australian line. It still corrects rather than
+blocks, because the right price is knowable from what the studio already told us.
+
+**The loose end was that `resolve-pricing` did not derive at all.** It trusted a client-supplied
+`country`, which is only ever whatever the URL implied, so a studio who reached /au/ directly would
+be SHOWN AUD and CHARGED USD. It now accepts an optional `session_token`, loads the submission, and
+runs the same `pricingCountryFor` that checkout runs. One function, same inputs, so the shown price
+and the charged price cannot disagree. The token is optional and a non-matching token falls through
+to the anonymous catalog view rather than erroring: this endpoint must never be able to stop a price
+from rendering. `js/form.js` sends `session.token`; cache-buster bumped to `20260826a` on all six
+`au|us/{launch,scale,ai}/index.html`. `door.css` deliberately left at `20260820a`, since it did not
+change.
+
+Verified: anonymous preview unchanged (AU -> AUD 69900 +10%, US -> USD 54900 +0%); the exact
+session-hash lookup run against the live row returns `country=AU`, `contact_phone=+64...`,
+`address_postcode=0632`, which `pricingCountryFor` turns into `US`. Functions deployed BEFORE the
+push, since form.js ships via Pages on any push to main. Gate green, 65 `_shared` tests.
+
+### Why no synthetic submission row was inserted to test this
+
+`submissions` carries an **AFTER INSERT** trigger (`on-submission-trigger`) that POSTs to the
+`on-submission` edge function, plus a `Sync-to-sheet` trigger. Inserting a throwaway row to test the
+lookup would have fired a real admin notification. The lookup was proven against the existing row
+instead, without writing anything.
+
+### Security finding, pre-existing, NOT introduced here
+
+`pg_get_triggerdef` for `on-submission-trigger` and `Sync-to-sheet` embeds a **service-role JWT in
+plaintext** in the trigger definition. Anyone who can read `pg_trigger` (any DB read access) can
+lift a service-role key from it. That is a stored credential in a readable catalog, and rotating the
+service-role key would also silently break both triggers, since the old token is baked into the DDL.
+Worth a deliberate fix: move the token to Vault and have the trigger read it, the way the cron jobs
+now do. Not touched in this slice.

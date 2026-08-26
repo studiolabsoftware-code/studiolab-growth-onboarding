@@ -120,13 +120,13 @@ Deno.test('a non-Australian on the AU form is repriced, not blocked', () => {
   assertEquals(r.evidence?.source, 'phone');
 });
 
-Deno.test('the correction only ever reduces the price, never silently adds GST', () => {
-  // An Australian on the US form is NOT auto-corrected: that would quietly add
-  // 10% GST to a price they already saw. create-checkout-session blocks it
-  // explicitly instead.
+// Symmetric, because NEITHER crossing is acceptable. The two catalogs carry
+// independently set rates (AI/DFY is AUD 699 against USD 549, not a conversion),
+// so a crossing is not about paying more or less, it is the wrong price list.
+Deno.test('an Australian on the US form is corrected onto the Australian line', () => {
   const r = pricingCountryFor({ country: 'US', contactPhone: '+61412345678', addressPostcode: '3000' });
-  assertEquals(r.country, 'US');
-  assertFalse(r.corrected);
+  assertEquals(r.country, 'AU');
+  assert(r.corrected);
 });
 
 Deno.test('a genuine AU studio is priced AU, untouched', () => {

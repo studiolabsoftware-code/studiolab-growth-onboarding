@@ -1721,6 +1721,12 @@
       const r = await callFn('resolve-pricing', {
         plan: state.plan,
         setup_type: state.setup,
+        // Sent so the server can derive the commercial line from the SUBMISSION
+        // (phone, postcode) rather than trusting this country, which is only
+        // ever whatever the URL implied. Two lines, Australia and everyone else:
+        // an Auckland studio on /au/ must not be quoted AUD here and charged USD
+        // at checkout. Optional server-side, so an anonymous preview still works.
+        session_token: (session && session.token) || null,
         country: getCountryValue() || (REGION === 'AU' ? 'AU' : ''),
         discount_code: pricingState.discountCode || null,
       });
