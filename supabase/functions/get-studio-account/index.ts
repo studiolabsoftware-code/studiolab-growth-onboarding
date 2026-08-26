@@ -4,6 +4,8 @@
 // save-draft / get-submission-status). Anon-callable (verify_jwt = false).
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
+import { smsTileFor } from '../_shared/sms-registration.ts';
+import { ACCESS_SURFACES, visibleSurfaces } from '../_shared/setup-surfaces.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { ensureConversationForSubmission, ensureStudioToken } from '../_shared/inbox.ts';
 
@@ -19,22 +21,28 @@ Deno.serve(async (req) => {
     const sessionHash = await sha256Hex(sessionToken);
 
     const { data: submission, error: subErr } = await sb.from('submissions')
-      .select(
-        'id, plan, region, setup_type, status, ' +
-        'studio_name, contact_email, first_name, last_name, country, timezone, ' +
-        'payment_status, paid_at, captured_at, card_saved_at, ' +
-        'amount_paid_cents, currency, tax_amount_cents, ' +
-        'invoice_hosted_url, invoice_pdf_url, ' +
-        'submitted_at, last_saved_at, session_expires_at, activated_at, ' +
-        'email_notifications_enabled, unsubscribe_token, ' +
-        // Self-edit surface — the additional fields below are read back so
-        // the studio sees its current values when entering edit mode.
-        'first_name, last_name, role, contact_phone, address, website, ' +
-        'support_url, studio_description, primary_colour, secondary_colour, ' +
-        'sign_off, email_tone, footer_notes, from_name, reply_email, ' +
-        'custom_domain, instagram_handle, facebook_url, google_business_url, ' +
-        'tiktok_handle, youtube_url, booking_url, brand_reference_url, extra_notes',
-      )
+      // ONE template literal, not a concatenation. supabase-js parses this column
+      // list at the TYPE level, and it can only do that for a single literal: the
+      // `'a, b' + 'c, d'` form it used to be defeated the parser, so `submission`
+      // resolved to GenericStringError and every property read off it was a type
+      // error. There were 58 of them, and nobody had seen one, because deploys do
+      // not run `deno check` and this function had never been checked by hand.
+      // Keep it a literal. The column list stays explicit rather than `*` so a
+      // studio-facing endpoint reads only what it hands back.
+      .select(`
+        id, plan, region, setup_type, status,
+        studio_name, contact_email, first_name, last_name, country, timezone,
+        payment_status, paid_at, captured_at, card_saved_at,
+        amount_paid_cents, currency, tax_amount_cents,
+        invoice_hosted_url, invoice_pdf_url,
+        submitted_at, last_saved_at, session_expires_at, activated_at,
+        email_notifications_enabled, unsubscribe_token,
+        role, contact_phone, address, website,
+        support_url, studio_description, primary_colour, secondary_colour,
+        sign_off, email_tone, footer_notes, from_name, reply_email,
+        custom_domain, instagram_handle, facebook_url, google_business_url,
+        tiktok_handle, youtube_url, booking_url, brand_reference_url, extra_notes
+      `)
       .eq('session_token_hash', sessionHash)
       .maybeSingle();
     if (subErr) throw subErr;
@@ -89,15 +97,12 @@ Deno.serve(async (req) => {
 
     // Setup Checklist tiles. Only relevant for paid studios — we don't show
     // access-delegation tiles to studios who haven't completed payment yet.
-    // Surfaces are plan-aware: every plan gets the Google/social pack;
-    // Scale adds SMS A2P compliance (because Scale unlocks SMS automations);
-    // Dominate AI further adds WhatsApp Business (AI voice/chat channel).
-    const SURFACES_BASE = ['gbp', 'ga4', 'gsc', 'gtm', 'google_ads', 'meta', 'tiktok'];
-    let SETUP_SURFACES = SURFACES_BASE;
-    if (submission.plan === 'scale') SETUP_SURFACES = [...SURFACES_BASE, 'sms_a2p'];
-    if (submission.plan === 'ai')    SETUP_SURFACES = [...SURFACES_BASE, 'sms_a2p', 'whatsapp'];
+    // WHICH tiles, and when, is decided by _shared/setup-surfaces.ts: the access
+    // pack is every plan, the messaging pack is plan-gated AND staged behind it.
+    // The reasoning, and why "until the account is live" could not be the
+    // trigger, is written up there.
     const PAID_STATUSES = new Set(['paid', 'authorised', 'card_saved']);
-    let setupTasks: Array<{
+    type TaskRow = {
       id: string;
       surface: string;
       status: string;
@@ -106,38 +111,74 @@ Deno.serve(async (req) => {
       admin_started_at: string | null;
       completed_at: string | null;
       updated_at: string;
-    }> = [];
+    };
+    let setupTasks: TaskRow[] = [];
+    let messagingPending = false;
+    let smsRegistration: ReturnType<typeof smsTileFor> | null = null;
+
     if (PAID_STATUSES.has(String(submission.payment_status))) {
-      // Idempotent seed: insert any missing (submission, surface) rows so
-      // the UI always renders the full set of tiles even on first paint.
-      // ON CONFLICT DO NOTHING via the upsert + ignoreDuplicates flag.
-      const seedRows = SETUP_SURFACES.map((surface) => ({
-        submission_id: submission.id,
-        surface,
-        status: 'pending',
-      }));
-      await sb.from('setup_tasks').upsert(seedRows, {
-        onConflict: 'submission_id,surface',
-        ignoreDuplicates: true,
-      });
-      const { data: tasks } = await sb.from('setup_tasks')
-        .select('id, surface, status, data, studio_submitted_at, admin_started_at, completed_at, updated_at')
-        .eq('submission_id', submission.id)
-        .in('surface', SETUP_SURFACES);
-      setupTasks = (tasks || []).map((t) => ({
-        id: t.id,
-        surface: t.surface,
-        status: t.status,
-        data: (t.data && typeof t.data === 'object') ? t.data : {},
-        studio_submitted_at: t.studio_submitted_at,
-        admin_started_at: t.admin_started_at,
-        completed_at: t.completed_at,
-        updated_at: t.updated_at,
-      }));
+      const TASK_COLUMNS =
+        'id, surface, status, data, studio_submitted_at, admin_started_at, completed_at, updated_at';
+      // Idempotent seed: insert any missing (submission, surface) rows so the UI
+      // always renders the full set of tiles even on first paint. ON CONFLICT DO
+      // NOTHING via the upsert + ignoreDuplicates flag.
+      const seed = async (surfaces: string[]) => {
+        if (!surfaces.length) return;
+        await sb.from('setup_tasks').upsert(
+          surfaces.map((surface) => ({ submission_id: submission.id, surface, status: 'pending' })),
+          { onConflict: 'submission_id,surface', ignoreDuplicates: true },
+        );
+      };
+      const fetchAll = async () => {
+        const { data } = await sb.from('setup_tasks')
+          .select(TASK_COLUMNS)
+          .eq('submission_id', submission.id);
+        return (data || []) as unknown as TaskRow[];
+      };
+
+      await seed([...ACCESS_SURFACES]);
+      let rows = await fetchAll();
+      const statusOf = (surface: string) => rows.find((r) => r.surface === surface)?.status ?? null;
+
+      const visibility = visibleSurfaces(submission.plan, statusOf);
+      messagingPending = visibility.messagingPending;
+
+      // Seed anything the studio has just unlocked, then re-read so the newly
+      // created rows come back in this same response rather than a reload later.
+      const missing = visibility.surfaces.filter((surface) => statusOf(surface) === null);
+      if (missing.length) {
+        await seed(missing);
+        rows = await fetchAll();
+      }
+
+      const visible = new Set(visibility.surfaces);
+      setupTasks = visibility.surfaces
+        .map((surface) => rows.find((r) => r.surface === surface))
+        .filter((t): t is TaskRow => Boolean(t) && visible.has(t!.surface))
+        .map((t) => ({
+          id: t.id,
+          surface: t.surface,
+          status: t.status,
+          data: (t.data && typeof t.data === 'object') ? t.data : {},
+          studio_submitted_at: t.studio_submitted_at,
+          admin_started_at: t.admin_started_at,
+          completed_at: t.completed_at,
+          updated_at: t.updated_at,
+        }));
+
+      // The SMS tile's copy and fields depend on the studio's COUNTRY, which is
+      // a separate axis from the commercial line they pay on. Resolved here
+      // rather than in the browser: account.html has no bundler and could only
+      // carry a hand-kept copy of it. Sent only when the tile is on screen.
+      if (visible.has('sms_a2p')) {
+        smsRegistration = smsTileFor(submission.country, String(submission.studio_name || ''));
+      }
     }
 
     return jsonResponse({
       ok: true,
+      sms_registration: smsRegistration,
+      messaging_pending: messagingPending,
       submission: {
         id: submission.id,
         plan: submission.plan,

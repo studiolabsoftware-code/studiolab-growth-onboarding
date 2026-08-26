@@ -17,6 +17,7 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { postSystemMessage } from '../_shared/inbox.ts';
+import { smsFieldKeys } from '../_shared/sms-registration.ts';
 
 type SurfaceKey =
   | 'gbp' | 'ga4' | 'gsc' | 'gtm' | 'google_ads' | 'meta' | 'tiktok'
@@ -39,10 +40,12 @@ const SURFACE_FIELDS: Record<SurfaceKey, string[]> = {
                'ad_account_id', 'pixel_id', 'notes'],
   tiktok:     ['business_center_id', 'ad_account_id', 'handle',
                'handle_is_business', 'notes'],
-  sms_a2p:    ['privacy_policy_url', 'terms_url', 'industry_vertical',
-               'business_description', 'opt_in_method', 'opt_in_description',
-               'opt_in_screenshot_url', 'sample_sms_1', 'sample_sms_2',
-               'estimated_monthly_volume', 'notes'],
+  // Taken from the tile's own definition rather than restated here. Which of
+  // these a studio is SHOWN depends on their country (the US Campaign Registry
+  // fields are asked for nowhere else), but what we ALLOW is the union: a
+  // studio whose country resolves differently between two visits must not have
+  // work they already submitted rejected at the door.
+  sms_a2p:    smsFieldKeys(),
   whatsapp:   ['enabled', 'display_name', 'business_category',
                'verification_doc_url', 'notes'],
 };

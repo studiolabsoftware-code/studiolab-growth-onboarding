@@ -73,8 +73,11 @@ deno check supabase/functions/<function>/index.ts
 #    Edge Function sources for `.ilike(` and needs to read them.
 deno test --allow-read supabase/functions/_shared/
 
-# 3. The form is a plain script, so at minimum parse it.
-node --check js/form.js
+# 3. The client ships unbundled, so at minimum parse all of it. This covers the
+#    inline <script> in account.html (~2,000 lines, the whole post-payment
+#    portal) plus every file in js/ and admin/js/. The gate used to name
+#    js/form.js alone, so a syntax error anywhere else reached the browser first.
+node scripts/check-inline-js.mjs
 ```
 
 **Four functions did not type-check at all until 2026-08-21** (`manage-admin-users`,
@@ -87,6 +90,13 @@ fix it rather than skipping the gate.
 be imported under `deno test` without a Deno runtime and live env vars, so anything embedded in one is
 effectively untestable. `_shared/prebind.ts` is the pattern: pure functions plus an injected
 dependency, with the entrypoint reduced to wiring.
+
+**Type-check the function you touched, and expect to fix what you find.** Several functions have
+never been through `deno check` because deploys do not run it. `get-studio-account` had 58 errors
+on 2026-08-26, all from one cause: its `.select()` column list was built by string concatenation,
+and supabase-js can only parse that list at the type level when it is a SINGLE literal, so the row
+resolved to `GenericStringError` and every property read off it was an error. Use one template
+literal for a multi-line column list.
 
 **`js/form.js` ships via GitHub Pages on any push to `main`,** including a push that only touches an
 unrelated file. It is on a different rail from the Edge Functions, so a change that spans both must

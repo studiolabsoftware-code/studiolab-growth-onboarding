@@ -725,3 +725,127 @@ phone number, so this only makes the price SHOWN agree with the price CHARGED.
 
 Gate: `deno check` on the touched functions, 97 tests in `_shared/` (75 before),
 `node --check` on `js/form.js` and `admin/js/detail.js`.
+
+## 2026-08-26: the SMS tile speaks the studio's country, and waits its turn
+
+Same defect class as the business identifiers, one surface over. The Setup
+Checklist's `sms_a2p` tile described ONE country's process to everybody. It
+opened with "In the US that means registering your business with the 10DLC
+carrier registry", then asked every studio for a US Campaign Registry industry
+vertical, a US campaign throughput tier, and an opt-in screenshot for US
+Toll-Free verification, and told them carrier approval takes 3-7 business days.
+A studio in Manchester or Auckland read three fields of American telecoms
+machinery that does not apply to them and waited on an approval nobody was
+processing.
+
+Two shapes now, not five, in `_shared/sms-registration.ts`:
+
+- **US**: the 10DLC framing and the three registry-only fields, because we run
+  that process and the claims are true there.
+- **Everyone else**: "we set your automations up to text families from your
+  studio's own number, one they can reply to, and we handle whatever
+  registration your network asks for", then the three things every market cares
+  about: consent, saying who you are, and opt-out working first time. Three
+  fewer questions, none of them ones we could act on.
+
+**No statute is named and no timeline is promised where we do not own one.** We
+know the US process because we run it; for everywhere else the honest claim is
+what WE do, not what the local rulebook says. A test asserts the non-US copy
+carries no "10DLC", "Toll-Free", "IRS" or "N-N business days". **Canada is a
+recorded uncertainty rather than a guess**: Canadian long-code A2P is vetted
+through the same registry as the US by some providers, so it takes the generic
+wording, which is true either way, instead of a US-shaped tile asking a Toronto
+studio for fields they may not need.
+
+Sample messages carry STOP everywhere (understood in all of these markets) and
+HELP only in the US, where a carrier actually checks for it. US English for US
+studios, Australian English for everyone else, so "enrollments" and "enrolments"
+each go to the right reader.
+
+**Resolved SERVER-side, and that is the point.** account.html is a plain page
+with an inline script and no bundler, so the alternative was a hand-kept copy of
+all this copy in the browser held together by a drift test, the way
+`js/form.js` has to be. It is not necessary here: the account page always
+fetches before it renders and a studio's country cannot change while they are
+looking at it. So `get-studio-account` sends the resolved tile as
+`sms_registration` and the page renders it. One definition, no mirror.
+`studio-save-setup-task` sources its `sms_a2p` allowlist from the same module,
+as the UNION of every country's keys, so a studio whose country resolves
+differently between visits is never rejected at the door.
+
+**Staging: the messaging tiles now wait behind the access pack.** Gary's call
+was to hold them so a studio is not hit with SMS compliance on day one. The
+trigger he named, "until the account is live", could not be used: account.html
+hides the entire checklist at `status = 'active'` and the activation banner
+tells the studio "you can safely close this tab; this onboarding portal is no
+longer needed", so gating there would have made the tiles unreachable rather
+than later. Honouring it literally meant rewriting the handover story, which is
+his decision, so it went back to him with a recommendation and he took it. The
+trigger is the access pack: `sms_a2p` and `whatsapp` appear once no base tile is
+still `pending`. `submitted`, `no_account`, `in_progress` and `complete` all
+count, because each is the studio having dealt with that tile; requiring
+`complete` would hold their next step behind OUR queue instead of their own
+work. A tile already started is never taken away, so a studio who submitted SMS
+details before this existed keeps it. The decision lives in
+`_shared/setup-surfaces.ts` rather than the entrypoint, per this repo's own rule
+that logic inside an `index.ts` cannot be tested, and a test asserts the
+entrypoint has not restated the surface lists.
+
+The checklist says a further step is coming (`messaging_pending`), so the grid
+does not silently grow by two tiles, and saving a tile now refetches instead of
+re-rendering from local state, because that save can be the one that unlocks
+them and only the server knows.
+
+**Codex found the two that mattered, and one was not this slice's at all.**
+
+- **The studio can self-edit their COUNTRY on account.html**, and the self-edit
+  save re-rendered from local state. So a studio who corrected "United States"
+  to "United Kingdom" kept the cached US model and was still asked for a US
+  Campaign Registry vertical: the exact defect this tile was rebuilt to remove,
+  reachable in two clicks. That path now refetches, which costs a round trip and
+  nothing else, since `renderAccount` replaces the whole of `#acctRoot` anyway.
+- **Ticking "I don't have this yet" destroyed everything typed in the tile**, on
+  all eight surfaces, because that path posted an empty object and the endpoint
+  REPLACES `data`. A studio who wrote an opt-in description and two sample
+  messages, then ticked a box that was only ever about the policy URLs, lost the
+  lot. The stored data is now seeded on both paths. Pre-existing, not introduced
+  here, and fixed because we were in the code.
+- Two findings were artefacts of a stale review bundle (the extraction of
+  `setup-surfaces.ts` and the graceful-degradation fix had both landed after the
+  copies were taken), and the raw-HTML step rendering came back clean.
+
+**Three more, caught in this session's own review before Codex ran:**
+
+1. A re-save destroyed stored values. `studio-save-setup-task` REPLACES
+   `setup_tasks.data` rather than merging, and the tile posted only its rendered
+   fields, so a non-US studio who had filled the US registry fields before they
+   stopped being asked for would have wiped them by reopening and saving. The
+   save handler now seeds from stored data first. Same rule as the identifiers
+   slice: we write what we asked for and leave alone what we did not ask about.
+2. The tile vanished rather than degraded. If the deployed function lagged the
+   page, `sms_registration` would be absent, `tileMetaFor` returned null and
+   `renderSetupTile` rendered nothing, so a required tile silently disappeared
+   for Scale and AI studios. The grid tile now renders from local identity and
+   the modal says to refresh.
+3. `get-studio-account` had **58 type errors** and nobody had ever seen one,
+   because deploys do not run `deno check` and this function had never been
+   checked by hand. One cause: its `.select()` column list was built by string
+   concatenation, and supabase-js can only parse that list at the type level
+   from a SINGLE literal, so the row resolved to `GenericStringError` and every
+   property read off it was an error. Now one template literal; a column-by-
+   column diff against HEAD confirms nothing was lost (the only change is that
+   `first_name` and `last_name`, listed twice, appear once).
+
+**Gate widened.** It named `node --check js/form.js`, so `account.html`'s
+~2,000-line inline script, the whole post-payment portal, shipped unparsed,
+along with every file in `js/` and `admin/js/`. `scripts/check-inline-js.mjs`
+now extracts and parses the inline blocks from every page that has them plus all
+21 standalone scripts: 25 files. A syntax error in there is a blank page for a
+studio who has already paid.
+
+Also generalised: the WhatsApp tile asked every studio for an "ASIC extract",
+which is an Australian regulator.
+
+Gate: `deno check` on the three touched functions, 117 tests in `_shared/` (107
+before this slice's staging tests, 75 at the start of the day), 25 client
+scripts parse clean.

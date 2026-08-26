@@ -666,59 +666,24 @@
     },
     sms_a2p: {
       key: 'sms_a2p',
-      icon: '💬',
+      icon: '\u{1F4AC}',
       name: 'SMS compliance & registration',
       tagline: 'Required to send SMS to families.',
-      whatWeDo: 'We\'ll get your SMS registration done so we can send automations on your behalf. In the US that means registering your business with the 10DLC carrier registry. In Australia your messages send from your studio\'s own number. Either way we need business identity info, sample messages, and a couple of policy URLs. It\'s the most regulated part of the setup.',
-      whatYouNeedForGuided: 'Your privacy policy and terms of service on your website (with SMS handling and STOP/HELP language mentioned), one or two sample messages, and a brief description of how you collect customer consent to text them.',
-      stepsDfy: [
-        'Make sure your website has a Privacy Policy and Terms of Service. They must mention how you handle SMS data and include STOP/HELP language. <em>If you don\'t have these, leave the URLs blank and we\'ll send you compliant templates after submission.</em>',
-        'Pick an industry vertical that matches your studio (Education is the closest fit for most dance/music schools).',
-        'Tell us how families opt in to receive SMS from you (web form at enrolment, paper form, verbal, etc).',
-        'Review the two pre-filled sample SMS messages below, edit the wording if you like, but keep the brand name and STOP language.',
-        'Submit and we\'ll handle the registration. It usually takes 3-7 business days for the carriers to approve.',
-      ],
-      stepsGuided: [
-        'Publish a Privacy Policy and Terms of Service on your website. Both must mention SMS data handling and STOP/HELP. Free templates: termsfeed.com or the StudioLAB resources hub.',
-        'Inside StudioLAB Growth (post-handover), go to Settings → Phone Numbers → A2P Registration and submit your business identity (we send you a guide once you reach this step).',
-        'Use compliant sample messages, our pre-fill below shows the safe pattern.',
-        'After carriers approve (3-7 days), your sending limits unlock.',
-      ],
-      copyTokens: [],
-      fields: [
-        { key: 'privacy_policy_url', label: 'Privacy Policy URL', type: 'url', placeholder: 'https://yourstudio.com/privacy', hint: 'Must mention SMS data handling. Leave blank if you don\'t have one yet and we\'ll provide a template.' },
-        { key: 'terms_url', label: 'Terms of Service URL', type: 'url', placeholder: 'https://yourstudio.com/terms', hint: 'Must mention message frequency + STOP/HELP. Leave blank if missing.' },
-        { key: 'industry_vertical', label: 'Industry vertical', type: 'select', options: [
-          { value: '', label: 'Select…' },
-          { value: 'education', label: 'Education (most dance/music studios)' },
-          { value: 'professional_services', label: 'Professional Services' },
-          { value: 'recreation', label: 'Recreation & Entertainment' },
-          { value: 'fitness', label: 'Fitness & Wellness' },
-          { value: 'retail', label: 'Retail' },
-          { value: 'other', label: 'Other' },
-        ] },
-        { key: 'business_description', label: 'One-sentence business description', type: 'textarea', placeholder: 'e.g. Dance studio in Melbourne running term-based classes and casual workshops for ages 4 to adult.', hint: '1-2 sentences. Used for A2P registration and WhatsApp Business setup.' },
-        { key: 'opt_in_method', label: 'How do families opt in to your SMS?', type: 'select', options: [
-          { value: '', label: 'Select…' },
-          { value: 'web_form', label: 'Web form / online enrolment' },
-          { value: 'paper', label: 'Paper form at enrolment' },
-          { value: 'verbal', label: 'Verbal consent at front desk' },
-          { value: 'multiple', label: 'Multiple methods' },
-        ] },
-        { key: 'opt_in_description', label: 'Describe your opt-in in plain English', type: 'textarea', placeholder: 'e.g. Families tick a "Receive class reminders" checkbox on our online enrolment form. The checkbox is unchecked by default.', hint: 'The carriers want a clear plain-English description of how consent is captured.' },
-        { key: 'sample_sms_1', label: 'Sample SMS 1 (pre-filled, edit as needed)', type: 'textarea', placeholder: '', hint: 'Must include your studio name and "Reply STOP to opt out".', defaultTemplate: (studioName) => `${studioName}: Hi {first_name}, this is a reminder about your class on {date} at {time}. Reply STOP to opt out, HELP for support.` },
-        { key: 'sample_sms_2', label: 'Sample SMS 2 (pre-filled, edit as needed)', type: 'textarea', placeholder: '', hint: 'Different use case so the carriers see your message variety.', defaultTemplate: (studioName) => `${studioName}: Term enrolments open today! Browse classes and book your spot: {link}. Reply STOP to opt out.` },
-        { key: 'estimated_monthly_volume', label: 'Estimated monthly SMS volume', type: 'select', options: [
-          { value: '', label: 'Select…' },
-          { value: 'lt_1k', label: 'Under 1,000' },
-          { value: '1k_10k', label: '1,000 – 10,000' },
-          { value: '10k_100k', label: '10,000 – 100,000' },
-          { value: '100k_plus', label: 'Over 100,000' },
-        ] },
-        { key: 'opt_in_screenshot_url', label: 'Opt-in screenshot URL (optional)', type: 'url', placeholder: 'https://...', hint: 'Helpful for Toll-Free verification. Upload a screenshot of your enrolment opt-in checkbox somewhere and paste the link, or send it via Messages.' },
-        { key: 'notes', label: 'Anything else? (optional)', type: 'textarea', placeholder: 'e.g. We already had Twilio set up by a previous developer.' },
-      ],
-      noAccountLabel: 'I don\'t have a Privacy Policy or Terms yet, please help me set them up.',
+      // whatWeDo, the steps, the fields and the no-account label are NOT here.
+      // They depend on the studio's COUNTRY, which is a separate axis from the
+      // commercial line they pay on, and this tile used to describe the US
+      // process to everybody: it opened with the 10DLC carrier registry, then
+      // asked a studio in Manchester or Auckland for a US Campaign Registry
+      // industry vertical, a US campaign throughput tier, and an opt-in
+      // screenshot for US Toll-Free verification.
+      //
+      // The whole country-specific half is resolved SERVER-SIDE, by
+      // _shared/sms-registration.ts, and arrives as `sms_registration` on the
+      // account payload. This page has no bundler and could only have carried a
+      // hand-kept copy of that copy, held together by a drift test. It always
+      // fetches before it renders and a studio's country cannot change while
+      // they are looking at the page, so there is nothing to decide here.
+      // See tileMetaFor().
     },
     whatsapp: {
       key: 'whatsapp',
@@ -726,7 +691,7 @@
       name: 'WhatsApp Business',
       tagline: 'Optional. AI chat over WhatsApp.',
       whatWeDo: 'If you want your AI agent to also answer WhatsApp messages, we\'ll set up WhatsApp Business on the Meta Business Manager you gave us access to, register your display name, and connect it to your AI chat.',
-      whatYouNeedForGuided: 'Your Meta Business Manager already connected to us (the Meta tile), a verified business address on your Business Manager, and a digital copy of your business registration (incorporation cert / ASIC extract / utility bill in the business name).',
+      whatYouNeedForGuided: 'Your Meta Business Manager already connected to us (the Meta tile), a verified business address on your Business Manager, and a digital copy of your business registration (incorporation certificate, a company-register extract, or a utility bill in the business name).',
       stepsDfy: [
         'Make sure the Meta Business Manager tile above is complete first, WhatsApp setup runs through the same Business Manager.',
         'Decide if you want WhatsApp enabled. It costs extra per conversation (Meta\'s pricing, passed through) but lets families chat with your AI on WhatsApp.',
@@ -757,7 +722,7 @@
           { value: 'health_medical', label: 'Health & Medical' },
           { value: 'other', label: 'Other' },
         ] },
-        { key: 'verification_doc_url', label: 'Business verification document URL', type: 'url', placeholder: 'https://...', hint: 'Incorporation cert, ASIC extract, or a utility bill in the business name. Upload somewhere accessible (Google Drive shareable link works) and paste the link.' },
+        { key: 'verification_doc_url', label: 'Business verification document URL', type: 'url', placeholder: 'https://...', hint: 'Your incorporation certificate, an extract from your country\'s company register, or a utility bill in the business name. Upload somewhere accessible (a Google Drive shareable link works) and paste the link.' },
         { key: 'notes', label: 'Anything else? (optional)', type: 'textarea', placeholder: 'e.g. Our current WhatsApp number is the owner\'s personal one, happy to use a fresh number.' },
       ],
       noAccountLabel: 'I don\'t want WhatsApp, please skip this for now.',
@@ -779,6 +744,12 @@
     const sub_copy = isGuided
       ? 'Each tile walks you through one piece of your tech stack. Tap a tile to see what to do, plus what to paste back to us when you\'re done.'
       : 'Each tile lets you invite us into one of your accounts so we can set everything up for you. Tap a tile to see what we need.';
+    // The messaging tiles are held back until this pack is done, so that the
+    // most demanding step is not one of eight on the day a studio paid. Say so:
+    // a grid that grows by two tiles out of nowhere reads like a moving target.
+    const moreComing = acctState.messagingPending
+      ? `<p class="acct-checklist-sub">Once these are done we'll add one more step, for texting families. We've left it until last because it asks the most of you.</p>`
+      : '';
     return `
       <div class="acct-card">
         <div class="acct-checklist-hdr">
@@ -786,13 +757,30 @@
           <div class="acct-checklist-progress">${completeCount} of ${tasks.length} complete</div>
         </div>
         <p class="acct-checklist-sub">${esc(sub_copy)}</p>
+        ${moreComing}
         <div class="acct-checklist-grid">
           ${tasks.map((t) => renderSetupTile(t)).join('')}
         </div>
       </div>`;
   }
 
+  // The tile definition, with the country-specific half merged in for the one
+  // surface that has one. Returns null when the server did not send it, which
+  // can only happen if the tile is being rendered without its model, and a
+  // half-drawn SMS tile is worse than no tile.
+  function tileMetaFor(surface) {
+    const base = SETUP_SURFACES_META[surface];
+    if (!base) return null;
+    if (surface !== 'sms_a2p') return base;
+    const model = acctState.smsRegistration;
+    return model ? Object.assign({}, base, model) : null;
+  }
+
   function renderSetupTile(task) {
+    // Identity only, and deliberately NOT tileMetaFor(): the grid tile needs
+    // nothing that comes from the server, and a studio silently missing a
+    // required tile because one field of a payload was absent is a far worse
+    // failure than a tile that opens and says to refresh.
     const meta = SETUP_SURFACES_META[task.surface];
     if (!meta) return '';
     const statusLabel = TILE_STATUS_LABEL[task.status] || 'Not started';
@@ -807,10 +795,40 @@
       </button>`;
   }
 
+  function showTileUnavailable(base) {
+    const card = document.createElement('div');
+    card.className = 'acct-modal-backdrop';
+    card.id = 'setupTileModal';
+    card.innerHTML = `
+      <div class="acct-tile-modal-card" role="dialog" aria-modal="true" aria-labelledby="tileTitle">
+        <div class="acct-modal-hdr">
+          <h3 id="tileTitle">${base.icon} ${esc(base.name)}</h3>
+          <button type="button" class="acct-modal-close" data-close-tile aria-label="Close">&times;</button>
+        </div>
+        <p class="acct-modal-sub">We could not load this step just now. Refresh the page and it should open. If it keeps happening, send us a message and we will sort it out for you.</p>
+        <div class="acct-modal-actions">
+          <button type="button" class="acct-btn" data-close-tile>Close</button>
+        </div>
+      </div>`;
+    document.body.appendChild(card);
+    card.addEventListener('click', (e) => {
+      if (e.target === card || e.target.closest('[data-close-tile]')) card.remove();
+    });
+  }
+
   function openSetupTileModal(surface) {
     const task = (acctState.setupTasks || []).find((t) => t.surface === surface);
-    const meta = SETUP_SURFACES_META[surface];
-    if (!task || !meta) return;
+    const base = SETUP_SURFACES_META[surface];
+    if (!task || !base) return;
+    const meta = tileMetaFor(surface);
+    if (!meta) {
+      // The server-resolved half did not arrive. In practice this means the page
+      // is newer than the deployed function, which is a deploy-order slip and
+      // not the studio's problem, so say something true and recoverable rather
+      // than opening a half-drawn form or nothing at all.
+      showTileUnavailable(base);
+      return;
+    }
     const sub = acctState.submission;
     const isGuided = sub.setup_type === 'guided';
     const isComplete = task.status === 'complete';
@@ -846,22 +864,20 @@
         <ol>${steps.map((s) => `<li>${s}</li>`).join('')}</ol>
       </div>`;
 
-    const studioNameForTemplate = sub.studio_name || 'Your Studio';
-    const fieldsHtml = meta.fields.map((f) => {
+    const fieldsHtml = (meta.fields || []).map((f) => {
       const stored = data[f.key] != null ? String(data[f.key]) : '';
-      // Pre-fill compliant SMS samples (and any other field with a
-      // defaultTemplate) on first open. The studio can edit freely; once
-      // they save anything, stored wins on subsequent opens.
-      const val = (!stored && typeof f.defaultTemplate === 'function')
-        ? f.defaultTemplate(studioNameForTemplate)
-        : stored;
+      // Pre-fill on first open, from a defaultValue the server wrote out (it
+      // knows the studio name and the country, and the opt-out wording differs:
+      // STOP everywhere, HELP only where a US carrier is going to check for it).
+      // The studio edits freely, and once they save anything stored wins.
+      const val = (!stored && f.defaultValue) ? String(f.defaultValue) : stored;
       const hint = f.hint ? `<span class="f-hint">${esc(f.hint)}</span>` : '';
       if (f.type === 'select') {
         const opts = (f.options || []).map((o) => `<option value="${esc(o.value)}"${val === o.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
         return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><select id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}">${opts}</select>${hint}</div>`;
       }
       if (f.type === 'textarea') {
-        const rows = f.defaultTemplate ? 3 : 2;
+        const rows = f.defaultValue ? 3 : 2;
         return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><textarea id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}" rows="${rows}" placeholder="${esc(f.placeholder || '')}">${esc(val)}</textarea>${hint}</div>`;
       }
       return `<div class="f"><label for="tile-f-${esc(f.key)}">${esc(f.label)}</label><input type="${esc(f.type)}" id="tile-f-${esc(f.key)}" data-field="${esc(f.key)}" placeholder="${esc(f.placeholder || '')}" value="${esc(val)}">${hint}</div>`;
@@ -930,7 +946,23 @@
       const form = document.getElementById('tileForm');
       const noAccountFlag = !!form.querySelector('#tile-noaccount').checked;
       const status = noAccountFlag ? 'no_account' : 'submitted';
+      // Start from what is already stored, ALWAYS, including on the "I don't
+      // have this yet" path. The save REPLACES the row's data rather than
+      // merging into it, so anything not sent here is destroyed.
+      //
+      // Two ways that bit. A tile's field set is not fixed: the SMS one depends
+      // on the studio's country, so a UK studio who filled in the US registry
+      // fields back when everybody was asked for them lost those simply by
+      // reopening the tile and saving. And ticking "I don't have a Privacy
+      // Policy or Terms yet" used to post an empty object, which threw away the
+      // opt-in description and the two sample messages they had just written,
+      // over a checkbox that was only ever about the policy URLs.
+      //
+      // We write what we asked for and leave alone what we did not ask about. A
+      // field that IS on screen and empty still clears, because the loop below
+      // wins over the seed.
       const dataOut = {};
+      Object.keys(data).forEach((k) => { dataOut[k] = data[k]; });
       if (!noAccountFlag) {
         form.querySelectorAll('[data-field]').forEach((el) => {
           dataOut[el.getAttribute('data-field')] = el.value || '';
@@ -968,14 +1000,13 @@
         else list.push(j.task);
         acctState.setupTasks = list;
         closeIt();
-        renderAccount({
-          submission: acctState.submission,
-          invoices: acctState.invoices,
-          quotes: acctState.quotes,
-          service_requests: acctState.requests,
-          setup_tasks: acctState.setupTasks,
-          conversation: acctState.conv,
-        });
+        // Refetch rather than re-render from local state. THIS save can be the
+        // one that finishes the access pack and unlocks the messaging tiles, and
+        // only the server knows: it decides which surfaces are visible, seeds
+        // the new rows, and resolves the SMS tile for the studio's country.
+        // Rendering from a hand-built payload would leave them looking at a
+        // completed checklist that still says one more step is coming.
+        await load();
       } catch (err) {
         document.getElementById('tileErr').textContent = 'Network error. Try again in a moment.';
         btn.disabled = false;
@@ -1086,6 +1117,12 @@
     acctState.quotes = quotes;
     acctState.requests = data.service_requests || [];
     acctState.setupTasks = data.setup_tasks || acctState.setupTasks || [];
+    // The country-specific half of the SMS tile, resolved server-side.
+    acctState.smsRegistration = data.sms_registration || acctState.smsRegistration || null;
+    // Whether this studio's plan has messaging tiles still waiting to unlock.
+    acctState.messagingPending = data.messaging_pending != null
+      ? data.messaging_pending
+      : (acctState.messagingPending || false);
     acctState.conv = conv;
     acctState.fullName = fullName;
     acctState.statusPill = statusPill;
@@ -1868,7 +1905,14 @@
       const merged = Object.assign({}, acctState.submission, data.submission || patch);
       acctState.submission = merged;
       acctState.editing[sectionId] = false;
-      renderAccount({ submission: merged, invoices: acctState.invoices, quotes: acctState.quotes, conversation: acctState.conv });
+      // COUNTRY IS EDITABLE HERE, and the SMS tile's entire contents are derived
+      // from it server-side. Re-rendering from local state would leave a studio
+      // who has just corrected "United States" to "United Kingdom" still being
+      // asked for a US Campaign Registry industry vertical, which is the exact
+      // defect this tile was rebuilt to remove. Refetch so everything derived
+      // from the submission is resolved again. renderAccount replaces the whole
+      // of #acctRoot either way, so this costs a round trip and nothing else.
+      await load();
     } catch (err) {
       console.error('section save failed', err);
       msgEl.className = 'acct-edit-msg err';
