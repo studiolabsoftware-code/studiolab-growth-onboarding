@@ -301,3 +301,46 @@ on both functions, 45 `_shared` tests, `node --check`.
 
 `studiolab_service_role_key` is deliberately left as the placeholder. Nothing reads it any more, and
 repairing it would mean handling the project's highest-privilege key for no benefit.
+
+## 2026-08-26 (item 2): the AU/US routing hole closed server-side
+
+`js/form.js` stopped asking for a country, so `getCountryValue()` falls back to the URL and every
+studio on /au/ is stored `country='AU'`. `pricing.ts` decides currency from that field alone, so an
+Auckland studio was charged AUD with 10% Australian GST. Her submission already carried
+a `+64` mobile in `contact_phone` and `address_postcode = '0632'` before checkout. Nothing read
+either. `create-checkout-session` guarded only the opposite mistake, via `isAustralianFreeText`.
+
+**Charging-model gate.** Read `CHARGING-MODEL-CANON.md` before designing. Reconciliation: this
+surface sits OUTSIDE the two-sided ledger. It creates no charge or payment rows, no allocation, no
+stored paid column, and no derived balance; it selects which currency/tax catalog row a studio is
+sold at point of sale (`pricing.ts:83` `currencyForCountry`, `:154` the flat 10% AUD rate). None of
+the seven rules are engaged. The correctness risk is currency and tax selection, not the ledger.
+
+`_shared/region-guard.ts` + 11 tests. The design rule, which is the whole point: **block only on
+POSITIVE contradicting evidence, never on absence.** A false positive stops a real Australian studio
+from paying us, which is worse than the fault being fixed.
+
+- Phone: only an explicit international prefix (`+` or `00`) counts. `+61` is Australia, matched
+  exactly rather than by prefix so `+62`, `+64`, `+65` and `+66` are not mistaken for it. A national
+  number like `0421 056 987` is genuinely ambiguous and is NOT evidence.
+- Postcode: letters (UK/CA) or a length other than 4 (US ZIP) are positive evidence. A 4-digit code
+  is checked against Australia's allocated ranges (1000-9999, plus 0200-0299 ACT and 0800-0999 NT),
+  so `0632` is not merely unusual, it is not an Australian postcode at all.
+- Symmetric, so it also catches an Australian on the US flow being charged USD with no GST, which
+  is our own tax exposure rather than the studio's.
+
+Blocked attempts are logged as `checkout_blocked_region_mismatch`, because a blocked studio is
+otherwise a silently lost sale. **`activity_log.action` has a CHECK constraint and that value was
+not in it**, so the insert would have failed inside the try/catch that exists so logging can never
+break a checkout: silent. Migration `052` extends the constraint, rebuilt programmatically from its
+own live definition rather than retyping 61 values (verified 61 -> 62, nothing dropped).
+
+Verified: the guard returns `mismatch:true` on Neverland's exact stored values, `false` for a
+genuine AU studio, and `false` when phone and postcode are both absent. The function's real select
+string was run against the live row to prove `contact_phone` and `address_postcode` actually come
+back, since a mistyped column would have made the guard silently never fire. Deployed; a bogus
+session token still answers 401. Gate green, 56 `_shared` tests.
+
+STILL OPEN, deliberately: `resolve-pricing` (the preview) is unguarded, so a NZ studio is shown AUD
+pricing all the way to checkout and only stopped there. Correct on the money, poor on the journey.
+`COUNTRY_TO_REGION` at `js/form.js:266` remains dead code and the dropdown stays removed, per Gary.

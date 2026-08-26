@@ -10,6 +10,7 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { resolvePricing, isAustralianFreeText } from '../_shared/pricing.ts';
+import { assessRegion } from '../_shared/region-guard.ts';
 import { getAuGstTaxRateId, getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 
 type Submission = {
@@ -24,6 +25,8 @@ type Submission = {
   stripe_customer_id: string | null;
   payment_mode: 'immediate' | 'hold' | 'save_card' | null;
   payment_status: string | null;
+  contact_phone: string | null;
+  address_postcode: string | null;
 };
 
 type PaymentSettings = {
@@ -164,7 +167,7 @@ Deno.serve(async (req) => {
     const sessionHash = await sha256Hex(sessionToken);
     const { data: submission, error: subErr } = await sb
       .from('submissions')
-      .select('id, plan, setup_type, country, contact_email, studio_name, first_name, last_name, stripe_customer_id, payment_mode, payment_status, session_expires_at')
+      .select('id, plan, setup_type, country, contact_email, studio_name, first_name, last_name, stripe_customer_id, payment_mode, payment_status, session_expires_at, contact_phone, address_postcode')
       .eq('session_token_hash', sessionHash)
       .maybeSingle() as { data: (Submission & { session_expires_at: string | null }) | null; error: unknown };
     if (subErr) throw subErr;
@@ -183,6 +186,50 @@ Deno.serve(async (req) => {
     // into the Other-country box. Country='AU' is reserved for the AU form,
     // which is region-locked at /au/[plan]/.
     if (isAustralianFreeText(submission.country)) {
+      return jsonResponse({
+        ok: false,
+        error: 'Australian studios must use our AU onboarding form. Please email info@studiolabsoftware.com if you reached this page in error.',
+        code: 'au_must_use_au_flow',
+      }, 400);
+    }
+
+    // The mirror of the guard above, and the one that was missing. The form no
+    // longer asks for a country, so `country` is whatever the URL implied: every
+    // studio on /au/ is stored as 'AU' and priced in AUD with 10% GST. On
+    // 2026-08-26 an Auckland studio went through the AU flow carrying a +64
+    // phone and an Auckland postcode, and was charged Australian GST.
+    //
+    // Fires only on POSITIVE contradicting evidence, never on absence, because a
+    // false positive here stops a real Australian studio from paying us.
+    const region = assessRegion({
+      country: submission.country,
+      contactPhone: submission.contact_phone,
+      addressPostcode: submission.address_postcode,
+    });
+    if (region.mismatch) {
+      // Log it: otherwise a blocked studio is a silently lost sale. This is the
+      // team's cue to send the right link rather than wait for an email.
+      try {
+        await sb.from('activity_log').insert({
+          submission_id: submission.id,
+          action: 'checkout_blocked_region_mismatch',
+          actor: submission.contact_email || 'studio',
+          details: {
+            stored_country: submission.country,
+            expected: region.expected,
+            contradicting_source: region.contradicting.source,
+            contradicting_detail: region.contradicting.detail,
+          },
+        });
+      } catch (e) { console.error('activity_log insert failed:', e); }
+
+      if (region.expected === 'AU') {
+        return jsonResponse({
+          ok: false,
+          error: 'Your contact details suggest your studio is outside Australia, and this form prices in Australian dollars with Australian GST. Please email info@studiolabsoftware.com and we will send you the right link. If your details are wrong, correct them and try again.',
+          code: 'non_au_must_not_use_au_flow',
+        }, 400);
+      }
       return jsonResponse({
         ok: false,
         error: 'Australian studios must use our AU onboarding form. Please email info@studiolabsoftware.com if you reached this page in error.',
