@@ -38,7 +38,7 @@ export interface IdentifierSpec {
  * not, which is why an Australian sole trader has an ABN but no ACN, and a UK
  * sole trader has no company number at all.
  */
-const INCORPORATED = new Set(['llc', 'corp', 'pty_ltd', 'ltd', 'nonprofit']);
+const INCORPORATED = new Set(['llc', 'corp', 'pty_ltd', 'ltd', 'llp', 'nonprofit']);
 
 const ABN: IdentifierSpec = {
   key: 'abn',
@@ -51,7 +51,7 @@ const ABN: IdentifierSpec = {
 const ACN: IdentifierSpec = {
   key: 'acn',
   label: 'ACN',
-  hint: 'Australian Company Number, 9 digits. Companies only, so leave blank if you are a sole trader or partnership.',
+  hint: 'Australian Company Number, 9 digits. Companies only, so leave it blank if you do not have one.',
   digits: 9,
   appliesTo: 'incorporated',
 };
@@ -168,4 +168,126 @@ export function identifierShapeWarning(spec: IdentifierSpec, value: string | nul
   const d = identifierDigits(raw);
   if (d.length === spec.digits) return null;
   return `${spec.label} is usually ${spec.digits} digits. Yours has ${d.length}. Worth double checking, since SMS registration is refused on a mismatch.`;
+}
+
+// ── Entity types ────────────────────────────────────────────────────────────
+//
+// Same defect, one field over. The business-type list was a single mixed AU/US
+// menu, so an Australian studio was offered LLC and Corporation (neither of
+// which exists here) and a UK studio picked from six options none of which fit
+// their company. business_type feeds invoices and carrier registration, so a
+// wrong value there is a real one, not a cosmetic one.
+//
+// Values are STABLE and shared across countries; only the label and the
+// availability move. `sole_prop` means the same thing in Auckland and Ohio even
+// though one reads "Sole trader" and the other "Sole Proprietor". Never rename a
+// value to suit a country: existing rows have to keep resolving, and
+// `identifiersFor` keys off these values.
+
+export interface BusinessTypeOption {
+  value: string;
+  label: string;
+}
+
+const BUSINESS_TYPES_BY_COUNTRY: Record<string, BusinessTypeOption[]> = {
+  AU: [
+    { value: 'sole_prop', label: 'Sole Trader' },
+    { value: 'partnership', label: 'Partnership' },
+    { value: 'pty_ltd', label: 'Pty Ltd (Australian company)' },
+    { value: 'nonprofit', label: 'Incorporated association / not-for-profit' },
+    { value: 'other_au', label: 'Other Australian entity' },
+    { value: 'other', label: 'Other' },
+  ],
+  US: [
+    { value: 'sole_prop', label: 'Sole Proprietor' },
+    { value: 'llc', label: 'LLC' },
+    { value: 'corp', label: 'Corporation' },
+    { value: 'partnership', label: 'Partnership' },
+    { value: 'nonprofit', label: 'Non-profit' },
+    { value: 'other', label: 'Other' },
+  ],
+  NZ: [
+    { value: 'sole_prop', label: 'Sole trader' },
+    { value: 'partnership', label: 'Partnership' },
+    { value: 'ltd', label: 'Limited company' },
+    { value: 'nonprofit', label: 'Incorporated society / charitable trust' },
+    { value: 'other', label: 'Other' },
+  ],
+  UK: [
+    { value: 'sole_prop', label: 'Sole trader' },
+    { value: 'partnership', label: 'Partnership' },
+    { value: 'ltd', label: 'Private limited company (Ltd)' },
+    { value: 'llp', label: 'Limited liability partnership (LLP)' },
+    { value: 'nonprofit', label: 'Charity / community interest company' },
+    { value: 'other', label: 'Other' },
+  ],
+  CA: [
+    { value: 'sole_prop', label: 'Sole proprietorship' },
+    { value: 'partnership', label: 'Partnership' },
+    { value: 'corp', label: 'Corporation' },
+    { value: 'nonprofit', label: 'Non-profit' },
+    { value: 'other', label: 'Other' },
+  ],
+};
+
+/**
+ * The generic list, for a country we do not have a catalogue for. It stays
+ * deliberately vague ("Company / corporation") rather than borrowing a US label,
+ * because an Irish studio is not an LLC and telling them they are puts a wrong
+ * value on their invoice.
+ */
+const GENERIC_BUSINESS_TYPES: BusinessTypeOption[] = [
+  { value: 'sole_prop', label: 'Sole trader / sole proprietor' },
+  { value: 'partnership', label: 'Partnership' },
+  { value: 'corp', label: 'Company / corporation' },
+  { value: 'nonprofit', label: 'Non-profit' },
+  { value: 'other', label: 'Other' },
+];
+
+/** The entity types that actually exist in this country, in that country's words. */
+export function businessTypesFor(country: string | null | undefined): BusinessTypeOption[] {
+  return BUSINESS_TYPES_BY_COUNTRY[normaliseCountry(country)] ?? GENERIC_BUSINESS_TYPES;
+}
+
+/**
+ * The label to show for a stored value. Country-aware, so an Australian studio's
+ * review step and the admin view both read "Sole Trader" rather than the US
+ * "Sole Proprietor" for the same stored `sole_prop`.
+ *
+ * A value the country does not offer still resolves: a studio can move country
+ * between drafts, and an old row must never render as a blank. We fall back to
+ * any country's label for that value before giving up and showing the raw value.
+ */
+export function businessTypeLabelFor(country: string | null | undefined, value: string | null | undefined): string {
+  const v = String(value ?? '').trim();
+  if (!v) return '';
+  const own = businessTypesFor(country).find((o) => o.value === v);
+  if (own) return own.label;
+  for (const list of Object.values(BUSINESS_TYPES_BY_COUNTRY)) {
+    const hit = list.find((o) => o.value === v);
+    if (hit) return hit.label;
+  }
+  const generic = GENERIC_BUSINESS_TYPES.find((o) => o.value === v);
+  return generic ? generic.label : v;
+}
+
+/** Every value any country offers. The form's `<select>` must carry all of them. */
+export function allBusinessTypeValues(): string[] {
+  const out = new Set<string>();
+  for (const list of Object.values(BUSINESS_TYPES_BY_COUNTRY)) list.forEach((o) => out.add(o.value));
+  GENERIC_BUSINESS_TYPES.forEach((o) => out.add(o.value));
+  return Array.from(out);
+}
+
+/**
+ * Every country either catalogue names.
+ *
+ * Exists for the parity test, which drives its matrix off this rather than a
+ * hand-written list. A hand-written list is the gap that lets someone add a
+ * country here, forget the browser copy in js/form.js, and still go green.
+ */
+export function catalogueCountries(): string[] {
+  const out = new Set<string>(Object.keys(BY_COUNTRY));
+  Object.keys(BUSINESS_TYPES_BY_COUNTRY).forEach((c) => out.add(c));
+  return Array.from(out);
 }

@@ -278,7 +278,7 @@
           <span class="field-note">Only if you trade under a different name.</span>
         </div>
       </div>
-      <div class="fr">
+      <div class="fr" id="identifierRow">
         <div class="f">
           <label for="businessType">Business type </label>
           <select id="businessType">
@@ -289,28 +289,12 @@
             <option value="partnership">Partnership</option>
             <option value="nonprofit">Non-profit</option>
             <option value="pty_ltd">Pty Ltd (Australian company)</option>
+            <option value="ltd">Limited company</option>
+            <option value="llp">Limited liability partnership (LLP)</option>
             <option value="other_au">Other Australian entity</option>
             <option value="other">Other</option>
           </select>
           <span class="field-err">Please select your business type.</span>
-        </div>
-        <div class="f" id="einField" hidden>
-          <label for="ein">EIN </label>
-          <input type="text" id="ein" placeholder="XX-XXXXXXX" inputmode="numeric" maxlength="10">
-          <span class="field-note">Your IRS Employer Identification Number.</span>
-          <span class="field-err">Please enter your EIN.</span>
-        </div>
-        <div class="f" id="abnField" hidden>
-          <label for="abn">ABN </label>
-          <input type="text" id="abn" placeholder="11 222 333 444" inputmode="numeric" maxlength="14">
-          <span class="field-note">Your Australian Business Number (11 digits).</span>
-          <span class="field-err">Please enter your ABN.</span>
-        </div>
-        <div class="f" id="acnField" hidden>
-          <label for="acn">ACN </label>
-          <input type="text" id="acn" placeholder="123 456 789" inputmode="numeric" maxlength="11">
-          <span class="field-note">Australian Company Number (9 digits, Pty Ltd only).</span>
-          <span class="field-err">Please enter your ACN.</span>
         </div>
       </div>
       <div class="fr x1">
@@ -767,7 +751,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
-<script src="/js/form.js?v=20260826b"></script>
+<script src="/js/form.js?v=20260826c"></script>
 <script src="/js/form-attachments.js?v=20260515a"></script>
 
 </div><!-- /formWrap -->

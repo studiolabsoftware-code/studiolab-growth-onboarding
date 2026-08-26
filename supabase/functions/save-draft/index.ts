@@ -70,8 +70,14 @@ const ALLOWED_FIELDS = new Set([
   // A2P brand check, a third-party verification they complete in their own
   // sub-account, which we can neither run for them nor feed digits into. The
   // column stays for any historical row; nothing may write it again.
+  //
+  // The identifier columns are country-scoped, not line-scoped: which of them a
+  // studio is asked for comes from _shared/business-identifiers.ts, keyed on the
+  // studio's own country. The form sends ALL of them on every save, with the
+  // ones that country does not issue set to null, so switching entity type or
+  // resolving a country late cannot leave a stale ACN or EIN on the row.
   'legal_business_name','trading_name','business_type',
-  'ein','abn','acn',
+  'ein','abn','acn','nzbn','crn','bn','tax_id',
   'business_email','business_email_is_personal_domain',
   'address_street','address_city','address_region','address_postcode',
 ]);

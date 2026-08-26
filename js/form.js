@@ -267,21 +267,109 @@
   const REGION_DEFAULT_COUNTRY = { AU: 'AU', US: 'US' };
   const KNOWN_COUNTRY_CODES = new Set(['AU', 'US', 'CA', 'UK', 'NZ']);
 
-  // The studio's effective country for pricing, summary, and submit. When the
-  // dropdown is set to OTHER we fall back to the manual text input so studios
-  // outside our supported list can still finish setup.
+  // ── The studio's country, which is NOT the commercial line ────────────────
+  //
+  // Two commercial lines exist, Australia and everyone else, and the URL only
+  // ever says which of the two a studio pays on. It does not say where they are.
+  // A UK studio arrives on /us/, pays USD on the everyone-else line, and is
+  // still a UK business holding a Companies House number and no EIN. Keying the
+  // identifier fields off the URL is exactly what left every NZ, UK and Canadian
+  // studio asked for no business identifier at all.
+  //
+  // There is deliberately NO country dropdown. It would be a worse answer than
+  // the one we already hold: the signup told us the country before this form
+  // loaded. So we resolve it, strongest evidence first, and never ask again.
+
+  // The country stamped on the submission row at signup and kept by prebind.
+  // Empty until a draft is hydrated, which is why the fallbacks below exist.
+  let ROW_COUNTRY = '';
+
+  // Mirrors normaliseCountry() in supabase/functions/_shared/business-identifiers.ts.
+  // Held in step by business-identifier-parity.test.ts, which fails if they drift.
+  function normaliseCountry(country) {
+    const c = String(country == null ? '' : country).trim().toUpperCase();
+    if (!c) return '';
+    if (c === 'AU' || c === 'AUS' || c === 'AUSTRALIA') return 'AU';
+    if (c === 'US' || c === 'USA' || c === 'AMERICA' || c === 'UNITED STATES') return 'US';
+    if (c === 'NZ' || c === 'NZL' || c === 'NEW ZEALAND') return 'NZ';
+    if (c === 'UK' || c === 'GB' || c === 'GBR' || c === 'UNITED KINGDOM' || c === 'GREAT BRITAIN') return 'UK';
+    if (c === 'CA' || c === 'CAN' || c === 'CANADA') return 'CA';
+    return c;
+  }
+
+  // Dial codes that identify exactly one country we hold a catalogue for.
+  //
+  // +1 is deliberately ABSENT. The US and Canada share it, and guessing US would
+  // ask a Toronto studio for an EIN they do not have while never asking for the
+  // BN they do. An ambiguous code is not evidence, so we fall through to the URL
+  // region, which at least matches the common case.
+  const DIAL_TO_COUNTRY = { 61: 'AU', 64: 'NZ', 44: 'UK' };
+
+  function countryFromPhone(phone) {
+    const cleaned = String(phone || '').trim().replace(/[\s().-]/g, '');
+    let digits;
+    if (cleaned.charAt(0) === '+') digits = cleaned.slice(1);
+    else if (cleaned.slice(0, 2) === '00') digits = cleaned.slice(2);
+    else return ''; // national format ('04XX XXX XXX') belongs to several countries
+    if (!/^\d{4,}$/.test(digits)) return '';
+    const hit = Object.keys(DIAL_TO_COUNTRY).find((code) => digits.indexOf(code) === 0);
+    return hit ? DIAL_TO_COUNTRY[hit] : '';
+  }
+
+  // What we know without asking. The AU pages have no country field at all; the
+  // three US-line pages still carry one, and it is a MIRROR of this, not an
+  // input to it. See getCountryValue.
+  //
+  // This value reaches money: resolve-pricing and, through the saved row,
+  // create-checkout-session. Only one distinction matters there - Australia
+  // against everything else - since currencyForCountry maps AU/AUS/AUSTRALIA to
+  // AUD and every other value, known or not, to USD. So resolving UK instead of
+  // US changes nothing about what a studio pays. Resolving NZ on an /au/ page
+  // does, and deliberately: pricingCountryFor already corrected that studio at
+  // checkout off the same phone number, so this only makes the price they are
+  // SHOWN agree with the price they are CHARGED instead of disagreeing.
+  function resolveCountry() {
+    if (ROW_COUNTRY) return ROW_COUNTRY;
+    const fromPhone = countryFromPhone(val('contactPhone'));
+    if (fromPhone) return fromPhone;
+    return REGION_DEFAULT_COUNTRY[REGION] || REGION || 'AU';
+  }
+
+  // True once the studio has answered the country question themselves. Until
+  // then the select holds whatever WE put in it, and treating our own default as
+  // the studio's answer is how this went wrong: the US-line pages pre-selected
+  // "United States" on first paint, so a Manchester studio whose signup said UK
+  // was quietly overruled by a value nobody had chosen, and the row country and
+  // the dial code were never consulted at all.
+  let COUNTRY_USER_CHOSEN = false;
+
+  // Reflect the resolved country back into the select so the studio sees what we
+  // hold and can correct it. Never reads back into the resolution.
+  function syncCountrySelect() {
+    const cSel = document.getElementById('country');
+    if (!cSel || COUNTRY_USER_CHOSEN) return;
+    const resolved = normaliseCountry(resolveCountry());
+    if (!resolved) return;
+    const known = Array.prototype.slice.call(cSel.options).some((o) => o.value === resolved);
+    if (known && cSel.value !== resolved) {
+      cSel.value = resolved;
+      applyCountryOtherVisibility();
+    }
+  }
+
+  // The studio's effective country for pricing, summary, and submit. Their own
+  // explicit answer wins over everything, because they know and we are only
+  // inferring; absent that, what the signup told us wins over what the URL did.
   function getCountryValue() {
     const cSel = document.getElementById('country');
-    // Country field was removed from the live form (region is implied by
-    // the URL path and the studio's account on the GHL side already has
-    // it). Fall back to the URL region so the data the form posts stays
-    // consistent with what previous code expected.
-    if (!cSel) return REGION_DEFAULT_COUNTRY[REGION] || REGION || 'AU';
-    if (cSel.value === 'OTHER') {
-      const other = document.getElementById('countryOther');
-      return other ? (other.value || '').trim() : '';
+    if (COUNTRY_USER_CHOSEN && cSel) {
+      if (cSel.value === 'OTHER') {
+        const other = document.getElementById('countryOther');
+        return other ? (other.value || '').trim() : '';
+      }
+      if (cSel.value) return cSel.value.trim();
     }
-    return (cSel.value || '').trim();
+    return resolveCountry();
   }
 
   function applyCountryToTimezone() {
@@ -332,51 +420,147 @@
     // Pre-select the country dropdown to the URL's region default
     // (country field was removed from the live form but the helper
     // stays defensive in case a future variant brings it back).
-    const cSel = document.getElementById('country');
-    if (cSel && !cSel.value) {
-      const def = REGION_DEFAULT_COUNTRY[REGION] || 'AU';
-      cSel.value = def;
-    }
+    syncCountrySelect();
     applyCountryToTimezone();
     applyCountryOtherVisibility();
-    applyBusinessTypeOptions();
+    applyCountryDependentFields();
     applyRegionalCopy();
     applySmartDefaults();
   }
 
-  // Offer only the entity types that exist in the studio's country, and use
-  // that country's name for them. The list was identical on every route, so an
-  // Australian studio was offered LLC (which does not exist here) and a US
-  // studio was offered Pty Ltd. Nothing broke, because the ABN and EIN fields
-  // key off country rather than off this answer, but business_type feeds
+  // ── Entity types, per country ─────────────────────────────────────────────
+  //
+  // Mirrors businessTypesFor() in supabase/functions/_shared/business-identifiers.ts,
+  // which is the source of truth. business-identifier-parity.test.ts reads both
+  // files and fails if they drift, because a browser cannot import Deno source
+  // and a hand-kept copy with no test is a copy that goes stale.
+  //
+  // The list used to be one mixed AU/US menu, so an Australian studio was
+  // offered LLC and Corporation (neither exists here) and a UK studio picked
+  // from six options none of which fit their company. business_type feeds
   // invoices and carrier registration, so a wrong value there is a real one.
   //
-  // Values are deliberately unchanged: sole_prop and pty_ltd drive
-  // applyBusinessTypeConditionals(), and existing rows have to keep resolving.
-  // Only labels and availability move.
+  // Values are STABLE across countries and must never be renamed to suit one:
+  // they drive identifiersFor(), and existing rows have to keep resolving. Only
+  // the label and the availability move.
+  const BUSINESS_TYPES_BY_COUNTRY = {
+    AU: [
+      { value: 'sole_prop', label: 'Sole Trader' },
+      { value: 'partnership', label: 'Partnership' },
+      { value: 'pty_ltd', label: 'Pty Ltd (Australian company)' },
+      { value: 'nonprofit', label: 'Incorporated association / not-for-profit' },
+      { value: 'other_au', label: 'Other Australian entity' },
+      { value: 'other', label: 'Other' },
+    ],
+    US: [
+      { value: 'sole_prop', label: 'Sole Proprietor' },
+      { value: 'llc', label: 'LLC' },
+      { value: 'corp', label: 'Corporation' },
+      { value: 'partnership', label: 'Partnership' },
+      { value: 'nonprofit', label: 'Non-profit' },
+      { value: 'other', label: 'Other' },
+    ],
+    NZ: [
+      { value: 'sole_prop', label: 'Sole trader' },
+      { value: 'partnership', label: 'Partnership' },
+      { value: 'ltd', label: 'Limited company' },
+      { value: 'nonprofit', label: 'Incorporated society / charitable trust' },
+      { value: 'other', label: 'Other' },
+    ],
+    UK: [
+      { value: 'sole_prop', label: 'Sole trader' },
+      { value: 'partnership', label: 'Partnership' },
+      { value: 'ltd', label: 'Private limited company (Ltd)' },
+      { value: 'llp', label: 'Limited liability partnership (LLP)' },
+      { value: 'nonprofit', label: 'Charity / community interest company' },
+      { value: 'other', label: 'Other' },
+    ],
+    CA: [
+      { value: 'sole_prop', label: 'Sole proprietorship' },
+      { value: 'partnership', label: 'Partnership' },
+      { value: 'corp', label: 'Corporation' },
+      { value: 'nonprofit', label: 'Non-profit' },
+      { value: 'other', label: 'Other' },
+    ],
+  };
+
+  // For a country we hold no catalogue for. Deliberately vague rather than
+  // borrowing a US label: an Irish studio is not an LLC, and telling them they
+  // are puts a wrong value on their invoice and their carrier registration.
+  const GENERIC_BUSINESS_TYPES = [
+    { value: 'sole_prop', label: 'Sole trader / sole proprietor' },
+    { value: 'partnership', label: 'Partnership' },
+    { value: 'corp', label: 'Company / corporation' },
+    { value: 'nonprofit', label: 'Non-profit' },
+    { value: 'other', label: 'Other' },
+  ];
+
+  function businessTypesFor(country) {
+    return BUSINESS_TYPES_BY_COUNTRY[normaliseCountry(country)] || GENERIC_BUSINESS_TYPES;
+  }
+
+  // The label for a stored value, in the studio's own country's words. A value
+  // that country does not offer still resolves: a studio can move between
+  // drafts, and an older row must never render as a blank.
+  function businessTypeLabelFor(country, value) {
+    const v = String(value == null ? '' : value).trim();
+    if (!v) return '';
+    const own = businessTypesFor(country).find((o) => o.value === v);
+    if (own) return own.label;
+    const lists = Object.keys(BUSINESS_TYPES_BY_COUNTRY).map((k) => BUSINESS_TYPES_BY_COUNTRY[k]);
+    for (let i = 0; i < lists.length; i++) {
+      const hit = lists[i].find((o) => o.value === v);
+      if (hit) return hit.label;
+    }
+    const generic = GENERIC_BUSINESS_TYPES.find((o) => o.value === v);
+    return generic ? generic.label : v;
+  }
+
+  // Rebuilding the select on every keystroke of the phone field would be rude to
+  // anyone using it, so we only touch it when the resolved country actually moves.
+  let LAST_TYPES_COUNTRY = null;
+
   function applyBusinessTypeOptions() {
     const sel = document.getElementById('businessType');
     if (!sel) return;
-    const isAU = (REGION_DEFAULT_COUNTRY[REGION] || 'AU') === 'AU';
-    const LABELS = isAU
-      ? { sole_prop: 'Sole Trader', partnership: 'Partnership', nonprofit: 'Non-profit / incorporated association',
-          pty_ltd: 'Pty Ltd (Australian company)', other_au: 'Other Australian entity', other: 'Other' }
-      : { sole_prop: 'Sole Proprietor', llc: 'LLC', corp: 'Corporation',
-          partnership: 'Partnership', nonprofit: 'Non-profit', other: 'Other' };
+    const country = normaliseCountry(getCountryValue());
+    if (LAST_TYPES_COUNTRY === country) return;
+    LAST_TYPES_COUNTRY = country;
+
+    const selected = sel.value;
+    const optionFor = (value) => Array.prototype.slice.call(sel.options).find((o) => o.value === value);
+
+    // Hide every real option first, then re-show and re-order the ones this
+    // country has. Hidden rather than removed, so a draft saved under another
+    // country still round-trips the value it stored.
     Array.prototype.slice.call(sel.options).forEach((opt) => {
-      if (!opt.value) return; // keep the "Select" placeholder
-      const label = LABELS[opt.value];
-      if (label) {
-        opt.textContent = label;
-        opt.hidden = false;
-        opt.disabled = false;
-      } else {
-        // Not a thing in this country. Hide rather than remove, so a draft
-        // saved before this shipped still round-trips its stored value.
-        opt.hidden = true;
-        opt.disabled = true;
-      }
+      if (!opt.value) return; // the "Select" placeholder stays put
+      opt.hidden = true;
+      opt.disabled = true;
     });
+
+    businessTypesFor(country).forEach((o) => {
+      let opt = optionFor(o.value);
+      if (!opt) {
+        // This page's markup predates the country's list. Create the option
+        // rather than skip it, so a stale cached page still offers the right
+        // entities instead of silently dropping half of them.
+        opt = document.createElement('option');
+        opt.value = o.value;
+      }
+      opt.textContent = o.label;
+      opt.hidden = false;
+      opt.disabled = false;
+      sel.appendChild(opt); // appendChild MOVES an existing node, so this reorders
+    });
+
+    // A hydrated draft can hold a type this country does not offer. Keep it
+    // selectable rather than silently blanking an answer the studio gave us.
+    if (selected) {
+      const cur = optionFor(selected);
+      if (cur) { cur.hidden = false; cur.disabled = false; }
+      sel.value = selected;
+    }
   }
 
   // Smart defaults for fields where the URL region or the verified
@@ -1235,17 +1419,6 @@
   const SETUP_LABEL = { dfy: 'Done-For-You', guided: 'Guided (self-setup)' };
 
   // Business identity labels and helpers (Phase 1 of onboarding access plan).
-  const BUSINESS_TYPE_LABEL = {
-    sole_prop: 'Sole Proprietor',
-    llc: 'LLC',
-    corp: 'Corporation',
-    partnership: 'Partnership',
-    nonprofit: 'Non-profit',
-    pty_ltd: 'Pty Ltd',
-    other_au: 'Other Australian entity',
-    other: 'Other',
-  };
-
   const PERSONAL_EMAIL_DOMAINS = new Set([
     'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.co.uk',
     'outlook.com', 'live.com', 'msn.com', 'yahoo.com', 'yahoo.co.uk',
@@ -1273,53 +1446,222 @@
     return parts.join(', ');
   }
 
-  function businessTaxIdSummary() {
-    // Review-step display: pick the relevant ID per business type. EIN/ABN/ACN
-    // show in full, since the studio entered them and is reviewing their own
-    // data. A US sole proprietor has no ID here on purpose: their identity is
-    // verified by the platform's own A2P check, not by us.
-    const bt = val('businessType');
-    const ein = val('ein'); if (ein) return 'EIN ' + ein;
-    const abn = val('abn'); if (abn) return 'ABN ' + abn + (val('acn') ? ' · ACN ' + val('acn') : '');
-    return '';
+  // ── Business identifiers, per country ─────────────────────────────────────
+  //
+  // Mirrors business-identifiers.ts. Same source-of-truth rule and same parity
+  // test as the entity types above.
+  //
+  // The form used to render exactly three hard-coded fields, gated on the AU/US
+  // commercial line: EIN, ABN, ACN. Every studio outside those two countries was
+  // therefore asked for NO business identifier at all, and Standard A2P brand
+  // registration needs one, so an Auckland or Manchester studio would have
+  // reached SMS registration with nothing to submit and nothing in the flow
+  // would have said so until it failed.
+  //
+  // There is deliberately no SSN field, and there is not going to be one. A US
+  // sole proprietor proves identity through the platform's own A2P brand check,
+  // a third-party verification they complete inside their own sub-account, in
+  // their own browser. We can neither run it for them nor feed their digits
+  // into it, so holding the number would be collecting sensitive data we have
+  // no use for.
+  const IDENT_SPECS = {
+    abn: { key: 'abn', label: 'ABN', digits: 11, appliesTo: 'all',
+      hint: 'Australian Business Number, 11 digits. Every Australian business has one, including sole traders.' },
+    acn: { key: 'acn', label: 'ACN', digits: 9, appliesTo: 'incorporated',
+      hint: 'Australian Company Number, 9 digits. Companies only, so leave it blank if you do not have one.' },
+    ein: { key: 'ein', label: 'EIN', digits: 9, appliesTo: 'incorporated',
+      hint: 'Employer Identification Number, 9 digits. Must match your IRS filings exactly or SMS registration is refused.' },
+    nzbn: { key: 'nzbn', label: 'NZBN', digits: 13, appliesTo: 'all',
+      hint: 'New Zealand Business Number, 13 digits. Every New Zealand business can have one, including sole traders.' },
+    crn: { key: 'crn', label: 'Company registration number', appliesTo: 'incorporated',
+      hint: 'Your Companies House number, 8 characters. Companies and LLPs only, so leave blank if you are a sole trader.' },
+    bn: { key: 'bn', label: 'Business Number (BN)', digits: 9, appliesTo: 'all',
+      hint: 'Your CRA Business Number, 9 digits.' },
+    tax_id: { key: 'tax_id', label: 'Business registration or tax number', appliesTo: 'all',
+      hint: 'Whatever your country issues to identify a registered business. Needed before we can register SMS on your behalf.' },
+  };
+
+  const IDENTIFIERS_BY_COUNTRY = {
+    AU: ['abn', 'acn'],
+    US: ['ein'],
+    NZ: ['nzbn'],
+    UK: ['crn'],
+    GB: ['crn'],
+    CA: ['bn'],
+  };
+
+  const INCORPORATED_TYPES = ['llc', 'corp', 'pty_ltd', 'ltd', 'llp', 'nonprofit'];
+
+  // Every column the submission holds an identifier in. Order is display order.
+  const IDENTIFIER_KEYS = ['abn', 'acn', 'ein', 'nzbn', 'crn', 'bn', 'tax_id'];
+
+  // An unknown country returns the generic field rather than nothing. Asking a
+  // studio in Ireland or Singapore for "your business registration number" is
+  // imperfect, but it beats asking them for nothing and finding the hole at
+  // registration.
+  function identifiersFor(country, businessType) {
+    const keys = IDENTIFIERS_BY_COUNTRY[normaliseCountry(country)] || ['tax_id'];
+    const specs = keys.map((k) => IDENT_SPECS[k]);
+    const bt = String(businessType == null ? '' : businessType).trim().toLowerCase();
+    // Before a type is picked, show everything that country issues, so the
+    // fields are visible rather than appearing later under the studio's cursor.
+    if (!bt) return specs;
+    const incorporated = INCORPORATED_TYPES.indexOf(bt) >= 0;
+    return specs.filter((sp) => sp.appliesTo === 'all' || incorporated);
   }
 
+  // Advisory, never a block. A studio mistyping their ABN should be nudged, not
+  // stopped from paying us; the registry does the real validation.
+  function identifierShapeWarning(spec, value) {
+    const raw = String(value == null ? '' : value).trim();
+    if (!raw || !spec.digits) return '';
+    const d = raw.replace(/\D/g, '');
+    if (d.length === spec.digits) return '';
+    return spec.label + ' is usually ' + spec.digits + ' digits. Yours has ' + d.length
+      + '. Worth double checking, since SMS registration is refused on a mismatch.';
+  }
+
+  // What the studio has typed, held outside the DOM. The fields are rebuilt when
+  // the country resolves or the business type changes, and a value that lived
+  // only in a removed input would die with it. The DOM is the view; this is the
+  // model.
+  const IDENT_VALUES = {};
+
+  function identifierRow() {
+    let row = document.getElementById('identifierRow');
+    if (row) return row;
+    // The page markup may predate the container (a browser holding a cached
+    // copy of the old HTML). Fall back to the row the business-type select sits
+    // in, which is where the three hard-coded fields used to live.
+    const bt = document.getElementById('businessType');
+    if (!bt) return null;
+    row = bt.closest('.fr') || bt.closest('.card');
+    if (row && !row.id) row.id = 'identifierRow';
+    return row;
+  }
+
+  // The three hard-coded EIN / ABN / ACN blocks the six pages used to carry.
+  // Removed on first render so a stale cached page cannot end up showing two ABN
+  // inputs with the same id. Anything already typed into them is kept.
+  function absorbLegacyIdentifierFields() {
+    ['einField', 'abnField', 'acnField'].forEach((id) => {
+      const wrap = document.getElementById(id);
+      if (!wrap) return;
+      const input = wrap.querySelector('input');
+      const v = input && input.value ? input.value.trim() : '';
+      if (input && v) IDENT_VALUES[input.id] = v;
+      wrap.remove();
+    });
+  }
+
+  function buildIdentifierField(spec) {
+    const wrap = document.createElement('div');
+    wrap.className = 'f';
+    wrap.setAttribute('data-ident', spec.key);
+
+    const label = document.createElement('label');
+    label.setAttribute('for', spec.key);
+    label.textContent = spec.label + ' ';
+    const optional = document.createElement('span');
+    optional.className = 'hint';
+    optional.textContent = 'optional';
+    label.appendChild(optional);
+
+    const note = document.createElement('span');
+    note.className = 'field-note';
+    note.id = 'identnote-' + spec.key;
+    note.textContent = spec.hint;
+
+    const warn = document.createElement('span');
+    warn.className = 'field-note field-warn';
+    warn.id = 'identwarn-' + spec.key;
+    warn.hidden = true;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = spec.key;
+    input.setAttribute('data-ident-input', spec.key);
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('aria-describedby', note.id + ' ' + warn.id);
+    input.setAttribute('aria-invalid', 'false');
+    if (spec.digits) input.setAttribute('inputmode', 'numeric');
+    input.value = IDENT_VALUES[spec.key] || '';
+
+    // No data-required, deliberately. The card above these fields tells the
+    // studio in as many words that they are optional and can follow later, and
+    // the old code contradicted it: a US LLC with no EIN to hand was blocked
+    // from continuing, by a field carrying no required marker at all. The form
+    // takes payment and we talk to them afterwards.
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    wrap.appendChild(note);
+    wrap.appendChild(warn);
+    return wrap;
+  }
+
+  // Push the model back into whatever inputs are on screen. Never trims: the
+  // model holds exactly what the studio typed, so this compare stays true while
+  // they are mid-word and we never reach in and move their cursor.
+  function syncIdentifierValues() {
+    $$('[data-ident-input]').forEach((input) => {
+      const v = IDENT_VALUES[input.id] || '';
+      if (input.value !== v) input.value = v;
+      applyIdentifierWarning(input.id);
+    });
+  }
+
+  function renderIdentifierFields() {
+    const row = identifierRow();
+    if (!row) return;
+    absorbLegacyIdentifierFields();
+    const specs = identifiersFor(getCountryValue(), val('businessType'));
+    const wanted = specs.map((sp) => sp.key).join(',');
+    if (row.dataset.identRendered !== wanted) {
+      row.dataset.identRendered = wanted;
+      $$('[data-ident]', row).forEach((el) => el.remove());
+      specs.forEach((spec) => row.appendChild(buildIdentifierField(spec)));
+    }
+    // Unconditionally, INCLUDING when nothing was rebuilt. A returning studio on
+    // the country the page first painted for hydrates into an unchanged field
+    // set, so an early return here would leave their stored ABN sitting in the
+    // model and never show it - and the next autosave would then write that
+    // blank input straight back over the row and erase it.
+    syncIdentifierValues();
+  }
+
+  function applyIdentifierWarning(key) {
+    const spec = IDENT_SPECS[key];
+    const warn = document.getElementById('identwarn-' + key);
+    if (!spec || !warn) return;
+    const msg = identifierShapeWarning(spec, val(key));
+    warn.textContent = msg;
+    warn.hidden = !msg;
+  }
+
+  function businessTaxIdSummary() {
+    // Review-step display: whatever this studio's country actually issues, shown
+    // in full, since they entered it and are reviewing their own data. Blank is
+    // a legitimate answer - the fields are optional, and a US sole proprietor
+    // has nothing to show here on purpose.
+    return identifiersFor(getCountryValue(), val('businessType'))
+      .map((spec) => (val(spec.key) ? spec.label + ' ' + val(spec.key) : ''))
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  // Business type changed: which identifiers apply can move (an Australian sole
+  // trader has an ABN but no ACN), and so can the email advice.
   function applyBusinessTypeConditionals() {
-    // Show EIN / SSN / ABN / ACN fields based on country (from Step 1) and
-    // business type. Required flags toggle with visibility so validation
-    // only fires on the currently-shown field.
-    const country = (getCountryValue() || REGION_DEFAULT_COUNTRY[REGION] || '').toUpperCase();
-    const bt = val('businessType');
-    const isAU = country === 'AU';
-    const isUS = country === 'US';
-    const isPtyLtd = bt === 'pty_ltd';
-    const isSoleProp = bt === 'sole_prop';
-
-    const show = (id, on) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.hidden = !on;
-      const input = el.querySelector('input, select');
-      if (!input) return;
-      if (on) input.setAttribute('data-required', '');
-      else { input.removeAttribute('data-required'); /* keep value so it round-trips if studio re-toggles */ }
-    };
-
-    // EIN: shown for US non-Sole-Prop business types (and as a soft default
-    // until a type is picked, to keep the field visible for studios who
-    // skim ahead). Hidden for AU.
-    //
-    // There is deliberately no SSN field. A US sole proprietor proves identity
-    // through the platform's own A2P brand check, which runs a third-party ID
-    // verification inside their own sub-account, in their own browser. We can
-    // neither complete that for them nor feed their digits into it, so holding
-    // the number would be collecting sensitive data we have no use for. The
-    // pre-work that IS useful lives in the SMS task on account.html.
-    show('einField', isUS && bt && !isSoleProp);
-    show('abnField', isAU);
-    show('acnField', isAU && isPtyLtd);
-    // The email advice depends on country + business type, so it has to follow.
+    renderIdentifierFields();
     applyBusinessEmailWarning();
+  }
+
+  // The resolved country changed, or we are painting for the first time. The
+  // entity list and the identifier fields both key off it.
+  function applyCountryDependentFields() {
+    syncCountrySelect();
+    applyBusinessTypeOptions();
+    applyBusinessTypeConditionals();
   }
 
   function applyBusinessEmailWarning() {
@@ -1371,7 +1713,7 @@
     setSum('sv-country', getCountryValue());
     // Business details (Phase 1 — onboarding access & compliance plan)
     setSum('sv-legal', val('legalName'));
-    setSum('sv-biztype', BUSINESS_TYPE_LABEL[val('businessType')] || (val('businessType') || ''));
+    setSum('sv-biztype', businessTypeLabelFor(getCountryValue(), val('businessType')));
     setSum('sv-taxid', businessTaxIdSummary());
     setSum('sv-bizemail', val('businessEmail'));
     setSum('sv-address', composeAddress() || '');
@@ -1407,6 +1749,29 @@
     setSum('sv-domain', dns === true ? (val('emailDomain') || 'Yes') : (dns === false ? 'No, built-in email' : 'Not provided'));
   }
 
+  // ONLY the identifiers currently on screen, and every one of them, so a studio
+  // who clears a field really does clear it. Every other identifier column is
+  // OMITTED, not nulled, and save-draft leaves a column it was not sent alone.
+  //
+  // That asymmetry is deliberate and it is the safe side to err on. Sending the
+  // full set with the inapplicable ones nulled reads tidier and quietly destroys
+  // real data: a US sole proprietor who does hold an EIN never sees the field
+  // (their A2P path is a Sole Proprietor brand, which takes no tax ID), so a
+  // blanket null would erase a number we would need the day they incorporate.
+  // We never delete something the studio gave us just because we stopped asking.
+  //
+  // The cost is a stale value: switch from Pty Ltd to sole trader after typing
+  // an ACN and the ACN stays on the row. business_type sits beside it in the
+  // admin view and is the authoritative answer, so this is untidy rather than
+  // wrong, and untidy beats erased.
+  function identifierPayload() {
+    const out = {};
+    identifiersFor(getCountryValue(), val('businessType')).forEach((spec) => {
+      out[spec.key] = valOrNull(spec.key);
+    });
+    return out;
+  }
+
   // ── Submit ────────────────────────────────────────────────────────────────
   function buildPayload() {
     const isScalePlus = state.plan === 'scale' || state.plan === 'ai';
@@ -1426,9 +1791,7 @@
       legal_business_name: valOrNull('legalName'),
       trading_name: valOrNull('tradingName'),
       business_type: valOrNull('businessType'),
-      ein: valOrNull('ein'),
-      abn: valOrNull('abn'),
-      acn: valOrNull('acn'),
+      ...identifierPayload(),
       business_email: businessEmail,
       business_email_is_personal_domain: businessEmail ? isPersonalEmailDomain(businessEmail) : null,
       country: getCountryValue() || null,
@@ -1744,8 +2107,8 @@
         plan: state.plan,
         setup_type: state.setup,
         // Sent so the server can derive the commercial line from the SUBMISSION
-        // (phone, postcode) rather than trusting this country, which is only
-        // ever whatever the URL implied. Two lines, Australia and everyone else:
+        // (phone, postcode) rather than trusting this country, which is resolved
+        // here but still client-side. Two lines, Australia and everyone else:
         // an Auckland studio on /au/ must not be quoted AUD here and charged USD
         // at checkout. Optional server-side, so an anonymous preview still works.
         session_token: (session && session.token) || null,
@@ -2481,10 +2844,20 @@
       'smsTone',
       'googleBusinessUrl','bookingUrl',
       'extraNotes',
-      // Business details (Phase 1).
-      'tradingName','businessType','ein','abn','acn','businessEmail',
+      // Business details (Phase 1). The identifier fields are NOT here: they are
+      // rendered from the studio's country, so their values go to IDENT_VALUES
+      // below and reach the DOM when applyCountryDependentFields() paints them.
+      'tradingName','businessType','businessEmail',
       'addressStreet','addressCity','addressRegion','addressPostcode',
     ].forEach((id) => setVal(id, sub[idToColumn(id)]));
+    // Country first. It is the axis the entity list and the identifier fields
+    // both key off, and the row is the only source that actually knows it: it
+    // came from the signup payload, before this form existed.
+    if (sub.country) ROW_COUNTRY = String(sub.country).trim();
+    IDENTIFIER_KEYS.forEach((key) => {
+      const stored = sub[key];
+      if (stored != null && String(stored).trim()) IDENT_VALUES[key] = String(stored).trim();
+    });
     // Prefer the new canonical column for legal business name; fall back to
     // legacy legal_name for older drafts.
     setVal('legalName', sub.legal_business_name || sub.legal_name);
@@ -2559,7 +2932,7 @@
     }
     applyCountryToTimezone();
     applyCountryOtherVisibility();
-    applyBusinessTypeConditionals();
+    applyCountryDependentFields();
     applyBusinessEmailWarning();
     // If hydrating an older draft that only has the legacy single-line
     // address, split it best-effort into the structured fields so the new
@@ -2585,7 +2958,6 @@
       googleBusinessUrl: 'google_business_url', bookingUrl: 'booking_url',
       // Business details (Phase 1).
       tradingName: 'trading_name', businessType: 'business_type',
-      ein: 'ein', abn: 'abn', acn: 'acn',
       businessEmail: 'business_email',
       addressStreet: 'address_street', addressCity: 'address_city',
       addressRegion: 'address_region', addressPostcode: 'address_postcode',
@@ -2689,7 +3061,12 @@
         const label = t.closest('.tg');
         if (label) label.classList.toggle('chk', t.checked);
       } else if (t.id === 'logoFile') handleLogoChange(t);
-      else if (t.id === 'country') { applyCountryToTimezone(); applyCountryOtherVisibility(); applyBusinessTypeConditionals(); }
+      else if (t.id === 'country') {
+        // A change event only fires on a real interaction, never on our own
+        // assignment, so this is the studio answering rather than us guessing.
+        COUNTRY_USER_CHOSEN = true;
+        applyCountryToTimezone(); applyCountryOtherVisibility(); applyCountryDependentFields();
+      }
       else if (t.id === 'businessType') applyBusinessTypeConditionals();
       else if (t.id === 'businessEmail') applyBusinessEmailWarning();
     });
@@ -2706,6 +3083,19 @@
       if (t && t.id && AUTOFILL_SOURCES.has(t.id)) refreshAutoFill();
       // Sign-off preview reflects either line edit.
       if (t && (t.id === 'signOffLine1' || t.id === 'signOffLine2')) syncSignOff();
+      // Identifier inputs are rebuilt when the country or entity type moves, so
+      // what the studio typed has to live in the model, not only in the input.
+      if (t && t.id && t.hasAttribute && t.hasAttribute('data-ident-input')) {
+        IDENT_VALUES[t.id] = t.value || '';
+        applyIdentifierWarning(t.id);
+      }
+      // A typed international dial code is the second-strongest evidence of the
+      // studio's country, so it can change which identifier we ask for. Both
+      // calls no-op unless the resolved country actually moved.
+      if (t && t.id === 'contactPhone') applyCountryDependentFields();
+      // "Other (enter below)" is the studio naming their own country, so it moves
+      // which identifier we ask for exactly as the select does.
+      if (t && t.id === 'countryOther') { COUNTRY_USER_CHOSEN = true; applyCountryDependentFields(); }
     });
 
     document.addEventListener('keydown', (e) => {

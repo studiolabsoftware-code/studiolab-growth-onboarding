@@ -643,3 +643,85 @@ country resolved from the submission (prebind) falling back to the dial code and
 Also still country-blind and worth the same treatment: the `businessType` options are one mixed
 AU/US list (LLC, Corporation, Pty Ltd, Other Australian entity), so a UK studio picks from options
 none of which fit; and the `sms_a2p` tile frames everything in US terms.
+
+## 2026-08-26: the country axis reaches the form (identifiers and entity types)
+
+`_shared/business-identifiers.ts` shipped earlier the same day and nothing
+consumed it. The form still rendered three hard-coded fields, EIN / ABN / ACN,
+gated on the AU/US commercial LINE, so every studio in New Zealand, the UK,
+Canada or anywhere else was asked for NO business identifier at all. Standard
+A2P brand registration wants the one their country issues, so they would have
+reached SMS registration with nothing to submit, weeks later, with nothing in
+the flow having said so. The entity-type list had the same defect one field
+over: one mixed AU/US menu, so an Australian studio was offered LLC and a UK
+studio picked from six options none of which fitted their company.
+
+Both catalogues now come from that module, keyed on COUNTRY:
+
+- Identifiers: AU `abn`+`acn`, US `ein`, NZ `nzbn`, UK `crn`, CA `bn`, and a
+  generic `tax_id` for a country we hold no entry for. Filtered by entity type,
+  so an Australian sole trader is asked for an ABN and not an ACN.
+- Entity types: per country, in that country's words, with STABLE values.
+  `sole_prop` reads "Sole Trader" in Melbourne and "Sole Proprietor" in Ohio.
+  Added `ltd` and `llp`; `llp` counts as incorporated (a UK LLP holds a
+  Companies House number).
+- Migration `054` adds `nzbn`, `crn`, `bn`, `tax_id`. Applied by hand and
+  verified against `information_schema`. `save-draft` allows all seven and is
+  deployed. Cache-buster `?v=20260826c` on all six pages.
+
+**js/form.js renders the fields, it does not carry three static divs.** The six
+pages now hold one `#identifierRow` container. `identifierRow()` falls back to
+the business-type row and `absorbLegacyIdentifierFields()` removes the old
+blocks, so a browser holding a cached copy of the previous markup self-heals
+rather than showing two inputs with one id. Values live in `IDENT_VALUES`, not
+in the inputs, because the fields are rebuilt whenever the country or the entity
+type moves.
+
+**Three defects found in review, all in this slice's own code:**
+
+1. `renderIdentifierFields()` early-returned when the field set was unchanged,
+   so a returning AU studio hydrated into an unchanged set, never received their
+   stored ABN, and the next autosave wrote the blank input back over the row.
+   `syncIdentifierValues()` now runs unconditionally.
+2. `identifierPayload()` sent all seven columns with the inapplicable ones
+   nulled. That erases real data: a US sole proprietor who holds an EIN never
+   sees the field, so the null would have wiped it. It now sends ONLY the
+   identifiers on screen and omits the rest, which `save-draft` leaves alone.
+   The cost is a stale value outliving a change of entity type. Untidy beats
+   erased.
+3. **Codex caught the one that mattered.** The three US-line pages still carry a
+   country `<select>`, and `applyRegionDefaults()` pre-filled it with the region
+   default `US` on first paint, before any draft hydrated. `getCountryValue()`
+   read that select first, so the row country and the dial code were never
+   reached and every studio on those pages resolved to US regardless of what
+   their signup said: the whole slice would have been a no-op exactly where it
+   was needed. The select is now a MIRROR of the resolution, and only counts as
+   an answer once a `change` event proves the studio chose it themselves.
+
+Order of evidence, now pinned by `form-country-resolution.test.ts`: the country
+stamped on the row at signup, then an international dial code the studio typed,
+then the URL region. `+1` is deliberately not evidence, since the US and Canada
+share it and guessing US asks a Toronto studio for an EIN they do not have.
+
+**Identifiers are OPTIONAL.** They previously took `data-required` when shown,
+so a US LLC without their EIN to hand was blocked from continuing by a field
+carrying no required marker, while the card above it said in as many words that
+these are optional and can follow later. Behaviour now matches the copy and
+Gary's direction: capture basics, take payment, talk to them afterwards.
+
+**Two source-reading tests** keep the browser copy honest, because js/form.js
+cannot import Deno source and this repo has no bundler.
+`business-identifier-parity.test.ts` slices the catalogues and the pure
+functions out of js/form.js, evaluates them, and runs both implementations over
+a matrix driven by `catalogueCountries()` rather than a hand-written list. Both
+tests were verified by mutation: inject a label or digit-count change, or
+restore the select-wins ordering, and they fail.
+
+Money surface checked, unchanged: `currencyForCountry` maps AU/AUS/AUSTRALIA to
+AUD and everything else to USD, so resolving UK instead of US alters nothing a
+studio pays. Resolving NZ on an /au/ page does change it, and deliberately:
+`pricingCountryFor` already corrected that studio at checkout from the same
+phone number, so this only makes the price SHOWN agree with the price CHARGED.
+
+Gate: `deno check` on the touched functions, 97 tests in `_shared/` (75 before),
+`node --check` on `js/form.js` and `admin/js/detail.js`.

@@ -15,9 +15,44 @@
   const fmtBool = (v) => v === true ? 'Yes' : v === false ? 'No' : empty;
   const fmtList = (v) => Array.isArray(v) && v.length ? ESC(v.join(', ')) : empty;
   // Business-type label map (Phase 1 — onboarding access & compliance).
-  // Keep aligned with the form's BUSINESS_TYPE_LABEL.
-  const BIZ_TYPES = { sole_prop: 'Sole Proprietor', llc: 'LLC', corp: 'Corporation', partnership: 'Partnership', nonprofit: 'Non-profit', pty_ltd: 'Pty Ltd', other_au: 'Other Australian entity', other: 'Other' };
+  //
+  // Country-NEUTRAL wording on purpose. The form shows each studio their own
+  // country's word for the same stored value ("Sole Trader" in Melbourne, "Sole
+  // Proprietor" in Ohio, both `sole_prop`), and mirroring that per-country
+  // catalogue a third time here would be a third copy to keep in step. Admin
+  // already shows the country two rows above this one.
+  const BIZ_TYPES = {
+    sole_prop: 'Sole trader / sole proprietor', llc: 'LLC', corp: 'Corporation',
+    partnership: 'Partnership', nonprofit: 'Non-profit', pty_ltd: 'Pty Ltd',
+    ltd: 'Limited company', llp: 'Limited liability partnership (LLP)',
+    other_au: 'Other Australian entity', other: 'Other',
+  };
   const businessTypeLabel = (v) => v ? (BIZ_TYPES[v] || v) : '';
+
+  // Business identifiers, by the column they land in. Which one a studio was
+  // asked for is decided by their country, in
+  // supabase/functions/_shared/business-identifiers.ts.
+  const IDENT_LABELS = {
+    ein: 'EIN', abn: 'ABN', acn: 'ACN', nzbn: 'NZBN',
+    crn: 'Company registration number', bn: 'Business Number (BN)',
+    tax_id: 'Business registration / tax number',
+  };
+  // Masked in the admin list: a US tax ID, and a generic number from a country
+  // we hold no catalogue for, since we cannot know whether that one is a public
+  // registry ID or a sensitive tax ID. ABN, ACN, NZBN, CRN and BN are all
+  // publicly searchable registry numbers, so masking them buys nothing and
+  // costs an admin a click during a carrier registration.
+  const MASKED_IDENTS = ['ein', 'tax_id'];
+  // Only the identifiers this row actually holds. Seven mostly-empty rows would
+  // bury the one that matters.
+  const identifierRows = (sub) => Object.keys(IDENT_LABELS)
+    .filter((key) => sub[key] !== null && sub[key] !== undefined && sub[key] !== '')
+    .map((key) => [
+      IDENT_LABELS[key],
+      MASKED_IDENTS.indexOf(key) >= 0 ? maskTaxId(sub[key]) : fmtVal(sub[key]),
+      undefined,
+      key,
+    ]);
   // Mask sensitive tax IDs in admin display. Reveal only the last 4 of an EIN
   // (so admins can confirm what's on file) and a copy-to-clipboard affordance
   // lets the full value be retrieved when actually needed for a registration.
@@ -590,9 +625,7 @@
         ['Legal business name', fmtVal(sub.legal_business_name || sub.legal_name), undefined, 'legal_business_name'],
         ['Trading name / DBA', fmtVal(sub.trading_name), undefined, 'trading_name'],
         ['Business type', fmtVal(businessTypeLabel(sub.business_type)), undefined, 'business_type'],
-        ['EIN', maskTaxId(sub.ein, 'ein'), undefined, 'ein'],
-        ['ABN', fmtVal(sub.abn), undefined, 'abn'],
-        ['ACN', fmtVal(sub.acn), undefined, 'acn'],
+        ...identifierRows(sub),
         ['Business email',
           sub.business_email
             ? `<a href="mailto:${ESC(sub.business_email)}">${ESC(sub.business_email)}</a>${sub.business_email_is_personal_domain ? ' <span class="warn-pill" title="Personal email domain — A2P and Meta registration require a business-domain email.">personal</span>' : ''}`
