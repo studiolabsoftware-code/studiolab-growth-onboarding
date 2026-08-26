@@ -38,7 +38,13 @@ interface StripeEvent {
   id: string;
   type: string;
   livemode: boolean;
-  data: { object: Record<string, unknown> };
+  // `unknown`, deliberately, NOT Record<string, unknown>. The dispatch switch
+  // below narrows this to a concrete shape per event type, and TypeScript
+  // rejects a direct cast from Record<string, unknown> to those shapes as
+  // insufficiently overlapping (TS2352). Narrowing this back produces 12 type
+  // errors, which is how this file sat un-type-checked until 2026-08-26: the
+  // deploy path never runs `deno check`, so nothing surfaced them.
+  data: { object: unknown };
 }
 
 function plain(body: string, status: number): Response {

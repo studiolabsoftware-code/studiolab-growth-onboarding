@@ -344,3 +344,56 @@ session token still answers 401. Gate green, 56 `_shared` tests.
 STILL OPEN, deliberately: `resolve-pricing` (the preview) is unguarded, so a NZ studio is shown AUD
 pricing all the way to checkout and only stopped there. Correct on the money, poor on the journey.
 `COUNTRY_TO_REGION` at `js/form.js:266` remains dead code and the dropdown stays removed, per Gary.
+
+## 2026-08-26 (item 3): stripe-webhook redeployed, and it had never been type-checked
+
+The handover said live was v49 and the unsubscribe commit landed 2 minutes later. Close: live was
+**v51, deployed 2026-05-18 23:13:57 UTC**, and `e4f8ce2` was committed 23:15:03 UTC, **66 seconds
+after**. So the live webhook genuinely predated the studio email opt-out work and had been running
+roughly three months stale.
+
+**A redeploy was not the one-line job it looked like.** `deno check` on `stripe-webhook` reported
+**12 errors**, all TS2352: `event.data.object as CheckoutSession` and eleven siblings, because
+`StripeEvent.data.object` was typed `Record<string, unknown>`, which TypeScript refuses to cast to
+those shapes. The file had never been checked, because the deploy path does not run `deno check`.
+Fixed at the source by typing it `unknown` (any cast from `unknown` is legal), with a comment saying
+why so nobody helpfully narrows it back and reintroduces all 12. Both handlers that receive the
+whole event already take `eventPayload: unknown`, so nothing else moved. Zero runtime change.
+
+What the redeploy actually landed: 9 commits touching the import closure since v51, not just the
+unsubscribe link. `e4f8ce2` (opt-out + unsubscribe footer), `8e9d4c1` (em dashes stripped from
+customer-facing copy), `2a0f2bb` (mailgun attachment type fix), plus 6 others touching
+`email-templates.ts`, `post-payment.ts` and friends.
+
+Verified after deploy: v52 live, and an unsigned POST returns OUR body
+(`Invalid signature: Missing Stripe-Signature header`, 400) rather than a gateway 401, so
+`verify_jwt = false` survived. That probe is the one that matters here: `config.toml` carries the
+setting, but the 2026-08-20 incident was a redeploy silently re-enabling it.
+
+### The email opt-out cannot suppress a financial document, and now there is a test
+
+Prompted by a question about whether a studio can unsubscribe from invoices. Checked rather than
+assumed:
+
+- **Invoices never reach our opt-out gate at all.** They are issued by Stripe with
+  `collection_method='send_invoice'` and delivered by Stripe, not through Mailgun.
+- **Receipts are essential.** `stripe-webhook` sets `studio receipt (immediate|hold|save card)` and
+  all three are in `ESSENTIAL_INTENTS`, so `sendIfAllowed` always sends them.
+
+The fragility is that `ESSENTIAL_INTENTS` is a hand-maintained Set matched by EXACT STRING EQUALITY,
+and `studio-email.ts` says in its own comment to "grep for `intent:` to confirm coverage". A typo or
+a rename silently downgrades a financial email to optional and an opted-out studio stops receiving
+it, with nothing logged. So `_shared/essential-intents.test.ts` now scans every function source for
+both spellings (`intent: 'x'` and `intent = 'x'`, the latter being how the webhook does it and the
+reason a naive grep misses two of the three receipts) and fails on any intent that is neither
+essential nor in a reviewed KNOWN_OPTIONAL list with a stated reason. Confirmed it actually bites by
+injecting a bogus intent: it failed and named the file, then passed again on revert.
+
+### PII
+
+The Neverland owner's personal email address was committed to this PUBLIC repo's `IN-FLIGHT.md`
+by 9bcb2dd (the prior session). Redacted to "the Neverland owner"; the studio name and submission id
+are enough to work from, and it is not repeated here for the same reason. **It remains in git
+history and the repo is public, so treat it as disclosed.** Also
+caught before commit: the region-guard tests originally hard-coded her real mobile. They now use
+fictional +64 numbers, with a comment saying why.
