@@ -219,3 +219,55 @@ production rows are unchanged.
 - **Why is there still an OTP on the token path?** The token is a bearer credential sitting in an
   inbox. It removes typing, never verification. Worst case for a forwarded link is a code mailed to
   the legitimate studio.
+
+## 2026-08-26 (later): the webhook health check is scheduled, and two other crons were found dead
+
+Item 1 of the day's handover was "schedule `stripe-webhook-health`, copying 019_quote_reminders.sql".
+Copying 019 would not have worked, and finding out why turned up a second silent outage.
+
+**019 and 020 read two Supabase Vault secrets that contain the placeholder text from 019's own
+comment block.** `studiolab_project_url` was the literal `https://YOUR-PROJECT.supabase.co` and
+`studiolab_service_role_key` the literal `YOUR-SERVICE-ROLE-KEY`, both stored 2026-05-14 by someone
+running the "one-time setup" example lines verbatim. So `quote-reminders-daily` and
+`cleanup-attachments-daily` had fired daily ever since without once reaching an edge function:
+`net._http_response` recorded `Couldn't resolve host name` against a null status code, while
+`cron.job_run_details` reported `succeeded`, because the SQL itself ran fine. Same defect class as
+the `whsec_PASTE_HERE` incident earlier the same day, three months older. No harm had come of it
+only because `quotes` and `submission_attachments` were both still empty.
+
+**The pattern that does work** is the one used by `ops-reminders-daily` and
+`nudge-abandoned-onboarding-daily`: a `CRON_SECRET` bearer, not the service-role key. Job 6 returned
+a real 200 the previous night, which is stronger evidence than any digest comparison. It is also the
+smaller blast radius, a dedicated cron token instead of the highest-privilege key in the project.
+
+Shipped:
+- `_shared/cron-auth.ts` + 10 tests. Dependency-free, because `caller.ts` imports supabase-js from
+  esm.sh and cannot be imported under `deno test --allow-read`. Constant-time compare, and it fails
+  closed on an unset `CRON_SECRET` (otherwise `'' === ''` opens the endpoint to anonymous callers,
+  which is a test).
+- `stripe-webhook-health` now accepts `isCronCaller || isServiceRoleCaller`.
+- **`config.toml` gained `[functions.stripe-webhook-health] verify_jwt = false`.** It was absent.
+  Without it the gateway rejects a non-JWT `CRON_SECRET` bearer with
+  `UNAUTHORIZED_INVALID_JWT_FORMAT` before the function runs, so the health check's very first
+  scheduled run would have failed with exactly the invisible fault it exists to detect. This is the
+  2026-08-20 `nudge-abandoned-kb` incident repeating.
+- Migration `050`: repairs `studiolab_project_url`, promotes `CRON_SECRET` into the vault as
+  `studiolab_cron_secret` (sourced from the live cron job inside the database, never written into
+  this PUBLIC repo), and schedules `stripe-webhook-health-6h` at `40 */6 * * *`. It deliberately
+  drops 019's `case ... else 'skipped'` wrapper: a missing secret now makes `url := null` raise and
+  the run is recorded FAILED. The silent-skip wrapper is why nobody noticed those jobs were dead.
+
+Six-hourly, not hourly, because the function emails every admin on every unhealthy run by design.
+Hourly means 24 alerts a day for a fault needing a human in the Stripe dashboard, and a muted alert
+is a dead alert. This bounds the silent window at 6 hours against the 15 days it actually took.
+
+Verified: cron job 7 active; a manual run of the exact cron path returned
+`{"ok":true,"healthy":true,"mode":"live","endpoint_id":"we_1U8VYxCcwFH6sWzIYNEKgr57"}`; unauthenticated
+and wrong-bearer POSTs both 403. Gate green: `deno check`, 45 `_shared` tests (was 35), `node --check`.
+
+Migrations here are applied by hand: `supabase migration list --linked` shows an empty Remote column
+for all 50, so `supabase db push` would try to replay every one against the live schema.
+
+NOT fixed, deliberately: `quote-reminders` and `cleanup-attachments` still read the placeholder
+service-role key and remain dead. Repointing them at `CRON_SECRET` is a code change plus redeploy
+for both, so it is its own slice.

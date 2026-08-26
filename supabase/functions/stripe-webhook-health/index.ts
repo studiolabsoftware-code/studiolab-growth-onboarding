@@ -18,6 +18,7 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { isServiceRoleCaller } from '../_shared/caller.ts';
+import { isCronCaller } from '../_shared/cron-auth.ts';
 import { getStripeKey, getStripeMode, stripeRequest } from '../_shared/stripe.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
 import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
@@ -54,7 +55,12 @@ Deno.serve(async (req) => {
   const pf = preflight(req);
   if (pf) return pf;
 
-  if (!(await isServiceRoleCaller(req))) {
+  // Either credential is accepted. pg_cron presents CRON_SECRET, the same token
+  // the other scheduled functions use; a human re-running the check by hand
+  // presents the service-role key. The vault entry that would have carried the
+  // service-role key to pg_cron contained a placeholder for three months, so
+  // relying on it alone is what kept this check unscheduled. See migration 050.
+  if (!isCronCaller(req) && !(await isServiceRoleCaller(req))) {
     return jsonResponse({ ok: false, error: 'Forbidden.' }, 403);
   }
 
