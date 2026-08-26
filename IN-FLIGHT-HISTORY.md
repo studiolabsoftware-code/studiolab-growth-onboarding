@@ -592,3 +592,54 @@ messages send from the studio's own number.
 - `ssn_last` is a column nothing writes (`save-draft` refuses it deliberately). Dead PII, drop it.
 - AU sole traders holding only an ABN may fall in a gap: Standard needs a Company Number, and Sole
   Proprietor is US/Canada only. Needs confirming against a live account.
+
+## 2026-08-26: country is a SEPARATE axis from the commercial line
+
+Gary's direction: everything country-specific, not just AU vs US. A UK studio pays on the
+everyone-else line in USD AND is a UK business asked for a UK identifier. The two axes had been
+conflated everywhere.
+
+Two concrete consequences of that conflation, both found in code:
+
+**The form asked non-AU, non-US studios for NO business identifier at all.** The gating was
+`show('einField', isUS && ...)`, `show('abnField', isAU)`, `show('acnField', isAU && isPtyLtd)`.
+There is no NZBN, no UK company number, no Canadian BN and no generic field. Standard A2P brand
+registration requires a tax ID, so a New Zealand studio reaching SMS registration has nothing to
+submit, and nothing in the flow surfaces it until it fails.
+
+**The pre-bind threw the real country away.** `mapRegion` collapsed the signup's country hint to
+`'AU' | 'US' | null` and `toIdentity` kept only that, so even though the raw country DOES survive
+into the Connector's `inbound_signup.region`, the Onboarding side could never recover it.
+
+Shipped:
+
+- **`_shared/business-identifiers.ts`** + 8 tests. Country to the identifier that country issues:
+  AU ABN (all) and ACN (companies only), US EIN (not sole traders, who register as a Sole
+  Proprietor brand with no tax ID at all), NZ NZBN, UK company registration number (companies and
+  LLPs only), CA Business Number, and a GENERIC field for everywhere else. An unknown country gets
+  the generic field rather than nothing, which is the whole point. Shape warnings are advisory: a
+  studio mistyping an ABN should be nudged, never blocked from paying.
+- **`prebind.ts` keeps `identity.country`** alongside `region`, and `buildSeed` stamps it onto the
+  submission under the existing no-clobber rule. `submissions.country` has no CHECK constraint, so
+  it takes any country.
+- **`mapRegion` no longer returns a third outcome.** It had the identical defect the Connector's
+  `resolveFormRoute` had: anything outside the au/us aliases returned null. Now an AU alias gives
+  `AU`, anything else gives `US`, and null is reserved for "the signup told us nothing", which is
+  the only case where falling back to the URL is right.
+
+Four existing prebind tests failed on the added field, correctly, and one of them was worth keeping
+honest: "a fully-filled row must produce no write at all". Its fixture now carries a country so the
+invariant still means something rather than passing by omission. Two new tests assert that a New
+Zealand signup keeps `country: 'NZ'` while its line stays `US`, and that a signup with no country
+seeds none rather than guessing. 75 `_shared` tests, up from 65.
+
+### NOT YET CONSUMED, and this is the next slice
+
+The model exists and nothing reads it. The form still renders the hardcoded EIN/ABN/ACN trio gated
+on AU/US, so the hole is still open for NZ/UK/CA studios. Wiring it needs the identifier fields
+rendered from `identifiersFor(country, businessType)` across the six form pages, plus an effective
+country resolved from the submission (prebind) falling back to the dial code and then the URL.
+
+Also still country-blind and worth the same treatment: the `businessType` options are one mixed
+AU/US list (LLC, Corporation, Pty Ltd, Other Australian entity), so a UK studio picks from options
+none of which fit; and the `sms_a2p` tile frames everything in US terms.

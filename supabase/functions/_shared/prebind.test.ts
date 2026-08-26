@@ -62,7 +62,11 @@ Deno.test('mapPlan mirrors the Connector alias table, including the AI tier spel
 Deno.test('mapRegion returns the UPPERCASE form the submissions table stores', () => {
   for (const v of ['au', 'AU', 'aus', 'Australia']) assertEquals(mapRegion(v), 'AU');
   for (const v of ['us', 'USA', 'america', 'United States']) assertEquals(mapRegion(v), 'US');
-  for (const v of [null, undefined, '', 'NZ', 'europe']) assertEquals(mapRegion(v), null);
+  // Two lines only. An unrecognised country is not Australia, so it is the
+  // everyone-else line. null is reserved for "the signup told us nothing",
+  // which is the only case where falling back to the URL is right.
+  for (const v of ['NZ', 'europe', 'Canada']) assertEquals(mapRegion(v), 'US');
+  for (const v of [null, undefined, '', '   ']) assertEquals(mapRegion(v), null);
   assertEquals(mapRegion('  Australia '), 'AU');
   assertEquals(mapRegion(' us\n'), 'US');
 });
@@ -92,8 +96,11 @@ Deno.test('toIdentity refuses a PARTIAL row rather than half-resolving it', () =
 Deno.test('toIdentity keeps a usable row whose plan/region did not map, so nobody is stranded', () => {
   const id = toIdentity(row({ plan: 'something-new', region: 'Mars' }));
   assert(id);
-  assertEquals(id.plan, null);
-  assertEquals(id.region, null);
+  assertEquals(id.plan, null, 'a plan we cannot guess stays null; the URL decides');
+  // An unrecognised country is still not Australia, so it takes the
+  // everyone-else line rather than asserting nothing.
+  assertEquals(id.region, 'US');
+  assertEquals(id.country, 'MARS', 'kept verbatim, so a missing alias is visible rather than silent');
   assertEquals(id.contactEmail, 'sarah@yourstudio.com', 'identity still resolves');
 });
 
@@ -146,6 +153,7 @@ Deno.test('buildSeed fills everything on a brand new draft', () => {
     first_name: 'Sarah',
     last_name: 'Johnson',
     location_id: 'loc_ABC123',
+    country: 'AU',
   });
 });
 
@@ -155,6 +163,7 @@ Deno.test('buildSeed NEVER overwrites what the studio already typed', () => {
     first_name: 'Sarah-Jane',
     last_name: 'Smith-Johnson',
     location_id: 'loc_ALREADY_BOUND',
+    country: 'NZ',
   };
   assertEquals(buildSeed(identity(), existing), {}, 'a fully-filled row must produce no write at all');
 });
@@ -165,6 +174,7 @@ Deno.test('buildSeed fills only the gaps on a partly-filled draft', () => {
     first_name: 'Sarah',
     last_name: 'Johnson',
     location_id: 'loc_ABC123',
+    country: 'AU',
   });
 });
 
@@ -181,6 +191,26 @@ Deno.test('buildSeed writes nothing without an identity', () => {
 });
 
 Deno.test('buildSeed omits fields the signup payload itself did not carry', () => {
-  const sparse = toIdentity(row({ company_name: null, contact_first_name: null, contact_last_name: '' }))!;
+  const sparse = toIdentity(row({ company_name: null, contact_first_name: null, contact_last_name: '', region: null }))!;
   assertEquals(buildSeed(sparse, null), { location_id: 'loc_ABC123' });
+});
+
+// The studio's real country must survive the pre-bind. It used to be collapsed
+// to the AU/US commercial line and lost, which is why studios outside those two
+// countries were asked for no business identifier at all.
+Deno.test('buildSeed carries the studio\'s ACTUAL country, not the commercial line', () => {
+  const nz = toIdentity(row({ region: 'New Zealand' }))!;
+  assertEquals(nz.country, 'NZ', 'the country is kept as itself');
+  assertEquals(nz.region, 'US', 'while the commercial line is still everyone-else');
+  assertEquals(buildSeed(nz, null).country, 'NZ');
+
+  const uk = toIdentity(row({ region: 'United Kingdom' }))!;
+  assertEquals(uk.country, 'UK');
+  assertEquals(buildSeed(uk, null).country, 'UK');
+});
+
+Deno.test('a signup with no country seeds none, rather than guessing', () => {
+  const none = toIdentity(row({ region: null }))!;
+  assertEquals(none.country, '');
+  assertEquals(buildSeed(none, null).country, undefined);
 });

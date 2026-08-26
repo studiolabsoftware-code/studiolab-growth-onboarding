@@ -18,6 +18,8 @@
 // no network. Nothing in this file logs, echoes, or stores the raw token.
 
 /** The row shape growth_manager.resolve_signup_by_token returns. */
+import { normaliseCountry } from './business-identifiers.ts';
+
 export interface PrebindRow {
   location_id: string | null;
   contact_email: string | null;
@@ -38,8 +40,25 @@ export interface PrebindIdentity {
   companyName: string | null;
   /** Form vocabulary. null when the stored value did not map; the caller then falls back to the URL. */
   plan: 'launch' | 'scale' | 'ai' | null;
-  /** null when the stored value did not map; same fallback. */
+  /**
+   * The COMMERCIAL LINE, not the studio's country. Two lines exist, Australia
+   * and everyone else, so a New Zealand studio resolves to 'US' here.
+   * null when the stored value did not map; same fallback.
+   */
   region: 'AU' | 'US' | null;
+  /**
+   * The studio's ACTUAL country, normalised, kept separately and deliberately.
+   *
+   * This used to be thrown away: the raw signup hint (e.g. 'New Zealand') was
+   * collapsed to 'AU' | 'US' by mapRegion and nothing downstream could ever
+   * recover it. That is why every studio outside those two countries was asked
+   * for no business identifier at all, since the form gated its ABN/ACN/EIN
+   * fields on the commercial line. Line and country are two different axes: a
+   * UK studio pays on the everyone-else line AND is a UK business.
+   *
+   * Empty string when the signup carried no usable country.
+   */
+  country: string;
 }
 
 // The receiver mints randomTokenHex(32) = 64 lowercase hex characters. The bound is a little wider so
@@ -77,8 +96,24 @@ export function mapPlan(stored: string | null | undefined): 'launch' | 'scale' |
   return PLAN_ALIASES[String(stored ?? '').trim().toLowerCase()] ?? null;
 }
 
+/**
+ * Map a signup's country hint to the COMMERCIAL LINE, of which there are two:
+ * Australia, and everyone else.
+ *
+ * An unrecognised country is not a third outcome, it is simply not Australia,
+ * so it takes the everyone-else line. This used to return null for anything
+ * outside the au/us aliases, which meant a New Zealand pre-bind asserted no line
+ * at all and leaned entirely on the URL. Same defect as the Connector's
+ * resolveFormRoute, fixed there on 2026-08-26.
+ *
+ * null is reserved for "the signup told us nothing", where falling back to the
+ * URL is genuinely the right move. For the studio's real country, which is a
+ * different question, use `country` on the identity.
+ */
 export function mapRegion(stored: string | null | undefined): 'AU' | 'US' | null {
-  return REGION_ALIASES[String(stored ?? '').trim().toLowerCase()] ?? null;
+  const raw = String(stored ?? '').trim();
+  if (!raw) return null;
+  return REGION_ALIASES[raw.toLowerCase()] ?? 'US';
 }
 
 const clean = (v: string | null | undefined): string | null => {
@@ -107,6 +142,7 @@ export function toIdentity(row: PrebindRow | null | undefined): PrebindIdentity 
     companyName: clean(row.company_name),
     plan: mapPlan(row.plan),
     region: mapRegion(row.region),
+    country: normaliseCountry(row.region),
   };
 }
 
@@ -160,5 +196,8 @@ export function buildSeed(
   if (identity.firstName && blank(row?.first_name)) seed.first_name = identity.firstName;
   if (identity.lastName && blank(row?.last_name)) seed.last_name = identity.lastName;
   if (blank(row?.location_id)) seed.location_id = identity.locationId;
+  // The studio's real country, so the form can ask for the identifier their
+  // country actually issues instead of guessing from the pricing line.
+  if (identity.country && blank(row?.country)) seed.country = identity.country;
   return seed;
 }
