@@ -11,6 +11,7 @@
 // secrets — see docs/sheets-sync-setup.md for the one-time setup.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
+import { isCronCaller } from '../_shared/cron-auth.ts';
 import { adminClient } from '../_shared/supabase.ts';
 
 const SHEET_FIELDS = [
@@ -48,6 +49,20 @@ function pickFields(row: Record<string, unknown>) {
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
+
+  // AUTH. This endpoint is reached ONLY by a database trigger on public.submissions, which
+  // presents CRON_SECRET from the Vault (migration 053).
+  //
+  // It previously had NO application auth at all. Its only gate was the
+  // gateway's verify_jwt, which is not auth here: the gateway accepts any
+  // validly signed project JWT, and the publishable anon key satisfying it
+  // SHIPS IN THE PAGE SOURCE. Anyone who read it could POST a forged record
+  // and reach this code. For this function that meant an unauthenticated caller could push arbitrary
+  // rows into the operations sheet, or force reads of any submission by id.
+  if (!isCronCaller(req)) {
+    return jsonResponse({ ok: false, error: 'Unauthorized.' }, 401);
+  }
+
 
   try {
     const body = await req.json().catch(() => ({}));

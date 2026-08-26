@@ -485,3 +485,59 @@ lift a service-role key from it. That is a stored credential in a readable catal
 service-role key would also silently break both triggers, since the old token is baked into the DDL.
 Worth a deliberate fix: move the token to Vault and have the trigger read it, the way the cron jobs
 now do. Not touched in this slice.
+
+## 2026-08-26 (security): three trigger targets had no auth at all, one was an open email relay
+
+Started as the tidy-up I recommended, moving a service-role JWT out of trigger definitions into the
+Vault. Reading the surface turned up something considerably worse.
+
+**Three triggers called edge functions with the token written as a literal in the trigger
+definition**: `submissions/on-submission-trigger` -> `on-submission`, `submissions/Sync-to-sheet` ->
+`sync-to-sheet`, and `messages/messages-notify` -> `notify-new-message`. That token sat in plaintext
+in `pg_trigger`, readable with any database read access, and baked into DDL, so rotating the
+service-role key would have silently broken all three.
+
+**The real problem was that none of the three had ANY application-level auth.** Their only gate was
+the gateway's `verify_jwt`, and that is not authentication here: the gateway accepts any validly
+signed project JWT, and **the publishable key that satisfies it ships in the page source**.
+Confirmed by probing all three with the public key: each answered with its own body, not a gateway
+rejection.
+
+`on-submission` then does `const row = payload.record || payload` and, for any record whose status is
+not `draft`, sends to `row.contact_email`. So anyone who viewed source could make our server send
+StudioLAB-branded mail from our authenticated Mailgun domain to any address they chose, with
+template fields they controlled. An open relay. The sending reputation that would burn is the same
+one every payment receipt depends on. Stripe mode is live, so the send path was active. Verified by
+reading the code path, deliberately NOT by sending mail; the retest afterwards used
+`@example.invalid`, a reserved non-routable TLD.
+
+Two findings that made the sequencing non-obvious:
+
+- The trigger's JWT does NOT match the current `SUPABASE_SERVICE_ROLE_KEY` (sha256 compared against
+  the digest, false), and `isServiceRoleCaller` REJECTS it: posting it to `stripe-webhook-health`
+  returned 403. It worked only because the gateway honours its signature. So "just add
+  isServiceRoleCaller" would have broken all three instantly.
+- There is therefore no zero-downtime ordering. Functions were deployed first and 053 applied
+  immediately after; in that window the old triggers present the legacy JWT and are rejected, which
+  is recorded in `net._http_response` rather than lost silently. Traffic is effectively nil.
+
+Fixed: all three now require `CRON_SECRET` via `isCronCaller`, `config.toml` declares
+`verify_jwt = false` for them (the gateway check was never load-bearing), and migration `053`
+replaces the three triggers with `public.notify_edge_function()`, which reads the project URL and
+CRON_SECRET from the Vault exactly as the cron jobs have since 050/051. It is SECURITY DEFINER with
+a pinned `search_path`, and it returns without raising if the secrets are missing, because a
+notification must never abort a studio's INSERT.
+
+The webhook payload shape is preserved exactly (`type`, `table`, `schema`, `record`, `old_record`);
+`sync-to-sheet` reads `old_record`, so that is not cosmetic.
+
+Verified: no trigger definition contains a bearer token any more; forged POSTs with the public key
+return 401 on all three; the real Vault path returns 200; and a draft row inserted into
+`submissions` fired BOTH triggers, each returning `{"ok":true,"skipped":"draft"}`, which is the
+no-email path. Test row deleted, one row left in the table.
+
+### Still open on this surface
+
+`sync-to-sheet` is separately broken and has been for a while: it 500s with
+`SHEETS_WEBAPP_URL or SHEETS_SHARED_SECRET missing`. Only visible on non-draft rows, so today's
+draft test skipped past it.

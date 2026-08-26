@@ -8,6 +8,7 @@
 // sandbox test submissions from spamming the real studio + admin inboxes.
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
+import { isCronCaller } from '../_shared/cron-auth.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
 import { submissionConfirmation, adminNewSubmission } from '../_shared/email-templates.ts';
@@ -18,6 +19,22 @@ const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guid
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
+
+  // AUTH. This endpoint is reached ONLY by a database trigger on public.submissions, which
+  // presents CRON_SECRET from the Vault (migration 053).
+  //
+  // It previously had NO application auth at all. Its only gate was the
+  // gateway's verify_jwt, which is not auth here: the gateway accepts any
+  // validly signed project JWT, and the publishable anon key satisfying it
+  // SHIPS IN THE PAGE SOURCE. Anyone who read it could POST a forged record
+  // and reach this code. For this function that meant `to: row.contact_email` on an attacker-supplied
+  // record: an open relay able to send StudioLAB-branded mail from our own
+  // Mailgun domain to any address, burning the sending reputation every real
+  // receipt depends on.
+  if (!isCronCaller(req)) {
+    return jsonResponse({ ok: false, error: 'Unauthorized.' }, 401);
+  }
+
 
   try {
     const payload = await req.json();

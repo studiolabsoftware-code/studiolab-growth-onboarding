@@ -14,6 +14,7 @@
 // Webhook payload shape (Supabase): { type, table, record, schema, old_record }
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
+import { isCronCaller } from '../_shared/cron-auth.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { sendEmail } from '../_shared/mailgun.ts';
 import { loadStudioEmailPrefs, unsubscribeUrl, injectUnsubscribeFooter } from '../_shared/studio-email.ts';
@@ -29,6 +30,20 @@ import { inboxMessageEmail } from '../_shared/email-templates.ts';
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
+
+  // AUTH. This endpoint is reached ONLY by a database trigger on public.messages, which
+  // presents CRON_SECRET from the Vault (migration 053).
+  //
+  // It previously had NO application auth at all. Its only gate was the
+  // gateway's verify_jwt, which is not auth here: the gateway accepts any
+  // validly signed project JWT, and the publishable anon key satisfying it
+  // SHIPS IN THE PAGE SOURCE. Anyone who read it could POST a forged record
+  // and reach this code. For this function that meant unauthenticated notification email on a forged
+  // message record.
+  if (!isCronCaller(req)) {
+    return jsonResponse({ ok: false, error: 'Unauthorized.' }, 401);
+  }
+
 
   try {
     const payload = await req.json();

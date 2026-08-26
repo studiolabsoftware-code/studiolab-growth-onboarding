@@ -41,6 +41,24 @@ verify_jwt = false
 [functions.stripe-webhook-health]
 verify_jwt = false
 
+# Database-trigger targets. These are NOT public despite the flag: each one
+# requires CRON_SECRET, presented by its trigger from the Vault (migration 053).
+#
+# The flag is set because the trigger's bearer is CRON_SECRET, which is not a
+# JWT. Turning the gateway check off removes nothing that was protecting them:
+# it accepts any validly signed project JWT, and the publishable key satisfying
+# it ships in the page source, so all three were reachable by anyone who viewed
+# source. on-submission sent mail to an address taken straight from the posted
+# record. The real gate is now the shared secret checked in code.
+[functions.on-submission]
+verify_jwt = false
+
+[functions.sync-to-sheet]
+verify_jwt = false
+
+[functions.notify-new-message]
+verify_jwt = false
+
 # Anon-callable from payment-confirm.html with only the studio's session token,
 # the same posture the page's previous poller had.
 [functions.get-submission-status]
