@@ -79,3 +79,12 @@ verify_jwt = false
 
 [functions.validate-change-request]
 verify_jwt = false
+
+# Stripe calls this with its own HMAC in the Stripe-Signature header and NO Authorization header,
+# so the platform default would 401 every event before our code ran. It has always been deployed
+# with --no-verify-jwt on the command line and never said so here, which is the same trap the
+# block above describes: one redeploy without the flag silently takes payment processing offline.
+# Recorded 2026-08-26, while fixing the related outage where the live endpoint was never registered
+# in Stripe at all and a real studio's payment landed with no receipt and no admin notification.
+[functions.stripe-webhook]
+verify_jwt = false
