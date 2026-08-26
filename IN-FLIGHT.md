@@ -1,64 +1,66 @@
 # IN-FLIGHT: Growth Onboarding
 
 Live state only. Completed work lives in `IN-FLIGHT-HISTORY.md`. Verify anything here against the
-live database, not this file. Last updated: 2026-08-24.
+live database, not this file. Last updated: 2026-08-26.
+
+## WE HAVE A REAL PAYING STUDIO. The table is no longer empty.
+
+Neverland (michelle@neverlandstudios.co.nz), submission `e6978e3f-d85d-4d43-b695-071d07dc0d98`,
+paid **AUD 768.90** (699 + 69.90 GST) 2026-08-26 09:52 AEST for "Dominate AI, Done for you".
+Invoice `SLG-0204`. Row is now `submitted`/`paid`, receipt sent. She has NO Growth sub-account and
+NO plan subscription yet, and Stripe told her the team would be in touch within a few business
+days. **That clock started 2026-08-26.** She reached the form directly; the signup webhook is
+still inert, so she did not come through it.
+
+## The payment webhook was DEAD for 15 days. Fixed 2026-08-26.
+
+`stripe_events` holds 649 events from 2026-05-14 to **2026-08-11**, then nothing. The platform's
+production endpoint was created on the SHARED Stripe account at 2026-08-11 06:07 UTC; ours stopped
+~3h later. Someone else with access deleted it. Neverland's payment fell in that window, which is
+why she got a Stripe receipt but nothing from us and Gary was never told.
+
+- New endpoint `we_1U8VYxCcwFH6sWzIYNEKgr57`, 18 events, enabled, live. Secret re-set and PROVEN by
+  replaying `evt_1U8U9FCcwFH6sWzIqgeJQ19r`: row reconciled, receipt sent, admin email received.
+- **The account is shared and the dev team works in it. This can recur.**
+- `stripe-webhook-health` is DEPLOYED but **NOT SCHEDULED** and has never had a positive invoke.
+  Needs a pg_cron migration passing a service-role bearer. Until then it protects nothing.
+- `stripe-webhook` live is **v49 (2026-05-18)**; commit `e4f8ce2` (unsubscribe link) landed 2 min
+  after. Michelle's receipt may lack it. Redeploy as its own slice.
+
+## The AU/US routing hole is OPEN
+
+`COUNTRY_TO_REGION` in `js/form.js:266` maps NZ/CA/UK/OTHER to the US route exactly as designed,
+and is **dead code, never read**. The country field was removed from the form, so `getCountryValue()`
+falls back to the URL region and any studio on `/au/` is hard-set `country='AU'` and priced AUD with
+10% GST. Michelle is in Auckland; her phone `+64...` was in the submission before checkout and
+nothing looked at it. `create-checkout-session` blocks an Australian on the US form
+(`au_must_use_au_flow`) but has NO mirror guard. Gary is holding on Neverland commercially (no
+refund, no recharge, negligible dollar difference, handled in accounting) but the FIX is still
+wanted. Server-side guard, not a restored dropdown.
 
 ## Waiting on Gary
 
-**The signup cutover, inside StudioLAB Growth. THIS is go-live, and the only thing left.**
-`SIGNUP_WEBHOOK_SECRET` is ROTATED and verified (2026-08-24); the value sits in the Connector's
-gitignored `supabase/manual/.rotated-signup-secret`, never printed to a transcript. Remaining: audit
-every automation emailing on sub-account creation (KEEP the login-credentials email, disable the
-welcome one), then flip both switches in one sitting. Never the second without the audit. The
-executable pack (endpoint, payload contract, exact plan/region vocabulary) is in the PRIVATE repo:
-`Growth Connector/docs/signup-email-cutover-pack.md`. THIS repo is public, so
-`outputs/signup-email-cutover-runbook.md` is only a pointer plus the non-sensitive half.
+**The signup cutover, inside StudioLAB Growth. Still the go-live item.** `SIGNUP_WEBHOOK_SECRET`
+rotated 2026-08-24; value in the Connector's gitignored `supabase/manual/.rotated-signup-secret`.
+Remaining: audit every automation emailing on sub-account creation (KEEP the login-credentials
+email, disable the welcome one), then flip both switches in one sitting. Pack:
+`Growth Connector/docs/signup-email-cutover-pack.md` (PRIVATE repo; this one is public).
 
-**Silent-hold hazard.** An unmapped `plan`/`region` makes the receiver answer `200 {held:true}`,
-writing NO row and sending NO email. With platform emails off that is a total silent failure, and
-`missed-signup-sweep` cannot catch it (a hold records nothing). Confirm an `invited` row in
-`inbound_signup` BEFORE switching anything off.
-
-## Deployed, verified live, and PROVEN by a real click
-
-- **Tier-1 pre-fill is LIVE.** `send-otp` v39, `verify-otp` v36, plus `save-draft`,
-  `get-studio-account` and `apply-change-request` off the gateway block. The LIKE-injection that let
-  an unauthenticated caller read every submission is closed.
-- **C3 is LIVE** (Connector): both operator read RPCs now return `location_id`, and
-  `onboarding-read` is redeployed. The Review drawer, which had 400'd on every open since
-  2026-06-25, works for the first time.
-- **The LIKE-wildcard sweep is LIVE.** Migration 049's three constraints are VALIDATED and all 25
-  functions redeployed (verified against the catalog, not the script's output).
-- **The end-to-end smoke PASSED 2026-08-24** and was cleaned up. A real click proved the whole
-  chain: signup webhook, Mailgun invite, token resolve, OTP, pre-filled form, server-side
-  `location_id` stamp, the widened read RPCs, and the console drawer (which had failed on every open
-  since 2026-06-25). Both tables are empty again.
-
-## The submissions table is deliberately EMPTY
-
-All five rows were test data, deleted 2026-08-21 with three test invoices, the 99%-off test code and
-a dormant admin account. **No real studio has ever completed this form.** An empty Review queue is
-the truth, not a bug, and any smoke needs synthetic data.
+**Silent-hold hazard.** An unmapped `plan`/`region` returns `200 {held:true}`, writes NO row, sends
+NO email. Confirm an `invited` row in `inbound_signup` BEFORE switching anything off.
 
 ## Open decisions for Gary
 
-- **Should a studio be able to change plan during onboarding?** `plan` was removable by the browser
-  on every autosave and `create-checkout-session` prices off it, so a Dominate AI studio could open
-  `/au/launch/` and check out at Launch pricing. That is now closed (`plan` is off `save-draft`'s
-  allow-list, and the invite token decides the plan). If you WANT studios to be able to switch, it
-  needs a deliberate server-side path, not an autosave side effect.
-- **Is Stripe Tax configured for live mode?** `stripe_mode` is `live`. An earlier session recorded
-  that automatic tax was deliberately off in test mode and had to be verified at cutover against the
-  business address and AU GST registration. Whether that check ever happened is unknown from here.
-  Tax question, not a technical one: route it to the accountant.
+- **Should a studio be able to change plan during onboarding?** Currently closed deliberately.
+- **Stripe Tax**: `automatic_tax` is OFF in live; a flat AU GST rate is applied on CURRENCY, not
+  the studio's country. That is how a NZ business was charged Australian GST. Accountant question.
 
 ## Known, deliberately NOT fixed
 
-- The Supabase JS SDK loads from a CDN at a floating major, no SRI, no CSP, on the six form pages.
+- Supabase JS SDK loads from a CDN at a floating major, no SRI, no CSP, on the six form pages.
 - `send-otp` has no per-IP cap: a link holder can mail a studio a code every 60 seconds.
 
-## Scenario B, live state only (settled decisions moved to `IN-FLIGHT-HISTORY.md` 2026-08-21)
+## Scenario B
 
-- **C1 `signup-webhook-receiver` is DEPLOYED and INERT.** Nothing calls it until step 3 above.
-- **The match-at-Connect seam is not dead yet.** C3 made `location_id` readable; `conversation-bind`
-  still resolves by an email guess. That slice is queued in the Connector's `IN-FLIGHT.md`.
+- **C1 `signup-webhook-receiver` is DEPLOYED and INERT.** Nothing calls it until the cutover.
+- **The match-at-Connect seam is not dead.** `conversation-bind` still resolves by an email guess.
