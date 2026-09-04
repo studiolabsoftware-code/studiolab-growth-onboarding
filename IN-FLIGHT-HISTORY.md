@@ -849,3 +849,19 @@ which is an Australian regulator.
 Gate: `deno check` on the three touched functions, 117 tests in `_shared/` (107
 before this slice's staging tests, 75 at the start of the day), 25 client
 scripts parse clean.
+
+## 2026-09-04 — moved out of IN-FLIGHT (shipped, kept for detail)
+
+Trimmed from the live ledger to stay under the 4 KB lean-state cap when the publish-root
+hazard was added. Both slices shipped 2026-08-26 and were verified live.
+
+**A UK studio pays on the everyone-else line AND is a UK business.** The form and the `sms_a2p`
+tile both key their fields on COUNTRY, from `_shared/business-identifiers.ts` and
+`_shared/sms-registration.ts` (054 adds `nzbn`/`crn`/`bn`/`tax_id`; form `?v=20260826c`). Country
+resolves row → dial code → URL, and the US pages' select MIRRORS that, never answers it. **We never
+erase what a studio gave us:** a field that stops applying is OMITTED, never nulled, on the form
+and the tiles alike. The tile's country half is resolved SERVER-side, so account.html has no mirror.
+
+**Messaging tiles are STAGED behind the access pack** (`_shared/setup-surfaces.ts`), NOT behind
+`status='active'`: that hides the whole checklist and tells the studio to close the tab, so gating
+there made them unreachable, not later. Gary picked this trigger. Guided (DIY) removal PARKED.
