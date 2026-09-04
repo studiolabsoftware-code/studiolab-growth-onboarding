@@ -6,7 +6,7 @@
 // our endpoint vanished from the shared Stripe account roughly three hours after
 // someone created the platform's production endpoint on it. It had carried 649
 // events since 2026-05-14. Nobody noticed for 15 days, until a studio paid
-// AUD 768.90 and got nothing from us.
+// in full and got nothing from us.
 //
 // That account is shared with the platform's SaaS billing and the dev team works
 // in it, so we do not control whether this happens again. What we can control is

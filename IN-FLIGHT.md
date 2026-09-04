@@ -4,8 +4,8 @@ Live state only; history in `IN-FLIGHT-HISTORY.md`. Verify against the live DB, 
 
 ## WE HAVE A REAL PAYING STUDIO. **Onboarding her is the oldest clock.**
 
-Neverland, `e6978e3f-...`, paid **AUD 768.90** 2026-08-26, invoice `SLG-0204`, `submitted`/`paid`,
-receipt sent. NO Growth sub-account and NO plan subscription yet. **Clock started 2026-08-26.
+One AU studio, paid in full 2026-08-26, `submitted`/`paid`, receipt sent.
+Identifiers live in the DB; this repo is PUBLIC, so never write them here. NO Growth sub-account and NO plan subscription yet. **Clock started 2026-08-26.
 Gary's call, do not re-litigate: NO refund, NO recharge on the AUD/GST.**
 
 ## Standing hazards (full detail in history)

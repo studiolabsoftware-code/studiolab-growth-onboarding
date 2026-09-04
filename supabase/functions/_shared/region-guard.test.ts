@@ -15,7 +15,7 @@ import { assessRegion, phoneRegionEvidence, postcodeRegionEvidence, pricingCount
 // never a real studio's mobile. The postcode 0632 is a public Auckland area code.
 
 // ---------------------------------------------------------------- the real case
-Deno.test('the 2026-08-26 regression: Neverland would now be blocked', () => {
+Deno.test('the 2026-08-26 regression: the first paying studio would now be blocked', () => {
   const r = assessRegion({
     country: 'AU',
     contactPhone: '+64211234567',

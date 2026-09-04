@@ -5,7 +5,7 @@
 -- BACKGROUND. On 2026-08-11 our Stripe webhook endpoint was deleted from the
 -- shared Stripe account. Stripe simply stopped calling. Nothing alerted, because
 -- a deleted webhook has no failure mode, and 15 days later a studio paid
--- AUD 768.90 and received nothing from us. `stripe-webhook-health` was written
+-- in full and received nothing from us. `stripe-webhook-health` was written
 -- to assert that endpoint's existence, but it was deployed WITHOUT a schedule,
 -- so it protected nothing.
 --

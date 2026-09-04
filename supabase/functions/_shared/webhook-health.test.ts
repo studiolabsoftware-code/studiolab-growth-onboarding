@@ -2,7 +2,7 @@
 //
 // The regression under test is real and dated. On 2026-08-11 our Stripe webhook
 // endpoint disappeared from a shared account and nothing noticed for 15 days,
-// until a studio paid AUD 768.90 and received nothing from us. Every case below
+// until a studio paid in full and received nothing from us. Every case below
 // is a shape that must raise the alarm rather than pass quietly.
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { assessWebhookHealth, REQUIRED_EVENTS, type StripeWebhookEndpointLike } from './webhook-health.ts';

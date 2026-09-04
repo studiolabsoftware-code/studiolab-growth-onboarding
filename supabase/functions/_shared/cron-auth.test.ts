@@ -2,7 +2,7 @@
 //
 // This guards the auth path that pg_cron uses to reach `stripe-webhook-health`,
 // the check that exists because a deleted Stripe webhook went unnoticed for 15
-// days and a real studio paid AUD 768.90 for nothing. A monitor that cannot
+// days and a real studio paid in full for nothing. A monitor that cannot
 // authenticate is a monitor that does not run, so these are not academic.
 import { assert, assertEquals, assertFalse } from 'jsr:@std/assert@1';
 import { bearerToken, constantTimeEquals, isCronCaller } from './cron-auth.ts';

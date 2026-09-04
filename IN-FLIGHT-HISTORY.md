@@ -322,7 +322,7 @@ from paying us, which is worse than the fault being fixed.
 
 - Phone: only an explicit international prefix (`+` or `00`) counts. `+61` is Australia, matched
   exactly rather than by prefix so `+62`, `+64`, `+65` and `+66` are not mistaken for it. A national
-  number like `0421 056 987` is genuinely ambiguous and is NOT evidence.
+  number like `0491 570 006` is genuinely ambiguous and is NOT evidence.
 - Postcode: letters (UK/CA) or a length other than 4 (US ZIP) are positive evidence. A 4-digit code
   is checked against Australia's allocated ranges (1000-9999, plus 0200-0299 ACT and 0800-0999 NT),
   so `0632` is not merely unusual, it is not an Australian postcode at all.
@@ -335,7 +335,7 @@ not in it**, so the insert would have failed inside the try/catch that exists so
 break a checkout: silent. Migration `052` extends the constraint, rebuilt programmatically from its
 own live definition rather than retyping 61 values (verified 61 -> 62, nothing dropped).
 
-Verified: the guard returns `mismatch:true` on Neverland's exact stored values, `false` for a
+Verified: the guard returns `mismatch:true` on the first paying studio's exact stored values, `false` for a
 genuine AU studio, and `false` when phone and postcode are both absent. The function's real select
 string was run against the live row to prove `contact_phone` and `address_postcode` actually come
 back, since a mistyped column would have made the guard silently never fire. Deployed; a bogus
@@ -391,8 +391,8 @@ injecting a bogus intent: it failed and named the file, then passed again on rev
 
 ### PII
 
-The Neverland owner's personal email address was committed to this PUBLIC repo's `IN-FLIGHT.md`
-by 9bcb2dd (the prior session). Redacted to "the Neverland owner"; the studio name and submission id
+The first paying studio owner's personal email address was committed to this PUBLIC repo's `IN-FLIGHT.md`
+by 9bcb2dd (the prior session). Redacted to "the studio owner"; the studio name and submission id
 are enough to work from, and it is not repeated here for the same reason. **It remains in git
 history and the repo is public, so treat it as disclosed.** Also
 caught before commit: the region-guard tests originally hard-coded her real mobile. They now use
@@ -426,7 +426,7 @@ surfaces an alias worth adding, or a platform field sending junk. Deployed with 
 and probed (unsigned POST still answers our own body). 1094 tests. Connector `89a37e2`.
 
 **The Onboarding guard was then demoted to what it should always have been:** a backstop for someone
-who reaches a form directly, which is exactly how Neverland arrived. `create-checkout-session` no
+who reaches a form directly, which is exactly how the first paying studio arrived. `create-checkout-session` no
 longer blocks. It REPRICES onto the everyone-else line and lets them finish, logged as
 `checkout_region_repriced` (052 updated; the earlier `checkout_blocked_region_mismatch` value is
 left in the CHECK constraint, unused, with zero rows).

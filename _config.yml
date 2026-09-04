@@ -1,0 +1,56 @@
+# ---------------------------------------------------------------------------
+# GitHub Pages publish control for app.studiolabgrowth.com.
+#
+# Pages serves this repo's ROOT branch, which means every file committed here
+# is served on the customer-facing domain unless it is excluded below. On
+# 2026-09-04 that was found to include the internal engineering notes, the
+# full database schema and every migration, the onboarding runbooks, and a
+# line naming a paying studio with the amount they paid and their invoice
+# number.
+#
+# Jekyll has no allow-list, only this deny-list, so it is not self-maintaining.
+# The real guard is the automated one: supabase/functions/_shared/
+# no-published-internals.test.ts fails the green gate if a file that is not
+# part of the customer-facing site becomes reachable. If you add a top-level
+# file or folder, that test tells you to make a decision here.
+#
+# Served on purpose: index/account/portal/project/quote/update/
+# payment-confirm/unsubscribe .html, admin/, assets/, au/, css/, js/, setup/,
+# us/, CNAME, robots.txt.
+# ---------------------------------------------------------------------------
+
+exclude:
+  # Jekyll's own defaults, which setting this key would otherwise discard.
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/
+
+  # Internal operating notes. Never customer-facing.
+  - AGENTS.md
+  - CLAUDE.md
+  - HANDOVER-NEXT-SESSION.md
+  - IN-FLIGHT.md
+  - IN-FLIGHT-HISTORY.md
+  - README.md
+
+  # Backend. Schema, migrations and Edge Function source are not web assets.
+  - supabase/
+
+  # Internal documentation, runbooks, deliverables and tooling.
+  - docs/
+  - outputs/
+  - calculators/
+  - scripts/
+
+  # Superseded copies of the AU pages, kept for reference, not for serving.
+  - au-tmp/
+
+  # Local-only scratch. Gitignored, so Pages never sees these anyway.
+  - tmp/
+  - ruvector.db
+
+  # Tooling and repo config.
+  - .claude/
+  - .cbmignore
+  - .gitignore

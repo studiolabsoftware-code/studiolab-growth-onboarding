@@ -8,7 +8,7 @@
 // alerted, because a deleted webhook has no failure mode: Stripe stops calling
 // and everything downstream simply never happens.
 //
-// The cost was a real studio paying AUD 768.90 on 2026-08-26 with no studio
+// The cost was a real studio paying in full on 2026-08-26 with no studio
 // receipt, no admin notification, no inbox record, and a submission still
 // reading 'draft'/'pending'. It surfaced only because Gary happened to check
 // Stripe directly.
