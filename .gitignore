@@ -5,7 +5,8 @@ node_modules/
 *.log
 .vscode/
 .idea/
-.claude/
+.claude/*
+!.claude/settings.json
 supabase/.temp/
 supabase/.branches/
 
@@ -17,25 +18,25 @@ assets/*.pdf
 
 # ---------------------------------------------------------------------------
 # THIS REPO IS PUBLIC (studiolabsoftware-code/studiolab-growth-onboarding).
-# outputs/ is the working deliverables folder, so it holds material that must
-# never be published. Plans and runbooks in outputs/ are still committed by
-# hand; these patterns stop an accidental `git add -A` from sweeping in the
-# rest. Nothing here is deleted, it just stays local. To publish one on
-# purpose: git add -f <path>
+#
+# outputs/ and calculators/ are working folders. They hold confidential
+# pricing, margin workings and commercial modelling for named studios, so the
+# default is DENY: nothing new in them is committed unless someone forces it.
+# Already-tracked files in these folders are unaffected and keep working
+# normally. Nothing is deleted, it just stays local.
+#
+# To publish one on purpose, and only after checking it carries no client
+# name, price, margin or contact detail:  git add -f <path>
+#
+# This used to be a list of file extensions (csv, docx, pdf, pptx, xlsx),
+# which left every .md, .html and .png unprotected. On 2026-09-04 that gap had
+# 45 untracked internal files sitting one `git add -A` away from publication,
+# including a document headed "Confidential" with the full AU and US plan
+# pricing. Do not narrow this back to an extension list.
 # ---------------------------------------------------------------------------
 
-# Contact exports: real names, emails and phone numbers.
-outputs/*.csv
-
-# Internal commercial and client material.
-outputs/private-*/
-outputs/*.docx
-outputs/*.pdf
-outputs/*.pptx
-outputs/*.xlsx
-
-# Local mirror of the Dropbox source of truth, not this repo's to publish.
-outputs/studiolab-growth-knowledge-base/
+outputs/
+calculators/
 
 # Scratch and local tooling state: never published, nothing here is tracked today.
 tmp/

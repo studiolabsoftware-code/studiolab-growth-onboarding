@@ -1,0 +1,12 @@
+# codebase-memory-mcp: never index secrets, even if committed to git
+appsettings*.json
+appsettings.*.json
+**/appsettings*.json
+*.env
+.env.*
+**/*.env
+**/secrets/**
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.p12
