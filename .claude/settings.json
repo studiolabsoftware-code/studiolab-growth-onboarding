@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/Users/gary/Claude_Projects/StudioLAB-Shared/guardrails/session-start.sh\"",
+            "timeout": 30,
+            "statusMessage": "studiolab-guardrails"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/Users/gary/Claude_Projects/StudioLAB-Shared/guardrails/protected-paths.sh\"",
+            "timeout": 15,
+            "statusMessage": "studiolab-guardrails"
+          }
+        ],
+        "matcher": "Edit|Write|MultiEdit"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/Users/gary/Claude_Projects/StudioLAB-Shared/guardrails/verify.sh\"",
+            "timeout": 300,
+            "statusMessage": "studiolab-guardrails"
+          }
+        ]
+      }
+    ]
+  }
+}
