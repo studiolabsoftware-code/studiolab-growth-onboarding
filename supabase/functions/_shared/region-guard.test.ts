@@ -36,7 +36,7 @@ Deno.test('no phone and no postcode is NOT a mismatch', () => {
 });
 
 Deno.test('a national-format phone number is ambiguous, never evidence', () => {
-  assertEquals(phoneRegionEvidence('0421 056 987'), null);
+  assertEquals(phoneRegionEvidence('0491 570 006'), null);
   assertEquals(phoneRegionEvidence('021 056 9878'), null);   // NZ national, still ambiguous
   assertEquals(phoneRegionEvidence('(02) 9876 5432'), null);
   assertEquals(phoneRegionEvidence('61412345678'), null);    // no +, could be anything

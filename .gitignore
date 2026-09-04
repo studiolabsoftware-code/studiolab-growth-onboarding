@@ -11,9 +11,9 @@ supabase/.temp/
 supabase/.branches/
 
 # Internal reference docs must never enter the public repo.
-assets/*.docx
-assets/*.doc
-assets/*.pdf
+site/assets/*.docx
+site/assets/*.doc
+site/assets/*.pdf
 .gstack/
 
 # ---------------------------------------------------------------------------

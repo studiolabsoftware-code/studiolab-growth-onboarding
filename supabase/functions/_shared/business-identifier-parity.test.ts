@@ -35,7 +35,9 @@ import {
 // fromFileUrl, not .pathname: the checkout directory is "Growth - Onboarding"
 // and .pathname hands back the space percent-encoded as %20.
 const REPO = fromFileUrl(new URL('../../../', import.meta.url));
-const FORM_JS = Deno.readTextFileSync(REPO + 'js/form.js');
+// The site lives under site/ so GitHub Pages publishes one explicit folder.
+const SITE = REPO + 'site/';
+const FORM_JS = Deno.readTextFileSync(SITE + 'js/form.js');
 
 /**
  * Slice a top-level declaration out of the form's source by matching braces from
@@ -196,7 +198,7 @@ Deno.test('every form page offers every entity value, and ships the same form.js
   const values = allBusinessTypeValues();
   const busters = new Set<string>();
   for (const page of PAGES) {
-    const html = Deno.readTextFileSync(REPO + page + '/index.html');
+    const html = Deno.readTextFileSync(SITE + page + '/index.html');
     // The container js/form.js renders the identifier fields into.
     assert(html.includes('id="identifierRow"'), `${page}: no #identifierRow to render identifiers into`);
     // The three hard-coded fields are gone; leaving one behind means a duplicate

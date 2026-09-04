@@ -77,6 +77,7 @@ deno test --allow-read supabase/functions/_shared/
 #    inline <script> in account.html (~2,000 lines, the whole post-payment
 #    portal) plus every file in js/ and admin/js/. The gate used to name
 #    js/form.js alone, so a syntax error anywhere else reached the browser first.
+#    Paths are under site/ since 2026-09-04.
 node scripts/check-inline-js.mjs
 ```
 
@@ -98,31 +99,42 @@ and supabase-js can only parse that list at the type level when it is a SINGLE l
 resolved to `GenericStringError` and every property read off it was an error. Use one template
 literal for a multi-line column list.
 
-## THIS REPO IS THE WEBSITE (added 2026-09-04 after finding it was publishing everything)
+## THE SITE IS site/ AND ONLY site/ (structural fix, 2026-09-04)
 
-GitHub Pages serves this repo's **branch root** at `app.studiolabgrowth.com`, and the repo is
-PUBLIC. So every file committed here is published on the customer-facing domain by default. Not
-the HTML pages: everything. On 2026-09-04 that was found to include `IN-FLIGHT.md`,
-`IN-FLIGHT-HISTORY.md`, `CLAUDE.md`, the whole of `docs/` and `supabase/` (full schema and every
-migration), the tracked plans in `outputs/`, and a line in `IN-FLIGHT.md` naming a paying studio
-with the amount they paid and their invoice number. `robots.txt` is `Disallow: /`, so none of it
-was search-indexed, but all of it was readable by anyone with the URL.
+`app.studiolabgrowth.com` is published from **`site/`** by
+`.github/workflows/pages.yml`. Nothing else in this repo reaches the public.
 
-Two things now stand between an internal file and the public:
+It used to be the opposite. Pages served the **branch root**, so every committed file was live on
+the customer domain: `IN-FLIGHT.md`, `IN-FLIGHT-HISTORY.md`, `CLAUDE.md`, all of `docs/` and
+`supabase/` (full schema and every migration), the tracked plans in `outputs/`, and a line in
+`IN-FLIGHT.md` naming a paying studio with the amount they paid and their invoice number.
+`robots.txt` was `Disallow: /` so none of it was search-indexed, but all of it was readable by
+anyone with the URL. Nobody chose to publish any of it. Publishing was the default, and adding a
+folder was enough to do it.
 
-1. **`_config.yml`** lists what Jekyll must exclude from the built site. Jekyll has no
-   allow-list, only this deny-list, so it cannot notice a new folder on its own.
-2. **`supabase/functions/_shared/no-published-internals.test.ts`** is what notices. It fails the
-   gate if any top-level entry is neither on its served allow-list nor excluded in `_config.yml`,
-   and separately if a personal email address or an Australian mobile appears anywhere in the
-   repo. Add a top-level file or folder and the gate stops you until you decide which it is.
+A deny-list was tried first and rejected: it cannot notice a new folder. The publish root is an
+allow-list by construction, which is why this is the shape the fix took.
 
-**Never write a studio's name, payment amount, invoice number or record id into a tracked file.**
-Look identifiers up in the live database. `IN-FLIGHT.md` in particular is read by every session
-and was the file that leaked; it is also the one most likely to be filled in from a handover.
+**Rules that follow from it:**
 
-**`js/form.js` ships via GitHub Pages on any push to `main`,** including a push that only touches an
-unrelated file. It is on a different rail from the Edge Functions, so a change that spans both must
-deploy the functions FIRST and push afterwards, or studios run new client code against old server
-code. Bump the `?v=` cache-buster in all six `au|us/{launch,scale,ai}/index.html` files plus
-`setup/index.html` whenever `form.js` changes.
+- A file is public **only** by being in `site/`. Put nothing there that is not a web asset.
+- **Never repoint `path:` in the workflow at the repo root.** That single line is the boundary.
+- **Do not switch the Pages source back to a branch** in repo settings. Build type must stay
+  "GitHub Actions". A branch-root source republishes everything.
+- The workflow runs the full green gate **before** deploying, so a red gate cannot ship.
+- **Never write a studio's name, payment amount, invoice number or record id into a tracked
+  file.** Look identifiers up in the live database. `IN-FLIGHT.md` is read by every session and
+  is the file that leaked, precisely because handovers get pasted into it.
+- Path-anchored `.gitignore` rules broke in the move (`assets/*.docx` stopped matching once the
+  folder became `site/assets/`, which silently un-ignored a real internal document). If you move
+  a folder, re-check every gitignore rule that names it.
+
+`supabase/functions/_shared/no-published-internals.test.ts` enforces the first three points plus
+the contact-details rule, and runs in the normal gate.
+
+**`site/js/form.js` ships via GitHub Pages on any push to `main`,** including a push that only
+touches an unrelated file. It is on a different rail from the Edge Functions, so a change that
+spans both must deploy the functions FIRST and push afterwards, or studios run new client code
+against old server code. Bump the `?v=` cache-buster in all six
+`site/au|us/{launch,scale,ai}/index.html` files plus `site/setup/index.html` whenever
+`form.js` changes.

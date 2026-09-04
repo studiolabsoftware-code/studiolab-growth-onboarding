@@ -22,7 +22,9 @@ import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { fromFileUrl } from 'jsr:@std/path@1';
 
 const REPO = fromFileUrl(new URL('../../../', import.meta.url));
-const FORM_JS = Deno.readTextFileSync(REPO + 'js/form.js');
+// The site lives under site/ so GitHub Pages publishes one explicit folder.
+const SITE = REPO + 'site/';
+const FORM_JS = Deno.readTextFileSync(SITE + 'js/form.js');
 
 function slice(header: string, open = '{', close = '}'): string {
   const at = FORM_JS.indexOf(header);
@@ -154,8 +156,8 @@ Deno.test('the row still beats the dial code, because a studio can travel', () =
 });
 
 Deno.test('a national-format number is not evidence of anything', () => {
-  const f = loadForm({ region: 'AU', hasCountrySelect: false, phone: '0421 056 987' });
-  assertEquals(f.countryFromPhone('0421 056 987'), '');
+  const f = loadForm({ region: 'AU', hasCountrySelect: false, phone: '0491 570 006' });
+  assertEquals(f.countryFromPhone('0491 570 006'), '');
   assertEquals(f.getCountryValue(), 'AU', 'falls through to the URL region');
   // +1 is shared by the US and Canada, so it is ambiguous and must not be read
   // as either: guessing US asks a Toronto studio for an EIN they do not have.

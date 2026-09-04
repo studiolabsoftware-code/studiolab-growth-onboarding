@@ -45,7 +45,7 @@ function isAllocatedAuPostcode(n: number): boolean {
  * Read an international dial code off a phone number.
  *
  * Returns null for anything without an explicit international prefix. A number
- * written nationally ('0421 056 987') could belong to several countries and is
+ * written nationally ('0491 570 006') could belong to several countries and is
  * NOT evidence of anything.
  */
 export function phoneRegionEvidence(phone: string | null | undefined): RegionEvidence | null {

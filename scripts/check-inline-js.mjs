@@ -20,6 +20,9 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
+// The site moved under site/ on 2026-09-04 so that GitHub Pages publishes an
+// explicit folder rather than the whole repository.
+const SITE = join(REPO, 'site');
 
 // Every page that carries inline script we actually ship to a studio or an admin.
 const PAGES = [
@@ -39,7 +42,7 @@ let failed = 0;
 for (const page of PAGES) {
   let html;
   try {
-    html = readFileSync(join(REPO, page), 'utf8');
+    html = readFileSync(join(SITE, page), 'utf8');
   } catch {
     console.error(`  ? ${page} (not found, skipped)`);
     continue;
@@ -67,22 +70,29 @@ for (const page of PAGES) {
 for (const dir of ['js', 'admin/js']) {
   let entries;
   try {
-    entries = readdirSync(join(REPO, dir)).filter((f) => f.endsWith('.js')).sort();
+    entries = readdirSync(join(SITE, dir)).filter((f) => f.endsWith('.js')).sort();
   } catch {
     continue;
   }
+  let dirFailed = 0;
   for (const file of entries) {
     const rel = `${dir}/${file}`;
     try {
-      execFileSync(process.execPath, ['--check', join(REPO, rel)], { stdio: 'pipe' });
+      execFileSync(process.execPath, ['--check', join(SITE, rel)], { stdio: 'pipe' });
       checked++;
     } catch (err) {
       failed++;
+      dirFailed++;
       console.error(`  FAIL ${rel}`);
       console.error(String(err.stderr || err.message).trim());
     }
   }
-  console.log(`  ok ${dir}/ (${entries.length} script${entries.length === 1 ? '' : 's'})`);
+  const n = entries.length;
+  if (dirFailed) {
+    console.error(`  FAIL ${dir}/ (${dirFailed} of ${n} script${n === 1 ? '' : 's'})`);
+  } else {
+    console.log(`  ok ${dir}/ (${n} script${n === 1 ? '' : 's'})`);
+  }
 }
 
 if (failed) {

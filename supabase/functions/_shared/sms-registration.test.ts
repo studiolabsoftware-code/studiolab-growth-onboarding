@@ -16,6 +16,8 @@ import {
 } from './sms-registration.ts';
 
 const REPO = fromFileUrl(new URL('../../../', import.meta.url));
+// The site lives under site/ so GitHub Pages publishes one explicit folder.
+const SITE = REPO + 'site/';
 const keys = (country: string | null | undefined) => smsRegistrationFor(country).fields.map((f) => f.key);
 
 // The three fields that exist only because the US Campaign Registry asks for them.
@@ -120,7 +122,7 @@ Deno.test('the save endpoint allows every key any country tile can produce', () 
 Deno.test('account.html no longer hardcodes one country\u2019s SMS process', () => {
   // The whole defect in one assertion. If someone puts country-blind SMS copy
   // back into the tile definition, this fails.
-  const page = Deno.readTextFileSync(REPO + 'account.html');
+  const page = Deno.readTextFileSync(SITE + 'account.html');
   const tileStart = page.indexOf('    sms_a2p: {');
   const tileEnd = page.indexOf('    whatsapp: {');
   assert(tileStart > 0 && tileEnd > tileStart, 'the sms_a2p tile definition moved');
@@ -146,7 +148,7 @@ Deno.test('a tile save never destroys what it did not ask about', () => {
   // everybody), and the "I don't have this yet" checkbox, which used to post an
   // empty object and throw away everything the studio had typed.
   const REPO2 = fromFileUrl(new URL('../../../', import.meta.url));
-  const page = Deno.readTextFileSync(REPO2 + 'account.html');
+  const page = Deno.readTextFileSync(REPO2 + 'site/account.html');
   const at = page.indexOf('const dataOut = {};');
   assert(at > 0, 'the tile save handler moved');
   const handler = page.slice(at, page.indexOf('body: JSON.stringify({ session_token: session.token, surface', at));

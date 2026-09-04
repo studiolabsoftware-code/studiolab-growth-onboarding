@@ -1,0 +1,70 @@
+# Publishes app.studiolabgrowth.com from site/ ONLY.
+#
+# This replaced branch-root publishing on 2026-09-04. Pages used to serve the
+# whole repository, so the internal engineering notes, the database schema,
+# every migration and a studio's payment details were all readable on the
+# customer-facing domain. Excluding files one by one could never be safe: the
+# default was publish, and a new folder was published before anyone noticed it
+# existed.
+#
+# Now the artifact is site/ and nothing else, so a file is published only by
+# being put there on purpose. Do not change `path:` below to the repo root.
+
+name: Deploy site to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; finish the one in flight, then run the newest.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # The same three commands CLAUDE.md defines as the green gate. A failure
+      # here means no deploy, so a broken or leaking state cannot reach the
+      # customer domain.
+      - name: Type-check Edge Functions
+        run: |
+          for f in supabase/functions/*/index.ts; do
+            echo "check $f"
+            deno check "$f"
+          done
+      - name: Unit tests
+        run: deno test --allow-read supabase/functions/_shared/
+      - name: Client JS parses
+        run: node scripts/check-inline-js.mjs
+
+  deploy:
+    needs: gate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          # The whole point of this file. site/ is the web root; everything
+          # else in the repo stays private to the repo.
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
