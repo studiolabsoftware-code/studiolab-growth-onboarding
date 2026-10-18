@@ -2,6 +2,12 @@
 
 This workspace covers StudioLAB Growth onboarding, pricing, billing, product packaging, and operational documentation. It is primarily a business operations and product workspace, not a general coding workspace.
 
+Hub: `StudioLAB-Shared/projects/growth-onboarding/PROJECT.md`. Code rules and the `site/` publish
+boundary: `CLAUDE.md`, full detail `docs/claude-context.md`.
+
+Gate: `deno check supabase/functions/<function>/index.ts`, `deno test --allow-read
+supabase/functions/_shared/`, `node scripts/check-inline-js.mjs`.
+
 ## Shared Knowledge Base
 
 Before answering pricing, margin, feature packaging, setup, upgrade, Family App, Communities, or client recommendation questions, start with the Dropbox active source of truth:
