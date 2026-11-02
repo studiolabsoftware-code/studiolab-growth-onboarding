@@ -201,3 +201,22 @@ export function buildSeed(
   if (identity.country && blank(row?.country)) seed.country = identity.country;
   return seed;
 }
+
+export type InvitedDraft =
+  | { kind: 'use'; row: Record<string, unknown> }
+  | { kind: 'new' }
+  | { kind: 'conflict'; boundLocationId: unknown };
+
+/**
+ * Which draft an invited studio lands on. The location decides, and nothing else. A row found only by
+ * address refuses, bound or not: two sub-accounts can share an owner, so an address cannot say which
+ * studio's row it is, and no session is issued on a guess. Staff settle it. A studio already holding a
+ * session on its own draft binds through save-draft, which the session authorises.
+ */
+export function decideInvitedDraft(
+  byLocation: Record<string, unknown> | null,
+  byEmail: Record<string, unknown> | null,
+): InvitedDraft {
+  if (byLocation) return { kind: 'use', row: byLocation };
+  return byEmail ? { kind: 'conflict', boundLocationId: byEmail.location_id ?? null } : { kind: 'new' };
+}

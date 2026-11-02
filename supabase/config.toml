@@ -113,3 +113,12 @@ verify_jwt = false
 # in Stripe at all and a real studio's payment landed with no receipt and no admin notification.
 [functions.stripe-webhook]
 verify_jwt = false
+
+# Signed by the dashboard server (HMAC, stored nonces) with no Authorization header, so the platform
+# default would refuse it before our code ran. The function authenticates every request itself.
+[functions.dashboard-onboarding]
+verify_jwt = false
+
+# Opened from an email with no session. The token is the only authority, same as ops-reminders' close link.
+[functions.stall-flag-done]
+verify_jwt = false

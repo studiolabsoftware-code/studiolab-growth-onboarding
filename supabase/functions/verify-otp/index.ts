@@ -14,7 +14,7 @@
 
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, growthClient, sha256Hex, randomToken } from '../_shared/supabase.ts';
-import { resolvePrebind, buildSeed, type PrebindIdentity, type PrebindRow } from '../_shared/prebind.ts';
+import { resolvePrebind, buildSeed, decideInvitedDraft, type PrebindIdentity, type PrebindRow } from '../_shared/prebind.ts';
 
 // Long-lived studio session. Onboarding payloads are not sensitive (studio
 // name, classes, public KB content) and we want studios to be able to come
@@ -185,6 +185,7 @@ Deno.serve(async (req) => {
     // studio B's details on a submission bound to studio A. That binding is what the Connector reads
     // to match a submission to a sub-account, so the mistake outlives onboarding.
     let existing: Record<string, unknown> | null = null;
+    let byLocationRow: Record<string, unknown> | null = null;
     if (prebound) {
       const { data: byLocation } = await sb
         .from('submissions')
@@ -192,9 +193,9 @@ Deno.serve(async (req) => {
         .eq('location_id', prebound.locationId)
         .order('last_saved_at', { ascending: false, nullsFirst: false })
         .limit(1);
-      existing = (byLocation && byLocation[0]) || null;
+      byLocationRow = (byLocation && byLocation[0]) || null;
     }
-    if (!existing) {
+    if (!byLocationRow) {
       const { data: byEmail } = await sb
         .from('submissions')
         .select('*')
@@ -205,18 +206,22 @@ Deno.serve(async (req) => {
       existing = byEmail || null;
     }
 
-    // A draft already bound to a DIFFERENT sub-account is a real conflict, not a no-op. buildSeed
-    // deliberately will not re-point it, but silence is how the wrong binding survives: make it
-    // visible in the logs and in the response instead of leaving it "for a human to notice" when no
-    // human is looking.
-    let locationConflict = false;
-    if (prebound && existing && existing.location_id && existing.location_id !== prebound.locationId) {
-      locationConflict = true;
-      console.error('prebind: draft already bound to a different sub-account', {
-        submission_id: existing.id,
-        bound_location_id: existing.location_id,
-        token_location_id: prebound.locationId,
-      });
+    // A draft found only by address is a conflict. It used to log and still issue a session on that
+    // row, so one studio could edit the row another is bound to. Now no session.
+    if (prebound) {
+      const decided = decideInvitedDraft(byLocationRow, existing);
+      if (decided.kind === 'conflict') {
+        console.error('prebind: a draft holds this address but not this sub-account', {
+          bound_location_id: decided.boundLocationId,
+          token_location_id: prebound.locationId,
+        });
+        return jsonResponse({
+          ok: false,
+          error: 'This email address already has a setup form under another record. Please email info@studiolabsoftware.com and we will sort it out.',
+          location_conflict: true,
+        }, 409);
+      }
+      existing = decided.kind === 'use' ? decided.row : null;
     }
 
     const sessionTokenRaw = randomToken(32);
@@ -271,7 +276,6 @@ Deno.serve(async (req) => {
       submission: safe,
       is_returning: Boolean(existing),
       ...(prebound ? { prebound: true } : {}),
-      ...(locationConflict ? { location_conflict: true } : {}),
     });
   } catch (err) {
     // Never interpolate the request body here: it may carry a raw pre-bind token.
