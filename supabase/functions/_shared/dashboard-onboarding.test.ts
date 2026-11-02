@@ -257,11 +257,10 @@ Deno.test('a failed email leaves the flag to retry at the next sweep', async () 
   assertEquals(w.flags.length, 1);
 });
 
-Deno.test('invited path: the location decides, an unbound draft is adopted, a row bound elsewhere refuses', () => {
+Deno.test('invited path: the location decides; a row found only by address refuses, bound or not', () => {
   const a = { id: 'a', location_id: 'A' };
-  assertEquals(decideInvitedDraft('A', a, null), { kind: 'use', row: a });
-  assertEquals(decideInvitedDraft('A', null, null), { kind: 'new' });
-  const unbound = { id: 'u', location_id: null };
-  assertEquals(decideInvitedDraft('A', null, unbound), { kind: 'use', row: unbound });
-  assertEquals(decideInvitedDraft('B', null, a), { kind: 'conflict', boundLocationId: 'A' });
+  assertEquals(decideInvitedDraft(a, null), { kind: 'use', row: a });
+  assertEquals(decideInvitedDraft(null, null), { kind: 'new' });
+  assertEquals(decideInvitedDraft(null, a), { kind: 'conflict', boundLocationId: 'A' });
+  assertEquals(decideInvitedDraft(null, { id: 'u', location_id: null }), { kind: 'conflict', boundLocationId: null });
 });

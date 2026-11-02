@@ -206,18 +206,18 @@ Deno.serve(async (req) => {
       existing = byEmail || null;
     }
 
-    // A draft bound to a DIFFERENT sub-account is a real conflict. It used to log and still issue a
-    // session on that row, so one studio could edit the row another is bound to. Now no session.
+    // A draft found only by address is a conflict. It used to log and still issue a session on that
+    // row, so one studio could edit the row another is bound to. Now no session.
     if (prebound) {
-      const decided = decideInvitedDraft(prebound.locationId, byLocationRow, existing);
+      const decided = decideInvitedDraft(byLocationRow, existing);
       if (decided.kind === 'conflict') {
-        console.error('prebind: draft already bound to a different sub-account', {
+        console.error('prebind: a draft holds this address but not this sub-account', {
           bound_location_id: decided.boundLocationId,
           token_location_id: prebound.locationId,
         });
         return jsonResponse({
           ok: false,
-          error: 'This email address is already set up for another StudioLAB Growth account. Please email info@studiolabsoftware.com and we will sort it out.',
+          error: 'This email address already has a setup form under another record. Please email info@studiolabsoftware.com and we will sort it out.',
           location_conflict: true,
         }, 409);
       }

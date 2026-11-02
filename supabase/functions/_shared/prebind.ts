@@ -208,19 +208,15 @@ export type InvitedDraft =
   | { kind: 'conflict'; boundLocationId: unknown };
 
 /**
- * Which draft an invited studio lands on. The location decides. A row found by address is used only
- * when it is bound to nothing, because the code just went to that address on the signup record. A row
- * bound to another sub-account refuses: no session, so nobody fills in one studio's details on a row
- * the Connector reads as another's. Staff settle it.
+ * Which draft an invited studio lands on. The location decides, and nothing else. A row found only by
+ * address refuses, bound or not: two sub-accounts can share an owner, so an address cannot say which
+ * studio's row it is, and no session is issued on a guess. Staff settle it. A studio already holding a
+ * session on its own draft binds through save-draft, which the session authorises.
  */
 export function decideInvitedDraft(
-  locationId: string,
   byLocation: Record<string, unknown> | null,
   byEmail: Record<string, unknown> | null,
 ): InvitedDraft {
   if (byLocation) return { kind: 'use', row: byLocation };
-  if (!byEmail) return { kind: 'new' };
-  const bound = byEmail.location_id;
-  if (bound && bound !== locationId) return { kind: 'conflict', boundLocationId: bound };
-  return { kind: 'use', row: byEmail };
+  return byEmail ? { kind: 'conflict', boundLocationId: byEmail.location_id ?? null } : { kind: 'new' };
 }
