@@ -17,53 +17,8 @@
 import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { postSystemMessage } from '../_shared/inbox.ts';
-import { smsFieldKeys } from '../_shared/sms-registration.ts';
+import { VALID_SURFACES, VALID_STATUSES, cleanTaskData, taskMessage, type SurfaceKey, type StatusKey } from '../_shared/setup-task-rules.ts';
 
-type SurfaceKey =
-  | 'gbp' | 'ga4' | 'gsc' | 'gtm' | 'google_ads' | 'meta' | 'tiktok'
-  | 'sms_a2p' | 'whatsapp';
-const VALID_SURFACES = new Set<SurfaceKey>([
-  'gbp', 'ga4', 'gsc', 'gtm', 'google_ads', 'meta', 'tiktok',
-  'sms_a2p', 'whatsapp',
-]);
-
-// Per-surface allowed keys in the `data` jsonb. Any other key in the
-// incoming payload is silently dropped to keep the column tidy.
-const SURFACE_FIELDS: Record<SurfaceKey, string[]> = {
-  gbp:        ['maps_url', 'place_id', 'verification_status', 'notes'],
-  ga4:        ['measurement_id', 'property_id', 'account_name', 'notes'],
-  gsc:        ['property_url', 'property_type', 'notes'],
-  gtm:        ['container_id', 'account_id', 'site_platform', 'notes'],
-  google_ads: ['customer_id', 'account_currency', 'account_timezone', 'notes'],
-  meta:       ['business_manager_id', 'page_url', 'page_id', 'instagram_username',
-               'instagram_is_professional', 'instagram_linked_to_page',
-               'ad_account_id', 'pixel_id', 'notes'],
-  tiktok:     ['business_center_id', 'ad_account_id', 'handle',
-               'handle_is_business', 'notes'],
-  // Taken from the tile's own definition rather than restated here. Which of
-  // these a studio is SHOWN depends on their country (the US Campaign Registry
-  // fields are asked for nowhere else), but what we ALLOW is the union: a
-  // studio whose country resolves differently between two visits must not have
-  // work they already submitted rejected at the door.
-  sms_a2p:    smsFieldKeys(),
-  whatsapp:   ['enabled', 'display_name', 'business_category',
-               'verification_doc_url', 'notes'],
-};
-
-const SURFACE_LABEL: Record<SurfaceKey, string> = {
-  gbp:        'Google Business Profile',
-  ga4:        'Google Analytics 4',
-  gsc:        'Google Search Console',
-  gtm:        'Google Tag Manager',
-  google_ads: 'Google Ads',
-  meta:       'Meta Business Manager',
-  tiktok:     'TikTok Business Center',
-  sms_a2p:    'SMS compliance & A2P registration',
-  whatsapp:   'WhatsApp Business',
-};
-
-type StatusKey = 'pending' | 'submitted' | 'no_account';
-const VALID_STATUSES = new Set<StatusKey>(['pending', 'submitted', 'no_account']);
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
@@ -101,19 +56,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: 'Setup checklist is unlocked after payment.' }, 403);
     }
 
-    // Filter the inbound data down to the keys we accept for this surface.
-    const allowedKeys = new Set(SURFACE_FIELDS[surface as SurfaceKey]);
-    const cleanData: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(data)) {
-      if (!allowedKeys.has(k)) continue;
-      if (v === null || v === undefined) continue;
-      if (typeof v === 'string') {
-        const trimmed = v.trim();
-        if (trimmed) cleanData[k] = trimmed.slice(0, 2000);
-      } else if (typeof v === 'boolean' || typeof v === 'number') {
-        cleanData[k] = v;
-      }
-    }
+    const cleanData = cleanTaskData(surface as SurfaceKey, data);
 
     // Upsert the row. On status='submitted' we stamp studio_submitted_at
     // the first time only — don't keep moving it every resubmit.
@@ -147,10 +90,7 @@ Deno.serve(async (req) => {
     // the submission in their workflow. Only do this on a real status
     // transition into submitted/no_account (not on every save).
     if (wasOpenForSubmission && (status === 'submitted' || status === 'no_account')) {
-      const label = SURFACE_LABEL[surface as SurfaceKey];
-      const text = status === 'submitted'
-        ? `Studio submitted ${label} access details. Setup Checklist tile is ready for us to action.`
-        : `Studio flagged "I don't have ${label} yet" — they need us to set it up on their behalf.`;
+      const text = taskMessage(surface as SurfaceKey, status);
       await postSystemMessage(sb, submission.id, submission.studio_name, text);
     }
 

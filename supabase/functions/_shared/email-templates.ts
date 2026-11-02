@@ -710,6 +710,30 @@ export function opsReminder(opts: {
   return { subject: `Still to do: ${opts.title}${nth}`, html: layout({ previewText: opts.body.slice(0, 120), body }) };
 }
 
+const STALL_COPY: Record<string, { title: string; next: string }> = {
+  account_no_install: { title: 'Account created, app not installed', next: 'Install the app on this account, this account only.' },
+  owner_unconfirmed: { title: 'App installed, owner not confirmed', next: 'Confirm who the owner is, then activate.' },
+  never_opened: { title: 'App installed, never opened', next: 'Check the invite reached them, then give them a call.' },
+  fee_unpaid: { title: 'Setup fee not paid', next: 'Check in with the studio. Their answers are saved.' },
+  studio_step_idle: { title: 'The studio has not moved in a week', next: 'See what is holding them up.' },
+  our_step_idle: { title: 'A step on our side has been idle', next: 'Pick it up in the Setup Queue.' },
+  third_party_overrun: { title: 'A third-party wait has gone past its usual time', next: 'Ask the studio where it stands.' },
+  fee_oddity: { title: 'Something odd on a setup fee', next: 'Check the payment in Stripe.' },
+  plan_payment_refused: { title: 'A plan payment could not be matched to a studio', next: 'Match it by hand in Stripe.' },
+};
+
+export function stallFlagEmail(opts: { flag: string; studioName: string; doneUrl: string; reminder: number }): { subject: string; html: string } {
+  const copy = STALL_COPY[opts.flag] ?? { title: 'A studio needs a look', next: 'Open their setup.' };
+  const nth = opts.reminder > 1 ? ` (reminder ${opts.reminder})` : '';
+  const body = `
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${COL.in_d};letter-spacing:-0.3px;">${escape(copy.title)}</h1>
+    <p style="margin:0 0 8px;"><strong>${escape(opts.studioName)}</strong></p>
+    <p style="margin:0 0 16px;">${escape(copy.next)}</p>
+    ${cta('Mark this done', opts.doneUrl)}
+    <p style="margin:14px 0 0;color:${COL.g6};font-size:12px;">This closes by itself once the step moves. The button stops the reminders sooner.</p>`;
+  return { subject: `Setup: ${copy.title}: ${opts.studioName}${nth}`, html: layout({ previewText: copy.next, body }) };
+}
+
 // ---------------------------------------------------------------------------
 // Abandoned-onboarding follow-up. A short, finite sequence for a studio who
 // signed up, opened the setup form and then stopped. Three emails, then we

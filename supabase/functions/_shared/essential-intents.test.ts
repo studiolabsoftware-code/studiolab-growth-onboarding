@@ -35,6 +35,7 @@ const KNOWN_OPTIONAL: ReadonlyArray<{ intent: string; why: string }> = [
   { intent: 'studio service request', why: 'Acknowledgement of a request the studio just submitted.' },
   // Admin-facing. These go to our own team via resolveAdminNotificationRecipients,
   // not to a studio, so a studio opt-out is not the relevant control for them.
+  { intent: 'stalled studio flag', why: 'Internal, addressed to the StudioLAB team. Off until the send gate opens.' },
   { intent: 'admin notification', why: 'Internal, addressed to the StudioLAB team.' },
   { intent: 'admin new submission', why: 'Internal, addressed to the StudioLAB team.' },
   { intent: 'admin change request completed', why: 'Internal, addressed to the StudioLAB team.' },

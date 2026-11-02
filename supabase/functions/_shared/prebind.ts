@@ -201,3 +201,26 @@ export function buildSeed(
   if (identity.country && blank(row?.country)) seed.country = identity.country;
   return seed;
 }
+
+export type InvitedDraft =
+  | { kind: 'use'; row: Record<string, unknown> }
+  | { kind: 'new' }
+  | { kind: 'conflict'; boundLocationId: unknown };
+
+/**
+ * Which draft an invited studio lands on. The location decides. A row found by address is used only
+ * when it is bound to nothing, because the code just went to that address on the signup record. A row
+ * bound to another sub-account refuses: no session, so nobody fills in one studio's details on a row
+ * the Connector reads as another's. Staff settle it.
+ */
+export function decideInvitedDraft(
+  locationId: string,
+  byLocation: Record<string, unknown> | null,
+  byEmail: Record<string, unknown> | null,
+): InvitedDraft {
+  if (byLocation) return { kind: 'use', row: byLocation };
+  if (!byEmail) return { kind: 'new' };
+  const bound = byEmail.location_id;
+  if (bound && bound !== locationId) return { kind: 'conflict', boundLocationId: bound };
+  return { kind: 'use', row: byEmail };
+}

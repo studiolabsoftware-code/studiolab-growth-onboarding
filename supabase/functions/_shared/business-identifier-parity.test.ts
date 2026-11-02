@@ -178,7 +178,7 @@ Deno.test('every identifier the catalogue can ask for has a column to land in', 
   }
   const migrations = ['040_business_details.sql', '054_country_business_identifiers.sql']
     .map((f) => Deno.readTextFileSync(REPO + 'supabase/migrations/' + f)).join('\n');
-  const saveDraft = Deno.readTextFileSync(REPO + 'supabase/functions/save-draft/index.ts');
+  const saveDraft = Deno.readTextFileSync(REPO + 'supabase/functions/_shared/submission-fields.ts');
   for (const key of keys) {
     assert(
       new RegExp(`add column if not exists\\s+${key}\\b`).test(migrations),

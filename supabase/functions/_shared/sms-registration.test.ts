@@ -114,7 +114,7 @@ Deno.test('the save endpoint allows every key any country tile can produce', () 
   }
   // And the endpoint must READ that list rather than restate it, or the two go
   // out of step the first time a field is added.
-  const endpoint = Deno.readTextFileSync(REPO + 'supabase/functions/studio-save-setup-task/index.ts');
+  const endpoint = Deno.readTextFileSync(REPO + 'supabase/functions/_shared/setup-task-rules.ts');
   assert(endpoint.includes('smsFieldKeys()'), 'studio-save-setup-task should source its sms_a2p keys from the model');
   assertFalse(/sms_a2p:\s*\[/.test(endpoint), 'studio-save-setup-task restates the sms_a2p field list as a literal');
 });
