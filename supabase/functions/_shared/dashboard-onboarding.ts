@@ -15,6 +15,10 @@ const LOCATION_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const ACTOR_RE = /^[A-Za-z0-9_:-]{1,128}$/;
 const MAX_TEXT = 4000;
 const REMIND_EVERY_DAYS = 3;
+/** Tax numbers go in and never come back out. The read says only which are on file. */
+const WRITE_ONLY = new Set<string>(['ein', 'abn', 'acn', 'nzbn', 'crn', 'bn', 'tax_id']);
+const BOOLEAN_ANSWERS = new Set<string>(['custom_domain', 'business_email_is_personal_domain', 'sms_setup_requested', 'consent_send_on_behalf']);
+const LIST_ANSWERS = new Set<string>(['lead_sources']);
 
 export const STALL_FLAGS = [
   'account_no_install', 'owner_unconfirmed', 'never_opened', 'fee_unpaid', 'studio_step_idle',
@@ -29,9 +33,11 @@ export interface Port {
   signupByLocation(locationId: string): Promise<PrebindRow | null>;
   /** Null when the row would break a unique rule: this location raced, or the address already has a draft. */
   insertSubmission(row: Row): Promise<Row | null>;
-  updateSubmission(id: string, patch: Row): Promise<Row>;
+  /** Writes only while the row is still a draft. Null when it no longer is. */
+  updateDraft(id: string, patch: Row): Promise<Row | null>;
   tasksFor(submissionId: string): Promise<Row[]>;
-  upsertTask(row: Row): Promise<Row>;
+  /** Writes only while the tile is still the studio's. False when staff have it, however recently they took it. */
+  saveTaskIfStudios(row: Row): Promise<boolean>;
   postMessage(submissionId: string, studioName: unknown, text: string): Promise<void>;
   log(submissionId: string, action: string, actor: string, details: Row): Promise<void>;
   sweepFacts(since: string): Promise<Row[]>;
@@ -45,12 +51,13 @@ export interface Port {
 }
 
 export type Result = { status: number; body: Row };
+const isLocation = (v: unknown): v is string => typeof v === 'string' && LOCATION_RE.test(v);
 const refuse = (status: number, code: string): Result => ({ status, body: { ok: false, code } });
 
 /** Only these leave the backend. No session hash, Stripe id, pricing, or staff note can be added by a new column. */
 function safeSubmission(s: Row): Row {
   const out: Row = {};
-  for (const k of APP_ANSWER_FIELDS) out[k] = s[k] ?? null;
+  for (const k of APP_ANSWER_FIELDS) if (!WRITE_ONLY.has(k)) out[k] = s[k] ?? null;
   return out;
 }
 
@@ -84,6 +91,7 @@ async function view(p: Port, s: Row): Promise<Result> {
       submission_status: s.status ?? null,
       last_saved_at: s.last_saved_at ?? null,
       answers: safeSubmission(s),
+      identifiers_on_file: [...WRITE_ONLY].filter((k) => s[k]),
       identifier_fields: identifiersFor(s.country as string, s.business_type as string).map((i) => i.key),
       checklist_open: PAID_STATUSES.has(String(s.payment_status)),
       messaging_pending: messagingPending,
@@ -103,10 +111,17 @@ function cleanAnswers(fields: unknown): Row | null {
   const picked = pickAllowed(Object.fromEntries(Object.entries(fields as Row).filter(([k]) => allowed.has(k))));
   const out: Row = {};
   for (const [k, v] of Object.entries(picked)) {
-    if (typeof v === 'string') out[k] = v.trim().slice(0, MAX_TEXT) || null;
-    else if (v === null || typeof v === 'boolean') out[k] = v;
-    else if (Array.isArray(v) && v.length <= 50 && v.every((x) => typeof x === 'string')) out[k] = v.map((x) => x.slice(0, 200));
-    else return null;
+    if (v === null) out[k] = null;
+    else if (BOOLEAN_ANSWERS.has(k)) {
+      if (typeof v !== 'boolean') return null;
+      out[k] = v;
+    } else if (LIST_ANSWERS.has(k)) {
+      if (!Array.isArray(v) || v.length > 50 || !v.every((x) => typeof x === 'string')) return null;
+      out[k] = v.map((x) => x.slice(0, 200));
+    } else {
+      if (typeof v !== 'string') return null;
+      out[k] = v.trim().slice(0, MAX_TEXT) || null;
+    }
   }
   return out;
 }
@@ -122,10 +137,13 @@ export async function handleOp(p: Port, body: Row, now = new Date()): Promise<Re
   }
 
   if (op === 'flags.sync') {
-    if (!Array.isArray(body.flags) || body.flags.length > 2000) return refuse(400, 'bad_request');
+    if (!Array.isArray(body.flags) || body.flags.length > 2000 || !Array.isArray(body.checked) || body.checked.length > 2000) return refuse(400, 'bad_request');
+    if (!body.checked.every((l) => isLocation(l))) return refuse(400, 'bad_request');
+    // A flag clears only for a location this sweep actually looked at, so a short or failed read clears nothing.
+    const checked = new Set<string>(body.checked as string[]);
     const firing = new Set<string>();
     for (const f of body.flags as Row[]) {
-      if (!LOCATION_RE.test(String(f?.location_id)) || !(STALL_FLAGS as readonly string[]).includes(String(f?.flag))) return refuse(400, 'bad_request');
+      if (!isLocation(f?.location_id) || !(STALL_FLAGS as readonly string[]).includes(String(f?.flag))) return refuse(400, 'bad_request');
       firing.add(`${f.location_id}|${f.flag}`);
     }
     const counts = { opened: 0, reminded: 0, cleared: 0, emailed: 0, unsent: 0 };
@@ -146,6 +164,7 @@ export async function handleOp(p: Port, body: Row, now = new Date()): Promise<Re
       const key = `${row.location_id}|${row.flag}`;
       seen.add(key);
       if (!firing.has(key)) {
+        if (!checked.has(String(row.location_id))) continue;
         await p.clearFlag(String(row.id), nowIso);
         counts.cleared++;
       } else if (!row.closed_at) {
@@ -169,8 +188,9 @@ export async function handleOp(p: Port, body: Row, now = new Date()): Promise<Re
   }
 
   const locationId = body.location_id;
-  if (typeof locationId !== 'string' || !LOCATION_RE.test(locationId)) return refuse(400, 'bad_request');
+  if (!isLocation(locationId)) return refuse(400, 'bad_request');
   const actor = typeof body.actor === 'string' && ACTOR_RE.test(body.actor) ? body.actor : '';
+  if (!actor) return refuse(400, 'bad_request');
 
   if (op === 'setup.read') {
     const { row, conflict } = await oneByLocation(p, locationId);
@@ -179,7 +199,6 @@ export async function handleOp(p: Port, body: Row, now = new Date()): Promise<Re
   }
 
   if (op === 'setup.ensure') {
-    if (!actor) return refuse(400, 'bad_request');
     const { row, conflict } = await oneByLocation(p, locationId);
     if (conflict) return refuse(409, 'conflict');
     if (row) return view(p, row);
@@ -203,7 +222,6 @@ export async function handleOp(p: Port, body: Row, now = new Date()): Promise<Re
     return view(p, created);
   }
 
-  if (!actor) return refuse(400, 'bad_request');
   const { row, conflict } = await oneByLocation(p, locationId);
   if (conflict) return refuse(409, 'conflict');
   if (!row) return refuse(404, 'not_found');
@@ -213,9 +231,13 @@ export async function handleOp(p: Port, body: Row, now = new Date()): Promise<Re
     if (row.status && row.status !== 'draft') return refuse(409, 'not_draft');
     const fields = cleanAnswers(body.fields);
     if (!fields) return refuse(400, 'bad_request');
-    if (fields.consent_send_on_behalf === true && !row.consent_captured_at) fields.consent_captured_at = nowIso;
-    if (typeof body.last_step_completed === 'number') fields.last_step_completed = body.last_step_completed;
-    const saved = await p.updateSubmission(String(row.id), { ...fields, last_saved_at: nowIso });
+    // The time consent was given, from this clock. Stamped each time it goes from not given to given.
+    if (fields.consent_send_on_behalf === true && row.consent_send_on_behalf !== true) fields.consent_captured_at = nowIso;
+    const step = body.last_step_completed;
+    if (Number.isInteger(step) && (step as number) >= 0 && (step as number) <= 20) fields.last_step_completed = step;
+    // Checked again in the write: a payment landing mid-save must not be edited over.
+    const saved = await p.updateDraft(String(row.id), { ...fields, last_saved_at: nowIso });
+    if (!saved) return refuse(409, 'not_draft');
     await p.log(String(row.id), 'app_answers_saved', actor, { fields: Object.keys(fields) });
     return view(p, saved);
   }
@@ -233,12 +255,16 @@ export async function handleOp(p: Port, body: Row, now = new Date()): Promise<Re
     const wasOpen = !existing || existing.status === 'pending' || existing.status === 'no_account';
     const wait = THIRD_PARTY_WAITS[surface as SurfaceKey];
     if (body.waiting === true && !wait) return refuse(400, 'bad_request');
-    await p.upsertTask({
+    // Leaving `waiting` out keeps a declared wait; a data re-save must not drop it.
+    const waitPatch = body.waiting === undefined
+      ? { waiting_on: existing?.waiting_on ?? null, waiting_since: existing?.waiting_since ?? null }
+      : { waiting_on: body.waiting === true ? wait!.who : null, waiting_since: body.waiting === true ? (existing?.waiting_since ?? nowIso) : null };
+    const wrote = await p.saveTaskIfStudios({
       submission_id: row.id, surface, status, data,
       studio_submitted_at: status === 'submitted' ? (existing?.studio_submitted_at ?? nowIso) : (existing?.studio_submitted_at ?? null),
-      waiting_on: body.waiting === true ? wait!.who : null,
-      waiting_since: body.waiting === true ? (existing?.waiting_since ?? nowIso) : null,
+      ...waitPatch,
     });
+    if (!wrote) return refuse(409, 'staff_owned');
     if (wasOpen && (status === 'submitted' || status === 'no_account')) await p.postMessage(String(row.id), row.studio_name, taskMessage(surface as SurfaceKey, status));
     await p.log(String(row.id), 'app_task_saved', actor, { surface, status });
     return view(p, row);

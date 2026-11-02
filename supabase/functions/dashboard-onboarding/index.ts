@@ -28,25 +28,33 @@ function port(sb: any, growth: any): Port {
       if (r.error) throw r.error;
       return r.data;
     },
-    updateSubmission: async (id, patch) => must(await sb.from('submissions').update(patch).eq('id', id).select('*').single()),
+    updateDraft: async (id, patch) => must(await sb.from('submissions').update(patch).eq('id', id).eq('status', 'draft').select('*').maybeSingle()),
     tasksFor: async (id) => must(await sb.from('setup_tasks').select('surface, status, data, studio_submitted_at, updated_at, waiting_on, waiting_since').eq('submission_id', id)),
-    upsertTask: async (row) => must(await sb.from('setup_tasks').upsert(row, { onConflict: 'submission_id,surface' }).select('*').single()),
+    saveTaskIfStudios: async (row) => {
+      // Insert first; on an existing tile, update only while its status is still the studio's. One statement each, so no window.
+      const ins = await sb.from('setup_tasks').insert(row).select('id');
+      if (!ins.error) return true;
+      if (ins.error.code !== '23505') throw ins.error;
+      const upd: Row[] = must(await sb.from('setup_tasks').update(row).eq('submission_id', row.submission_id).eq('surface', row.surface).in('status', ['pending', 'submitted', 'no_account']).select('id'));
+      return upd.length > 0;
+    },
     postMessage: (id, name, text) => postSystemMessage(sb, id, name == null ? null : String(name), text),
     log: async (id, action, actor, details) => { must(await sb.from('activity_log').insert({ submission_id: id, action, actor: `dashboard:${actor}`, details })); },
     sweepFacts: async (since) => {
-      const signups: Row[] = must(await growth.from('inbound_signup').select('location_id, plan, created_at, invited_at').gte('created_at', since).limit(500));
-      const locations = signups.map((s) => s.location_id);
+      // Newest first and capped. A studio past the cap is simply not looked at this run, so its flags stay as they are.
+      const signups: Row[] = must(await growth.from('inbound_signup').select('location_id, created_at, invited_at').gte('created_at', since).order('created_at', { ascending: false }).limit(200));
+      const locations = signups.map((s) => s.location_id as string);
       if (!locations.length) return [];
       const subs: Row[] = must(await sb.from('submissions').select('id, location_id, status, payment_status, created_at, last_saved_at, timezone').in('location_id', locations));
       const tasks: Row[] = subs.length ? must(await sb.from('setup_tasks').select('submission_id, surface, status, updated_at, studio_submitted_at, waiting_on, waiting_since').in('submission_id', subs.map((s) => s.id))) : [];
-      const events: Row[] = must(await growth.from('email_event').select('location_id, event_type, severity, event_at').in('location_id', locations).in('event_type', ['failed', 'complained', 'delivered']).order('event_at', { ascending: true }).limit(2000));
+      const outcomes: Row[] = must(await sb.rpc('invite_outcome_for_locations', { p_locations: locations }));
       return signups.map((s) => {
         const sub = subs.find((x) => x.location_id === s.location_id);
-        // Ids, dates and codes only: the address the event went to stays here.
-        const last = events.filter((e) => e.location_id === s.location_id).at(-1);
+        // Ids, dates and codes only.
+        const last = outcomes.find((o) => o.location_id === s.location_id)?.outcome;
         return {
           location_id: s.location_id, signed_up_at: s.created_at, invited_at: s.invited_at ?? null,
-          invite_event: last ? (last.event_type === 'failed' && last.severity === 'permanent' ? 'bounced' : last.event_type) : null,
+          invite_event: last === 'failed_permanent' ? 'bounced' : (last ?? null),
           submission: sub ? {
             status: sub.status, paid: ['paid', 'authorised', 'card_saved'].includes(String(sub.payment_status)), created_at: sub.created_at, last_saved_at: sub.last_saved_at, timezone: sub.timezone ?? null,
             tasks: tasks.filter((t) => t.submission_id === sub.id).map(({ submission_id: _id, ...t }) => t),

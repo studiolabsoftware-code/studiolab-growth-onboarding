@@ -21,12 +21,13 @@ function world(over: Partial<Port> = {}) {
       subs.push(r);
       return Promise.resolve(r);
     },
-    updateSubmission: (id, patch) => { const r = subs.find((s) => s.id === id)!; Object.assign(r, patch); return Promise.resolve(r); },
+    updateDraft: (id, patch) => { const r = subs.find((s) => s.id === id)!; if (r.status !== 'draft') return Promise.resolve(null); Object.assign(r, patch); return Promise.resolve(r); },
     tasksFor: (id) => Promise.resolve(tasks.filter((t) => t.submission_id === id)),
-    upsertTask: (row) => {
+    saveTaskIfStudios: (row) => {
       const i = tasks.findIndex((t) => t.submission_id === row.submission_id && t.surface === row.surface);
+      if (i >= 0 && (tasks[i].status === 'in_progress' || tasks[i].status === 'complete')) return Promise.resolve(false);
       if (i >= 0) tasks[i] = { ...tasks[i], ...row }; else tasks.push(row);
-      return Promise.resolve(row);
+      return Promise.resolve(true);
     },
     postMessage: (_i, _n, t) => { messages.push(t); return Promise.resolve(); },
     log: (_i, a) => { logs.push(a); return Promise.resolve(); },
@@ -86,7 +87,7 @@ Deno.test('no signup, unroutable signup, and two rows on one location are refuse
 
 Deno.test('a read never creates, and a read of nothing says found false', async () => {
   const w = world();
-  const r = await handleOp(w.port, { op: 'setup.read', location_id: LOC });
+  const r = await handleOp(w.port, { op: 'setup.read', location_id: LOC, actor: 'u' });
   assertEquals(r.body, { ok: true, found: false });
   assertEquals(w.subs.length, 0);
 });
@@ -95,14 +96,14 @@ Deno.test('a saved answer survives to the next read, from any device: all state 
   const w = world();
   await ensure(w.port);
   await handleOp(w.port, { op: 'answers.save', location_id: LOC, actor: 'u', fields: { studio_description: ' We dance ' } });
-  const r = await handleOp(w.port, { op: 'setup.read', location_id: LOC });
+  const r = await handleOp(w.port, { op: 'setup.read', location_id: LOC, actor: 'u' });
   assertEquals((r.body.answers as Row).studio_description, 'We dance');
 });
 
 Deno.test('what leaves the backend holds no session hash, Stripe id or staff note', async () => {
   const w = world();
   await ensure(w.port);
-  const text = JSON.stringify((await handleOp(w.port, { op: 'setup.read', location_id: LOC })).body);
+  const text = JSON.stringify((await handleOp(w.port, { op: 'setup.read', location_id: LOC, actor: 'u' })).body);
   for (const secret of ['SECRET', 'cus_X', 'session_token_hash', 'stripe_customer_id', 'contact_email']) assert(!text.includes(secret), secret);
 });
 
@@ -140,7 +141,7 @@ Deno.test('a tile: refused until paid, posts the same inbox line staff see today
   assertEquals(w.tasks[0].data, { maps_url: 'https://m' });
   assertEquals(w.messages, ['Studio submitted Google Business Profile access details. Setup Checklist tile is ready for us to action.']);
   w.tasks[0].status = 'in_progress';
-  const r = await handleOp(w.port, { op: 'setup.read', location_id: LOC });
+  const r = await handleOp(w.port, { op: 'setup.read', location_id: LOC, actor: 'u' });
   assertEquals((r.body.tasks as Row[]).find((t) => t.surface === 'gbp')!.owner, 'us');
   assertEquals((await save()).body.code, 'staff_owned');
   assertEquals(w.tasks[0].status, 'in_progress');
@@ -160,7 +161,7 @@ Deno.test('a third-party wait is stamped once by the server; a tile with no wait
 
 Deno.test('bad location, missing actor and unknown op are refused', async () => {
   const w = world();
-  for (const body of [{ op: 'setup.read', location_id: "a'; drop" }, { op: 'setup.read' }, { op: 'setup.ensure', location_id: LOC }, { op: 'answers.save', location_id: LOC, fields: {} }, { op: 'nope', location_id: LOC, actor: 'u' }, { op: 'sweep.facts', since: 'never' }, { op: 'flags.sync', flags: [{ location_id: LOC, flag: 'made_up' }] }, { op: 'flags.sync' }]) {
+  for (const body of [{ op: 'setup.read', location_id: "a'; drop" }, { op: 'setup.read', actor: 'u' }, { op: 'setup.read', location_id: LOC }, { op: 'setup.ensure', location_id: LOC }, { op: 'answers.save', location_id: LOC, fields: {} }, { op: 'nope', location_id: LOC, actor: 'u' }, { op: 'sweep.facts', since: 'never' }, { op: 'flags.sync', checked: [LOC], flags: [{ location_id: LOC, flag: 'made_up' }] }, { op: 'flags.sync', checked: [], flags: [{ location_id: null, flag: 'fee_unpaid' }] }, { op: 'flags.sync', flags: [] }, { op: 'flags.sync' }]) {
     assertEquals((await handleOp(w.port, body)).status === 200, false, JSON.stringify(body));
   }
   assertEquals(w.subs.length, 0);
@@ -169,12 +170,12 @@ Deno.test('bad location, missing actor and unknown op are refused', async () => 
 Deno.test('flags: with sending off nothing goes out, each flag is recorded once, and clears when its cause does', async () => {
   const w = world();
   const flags = STALL_FLAGS.map((flag) => ({ location_id: LOC, flag }));
-  const r = await handleOp(w.port, { op: 'flags.sync', flags });
+  const r = await handleOp(w.port, { op: 'flags.sync', checked: [LOC], flags });
   assertEquals([r.body.opened, r.body.emailed, r.body.unsent], [STALL_FLAGS.length, 0, STALL_FLAGS.length]);
-  const again = await handleOp(w.port, { op: 'flags.sync', flags });
+  const again = await handleOp(w.port, { op: 'flags.sync', checked: [LOC], flags });
   assertEquals(again.body.opened, 0);
   assertEquals(w.flags.length, STALL_FLAGS.length);
-  assertEquals((await handleOp(w.port, { op: 'flags.sync', flags: [] })).body.cleared, STALL_FLAGS.length);
+  assertEquals((await handleOp(w.port, { op: 'flags.sync', checked: [LOC], flags: [] })).body.cleared, STALL_FLAGS.length);
 });
 
 Deno.test('flags: with sending on, every flag emails once, money flags to owners and admins only, reminders every three days, and a closed one stays quiet', async () => {
@@ -182,15 +183,64 @@ Deno.test('flags: with sending on, every flag emails once, money flags to owners
   const w = world({ sendFlagEmail: (f) => { sent.push(f); return Promise.resolve(); } });
   const flags = STALL_FLAGS.map((flag) => ({ location_id: LOC, flag }));
   const t0 = new Date('2026-11-02T00:00:00Z');
-  await handleOp(w.port, { op: 'flags.sync', flags }, t0);
+  await handleOp(w.port, { op: 'flags.sync', checked: [LOC], flags }, t0);
   assertEquals(sent.map((s) => s.flag).sort(), [...STALL_FLAGS].sort());
   assertEquals(sent.filter((s) => s.ownerAdminOnly).map((s) => s.flag).sort(), ['fee_oddity', 'plan_payment_refused']);
-  await handleOp(w.port, { op: 'flags.sync', flags }, new Date('2026-11-03T00:00:00Z'));
+  await handleOp(w.port, { op: 'flags.sync', checked: [LOC], flags }, new Date('2026-11-03T00:00:00Z'));
   assertEquals(sent.length, STALL_FLAGS.length);
   w.flags[0].closed_at = t0.toISOString();
-  const later = await handleOp(w.port, { op: 'flags.sync', flags }, new Date('2026-11-06T00:00:00Z'));
+  const later = await handleOp(w.port, { op: 'flags.sync', checked: [LOC], flags }, new Date('2026-11-06T00:00:00Z'));
   assertEquals(later.body.reminded, STALL_FLAGS.length - 1);
   assertEquals(sent.at(-1)!.reminder, 2);
+});
+
+Deno.test('an empty or short sweep clears nothing: a flag clears only for a location it looked at', async () => {
+  const w = world();
+  await handleOp(w.port, { op: 'flags.sync', checked: [LOC], flags: [{ location_id: LOC, flag: 'fee_unpaid' }] });
+  assertEquals((await handleOp(w.port, { op: 'flags.sync', checked: [], flags: [] })).body.cleared, 0);
+  assertEquals((await handleOp(w.port, { op: 'flags.sync', checked: ['loc_other'], flags: [] })).body.cleared, 0);
+  assertEquals(w.flags[0].cleared_at, undefined);
+});
+
+Deno.test('tax numbers go in and never come back; the read says only which are on file', async () => {
+  const w = world();
+  await ensure(w.port);
+  await handleOp(w.port, { op: 'answers.save', location_id: LOC, actor: 'u', fields: { abn: '51 824 753 556' } });
+  const r = await handleOp(w.port, { op: 'setup.read', location_id: LOC, actor: 'u' });
+  assert(!JSON.stringify(r.body).includes('51 824'));
+  assertEquals(r.body.identifiers_on_file, ['abn']);
+});
+
+Deno.test('answers: a wrong type for a column is refused, not left to fail in the database', async () => {
+  const w = world();
+  await ensure(w.port);
+  for (const fields of [{ consent_send_on_behalf: 'maybe' }, { custom_domain: 'yes' }, { lead_sources: 'google' }, { website: true }]) {
+    assertEquals((await handleOp(w.port, { op: 'answers.save', location_id: LOC, actor: 'u', fields })).body.code, 'bad_request', JSON.stringify(fields));
+  }
+  await handleOp(w.port, { op: 'answers.save', location_id: LOC, actor: 'u', fields: { lead_sources: ['google'], custom_domain: true }, last_step_completed: -1 });
+  assertEquals([w.subs[0].lead_sources, w.subs[0].custom_domain, w.subs[0].last_step_completed], [['google'], true, undefined]);
+});
+
+Deno.test('a staff move or a payment landing mid-save wins over the save', async () => {
+  const w = world({ saveTaskIfStudios: () => Promise.resolve(false), updateDraft: () => Promise.resolve(null) });
+  await ensure(w.port);
+  w.subs[0].payment_status = 'paid';
+  assertEquals((await handleOp(w.port, { op: 'task.save', location_id: LOC, actor: 'u', surface: 'gbp', status: 'submitted' })).body.code, 'staff_owned');
+  assertEquals(w.messages, []);
+  assertEquals((await handleOp(w.port, { op: 'answers.save', location_id: LOC, actor: 'u', fields: { website: 'x' } })).body.code, 'not_draft');
+});
+
+Deno.test('a data re-save keeps a declared wait; waiting false clears it', async () => {
+  const w = world();
+  await ensure(w.port);
+  w.subs[0].payment_status = 'paid';
+  const save = (extra: Row) => handleOp(w.port, { op: 'task.save', location_id: LOC, actor: 'u', surface: 'gbp', status: 'no_account', ...extra });
+  await save({ waiting: true });
+  w.tasks[0].waiting_on = 'Google';
+  await save({});
+  assertEquals(w.tasks[0].waiting_on, 'Google');
+  await save({ waiting: false });
+  assertEquals(w.tasks[0].waiting_on, null);
 });
 
 Deno.test('a failed email leaves the flag to retry at the next sweep', async () => {
@@ -198,11 +248,11 @@ Deno.test('a failed email leaves the flag to retry at the next sweep', async () 
   let sends = 0;
   const w = world({ sendFlagEmail: () => { if (fail) throw new Error('down'); sends++; return Promise.resolve(); } });
   const flags = [{ location_id: LOC, flag: 'fee_unpaid' }];
-  const r = await handleOp(w.port, { op: 'flags.sync', flags });
+  const r = await handleOp(w.port, { op: 'flags.sync', checked: [LOC], flags });
   assertEquals(r.body.unsent, 1);
   assertEquals(w.flags[0].last_emailed_at, undefined);
   fail = false;
-  await handleOp(w.port, { op: 'flags.sync', flags });
+  await handleOp(w.port, { op: 'flags.sync', checked: [LOC], flags });
   assertEquals(sends, 1);
   assertEquals(w.flags.length, 1);
 });

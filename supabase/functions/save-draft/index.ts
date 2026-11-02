@@ -86,7 +86,16 @@ Deno.serve(async (req) => {
             token_location_id: prebound.locationId,
           });
         } else {
-          prebindSeed = buildSeed(prebound, row);
+          // One submission per sub-account (055). If another row holds this location, stamping it here
+          // would fail every autosave, so treat it as the same conflict and save the studio's work unbound.
+          const { data: holders } = row.location_id ? { data: [] } : await sb.from('submissions')
+            .select('id').eq('location_id', prebound.locationId).limit(1);
+          if (holders && holders.length) {
+            prebindConflict = true;
+            console.error('prebind: another draft already holds this sub-account', { submission_id: row.id, token_location_id: prebound.locationId });
+          } else {
+            prebindSeed = buildSeed(prebound, row);
+          }
         }
       }
     }
