@@ -178,6 +178,9 @@ Deno.serve(async (req) => {
     if (!submission.plan || !submission.setup_type) {
       return jsonResponse({ ok: false, error: 'Plan or setup type missing on submission.' }, 400);
     }
+    if (submission.setup_type === 'guided') {
+      return jsonResponse({ ok: false, error: 'Guided self-setup is no longer offered. Reopen your form to continue with Done-For-You.' }, 400);
+    }
     if (submission.payment_status === 'paid') {
       return jsonResponse({ ok: false, error: 'This submission has already been paid.' }, 409);
     }

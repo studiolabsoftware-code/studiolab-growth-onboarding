@@ -65,7 +65,8 @@ function validate(
 
   if (kind === 'setup_change') {
     const targetSetup = typeof body.target_setup_type === 'string' ? body.target_setup_type : '';
-    if (targetSetup !== 'dfy' && targetSetup !== 'guided') {
+    // Guided self-setup is no longer sold, so the only switch on offer is a Guided studio moving to Done-For-You.
+    if (targetSetup !== 'dfy') {
       return { ok: false, status: 400, error: 'Pick a setup type to switch to.' };
     }
     if (targetSetup === row.setup_type) {

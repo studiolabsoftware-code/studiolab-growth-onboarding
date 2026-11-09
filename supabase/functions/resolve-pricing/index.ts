@@ -33,7 +33,8 @@ Deno.serve(async (req) => {
     if (!['launch', 'scale', 'ai'].includes(plan)) {
       return jsonResponse({ ok: false, error: 'Invalid plan.' }, 400);
     }
-    if (!['dfy', 'guided'].includes(setup_type)) {
+    // Guided self-setup is no longer sold: Done-For-You is the only setup fee.
+    if (setup_type !== 'dfy') {
       return jsonResponse({ ok: false, error: 'Invalid setup type.' }, 400);
     }
 

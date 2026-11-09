@@ -229,8 +229,7 @@ select {
 .auto-list strong { color: var(--in-d); font-weight: 700; display: block; margin-bottom: 2px; }
 
 /* ── Setup type ────────────────────────────────────── */
-.setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 480px) { .setup-grid { grid-template-columns: 1fr; } }
+.setup-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .setup-card { display: block; border: 2px solid var(--g2); border-radius: 10px; padding: 16px; cursor: pointer; transition: border-color 0.15s, background 0.15s, box-shadow 0.15s; user-select: none; position: relative; background: #fff; }
 .setup-card:hover { border-color: var(--in); }
 .setup-card.sel { border-color: var(--in); background: var(--in-l); }

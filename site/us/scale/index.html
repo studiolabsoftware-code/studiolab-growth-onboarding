@@ -50,7 +50,7 @@
     <div class="dr-hero-inner">
       <p class="dr-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span>Account created</span></p>
       <h2 id="drTitle">Welcome to StudioLAB Growth<span class="dr-accent">Let's get you set up</span></h2>
-      <p class="dr-lede">You're on <b>Scale</b>. There are a few things only you can tell us: your studio's details, your branding, and how you'd like families to hear from you. At the end you choose how much of the setup you'd like us to handle.</p>
+      <p class="dr-lede">You're on <b>Scale</b>. There are a few things only you can tell us: your studio's details, your branding, and how you'd like families to hear from you. At the end you review your Done-For-You setup and pay.</p>
 
       <div class="dr-auth">
         <div class="dr-step-auth" id="authStepEmail">
@@ -93,7 +93,7 @@
         </li>
         <li class="dr-step dr-next">
           <span class="dr-dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h4.5"/><path d="M8.5 12l5-5.5H20"/><path d="M8.5 12l5 5.5H20"/><path d="M17.4 3.8L20 6.5l-2.6 2.7"/><path d="M17.4 14.8L20 17.5l-2.6 2.7"/></svg></span>
-          <div class="dr-txt"><span class="dr-slbl">Next</span><h4>Choose your setup and pay</h4></div>
+          <div class="dr-txt"><span class="dr-slbl">Next</span><h4>Review your setup and pay</h4></div>
         </li>
         <li class="dr-step dr-end">
           <span class="dr-dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.3 5.6 5.7 2.2-5.7 2.2L12 18.8l-2.3-5.6L4 11l5.7-2.2z"/></svg></span>
@@ -372,9 +372,10 @@
         </div>
         <div class="fr">
           <div class="f">
-            <label for="contactPhone">Phone </label>
-            <input type="tel" id="contactPhone" placeholder="(555) 555-0123">
-            <span class="field-err">Please enter your phone number.</span>
+            <label for="contactPhone">Mobile number <span class="req">*</span></label>
+            <input type="tel" id="contactPhone" data-required inputmode="tel" autocomplete="tel" aria-describedby="contactPhoneNote" placeholder="(555) 555-0123">
+            <span class="field-note" id="contactPhoneNote">We'll use this number to contact you about your StudioLAB account and support. Reply STOP to any text to opt out.</span>
+            <span class="field-err">Please enter a mobile number we can text.</span>
           </div>
           <div class="f">
             <label for="contactRole">Role</label>
@@ -600,8 +601,8 @@
 
 
     <div class="card">
-      <div class="ct" id="lbl-setup-review"><div class="ct-icon" aria-hidden="true">🛠️</div>Choose your setup option</div>
-      <p style="margin:0 0 12px; color:var(--g6); font-size:13px; line-height:1.55;">Neither option is hands-off. A few things can only be done by you, because they need your logins, your domain, or your identity: connecting your social accounts, adding records to your domain, and verifying your business with the phone carriers. What changes is how much of the rest we do, and whether we are on the call while you do your part.</p>
+      <div class="ct" id="lbl-setup-review"><div class="ct-icon" aria-hidden="true">🛠️</div>Your setup</div>
+      <p style="margin:0 0 12px; color:var(--g6); font-size:13px; line-height:1.55;">A few things can only be done by you, because they need your logins, your domain, or your identity: connecting your social accounts, adding records to your domain, and verifying your business with the phone carriers. We do the rest of the build and sit with you on a call for those parts.</p>
       <div class="setup-grid" role="radiogroup" aria-labelledby="lbl-setup-review">
         <label class="setup-card sel" id="sc-dfy" data-setup="dfy">
           <input type="radio" name="setup" value="dfy" aria-label="Done-For-You: We do the bulk of the build, and sit with you on a call for the parts that need your logins, your domain, or your identity." checked>
@@ -609,13 +610,6 @@
           <div class="setup-name" aria-hidden="true">Done-For-You</div>
           <div class="setup-desc" aria-hidden="true">We do the bulk of the build, and sit with you on a call for the parts that need your logins, your domain, or your identity.</div>
           <div class="setup-price" data-price-slot="dfy" aria-hidden="true"></div>
-        </label>
-        <label class="setup-card" id="sc-guided" data-setup="guided">
-          <input type="radio" name="setup" value="guided" aria-label="Guided (self-setup): You work through our checklist at your own pace. We send a walkthrough for each step that needs your own logins, and we are on hand if you get stuck.">
-          <div class="setup-dot" aria-hidden="true"></div>
-          <div class="setup-name" aria-hidden="true">Guided (self-setup)</div>
-          <div class="setup-desc" aria-hidden="true">You work through our checklist at your own pace. We send a walkthrough for each step that needs your own logins, and we are on hand if you get stuck.</div>
-          <div class="setup-price" data-price-slot="guided" aria-hidden="true"></div>
         </label>
       </div>
     </div>
@@ -751,7 +745,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
-<script src="/js/form.js?v=20260826c"></script>
+<script src="/js/form.js?v=20261109a"></script>
 <script src="/js/form-attachments.js?v=20260515a"></script>
 
 </div><!-- /formWrap -->

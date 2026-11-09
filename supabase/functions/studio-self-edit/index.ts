@@ -19,6 +19,7 @@ import { preflight, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, sha256Hex } from '../_shared/supabase.ts';
 import { createGatedSender } from '../_shared/email-gated.ts';
 import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
+import { phoneConsentFields, toE164 } from '../_shared/contact-phone.ts';
 
 // Whitelist of fields the studio can mutate from account.html. Kept tight
 // on purpose: anything that affects pricing/auth/identity stays locked.
@@ -74,6 +75,8 @@ const FIELD_LABEL: Record<string, string> = {
   last_name: 'Last name',
   role: 'Role',
   contact_phone: 'Contact phone',
+  contact_phone_consent_at: 'Phone notice shown',
+  contact_phone_consent_source: 'Phone notice source',
   studio_name: 'Studio name',
   legal_name: 'Legal entity name',
   country: 'Country',
@@ -182,6 +185,19 @@ Deno.serve(async (req) => {
     const patch = pickAllowed(payload);
     if (Object.keys(patch).length === 0) {
       return jsonResponse({ ok: false, error: 'No editable fields supplied.' }, 400);
+    }
+
+    // The mobile number is required and stored as E.164 with the time and source of the notice shown beside it.
+    if ('contact_phone' in patch) {
+      const e164 = toE164(patch.contact_phone, row.region as string | null);
+      if (!e164) {
+        return jsonResponse({
+          ok: false,
+          error: 'Enter a valid mobile number we can text, for example 0412 345 678 or +1 415 555 0123.',
+          code: 'invalid_phone',
+        }, 400);
+      }
+      Object.assign(patch, phoneConsentFields(row as Record<string, unknown>, e164, 'account_page', new Date().toISOString()));
     }
 
     const diff = diffFields(row as Record<string, unknown>, patch);

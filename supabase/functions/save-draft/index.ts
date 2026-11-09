@@ -14,6 +14,7 @@ import { createGatedSender } from '../_shared/email-gated.ts';
 import { resolveAdminNotificationRecipients } from '../_shared/admin-recipients.ts';
 import { sendIfAllowed } from '../_shared/studio-email.ts';
 import { pickAllowed } from '../_shared/submission-fields.ts';
+import { phoneConsentFields, toE164 } from '../_shared/contact-phone.ts';
 
 const PLAN_LABEL: Record<string, string> = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
 const SETUP_LABEL: Record<string, string> = { dfy: 'Done-For-You', guided: 'Guided' };
@@ -110,6 +111,17 @@ Deno.serve(async (req) => {
     // Never let the client clear the email or change the verification anchor
     delete (update as Record<string, unknown>).contact_email;
 
+    // Guided self-setup is no longer sold. An older open tab may still send it; Done-For-You is the one setup.
+    if (update.setup_type === 'guided') update.setup_type = 'dfy';
+
+    // The mobile number is stored as E.164 with the time and source of the notice shown beside it. A value
+    // that is not a mobile number is dropped, never stored and never allowed to blank an earlier number.
+    if ('contact_phone' in update) {
+      const e164 = toE164(update.contact_phone, row.region as string | null);
+      if (e164) Object.assign(update, phoneConsentFields(row, e164, 'onboarding_form', update.last_saved_at as string));
+      else delete update.contact_phone;
+    }
+
     if (finalize === true) {
       // Send-on-behalf consent is a legal authorisation to email/SMS families
       // on the studio's behalf. The client blocks submit without it, but a
@@ -122,6 +134,16 @@ Deno.serve(async (req) => {
           ok: false,
           error: 'Send-on-behalf consent is required before submitting.',
           code: 'consent_required',
+        }, 400);
+      }
+      // A required mobile number, checked here as well because a direct API call can skip the form.
+      const phoneGiven = typeof update.contact_phone === 'string'
+        || (!!row.contact_phone_consent_at && !!toE164(row.contact_phone, row.region as string | null));
+      if (!phoneGiven) {
+        return jsonResponse({
+          ok: false,
+          error: 'A mobile number is required before submitting.',
+          code: 'phone_required',
         }, 400);
       }
       update.status = 'submitted';

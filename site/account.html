@@ -111,6 +111,7 @@
   .acct-edit-btn:focus-visible { outline: 2px solid var(--in); outline-offset: 1px; }
   .acct-edit-grid { display: grid; grid-template-columns: 160px 1fr; gap: 10px 14px; align-items: start; }
   .acct-edit-grid label { color: var(--g6); font-size: 13px; padding: 10px 0 0; }
+  .acct-edit-grid .acct-edit-note { grid-column: 2; margin: -4px 0 0; font-size: 12px; line-height: 1.45; color: var(--g6); }
   .acct-edit-grid .acct-edit-locked { color: var(--in-d); font-size: 13px; padding: 10px 0 0; }
   .acct-edit-grid input[type="text"],
   .acct-edit-grid input[type="url"],
@@ -1392,6 +1393,9 @@
   // Keep labels concise — they appear next to the input, not as form
   // help text. Anything that needs a description belongs in a separate
   // explainer surface (the message thread).
+  // Shown beside the mobile number wherever it is collected or changed (word for word, Gary 9 Nov 2026).
+  const SMS_NOTICE = 'We\'ll use this number to contact you about your StudioLAB account and support. Reply STOP to any text to opt out.';
+
   const EDIT_SECTIONS = [
     {
       id: 'contact',
@@ -1403,7 +1407,7 @@
         { name: 'first_name',    label: 'First name',    type: 'text' },
         { name: 'last_name',     label: 'Last name',     type: 'text' },
         { name: 'role',          label: 'Your role',     type: 'text', placeholder: 'e.g. Owner, Director' },
-        { name: 'contact_phone', label: 'Contact phone', type: 'tel' },
+        { name: 'contact_phone', label: 'Mobile number', type: 'tel', required: true, note: SMS_NOTICE },
       ],
     },
     {
@@ -1496,9 +1500,13 @@
         const hex = /^#[0-9a-fA-F]{6}$/.test(v) ? v : '#000000';
         input = `<input type="color" name="${esc(f.name)}" value="${esc(hex)}">`;
       } else {
-        input = `<input type="${esc(f.type)}" name="${esc(f.name)}" value="${esc(v)}"${placeholder}>`;
+        const tel = f.type === 'tel' ? ' inputmode="tel" autocomplete="tel"' : '';
+        const req = f.required ? ' required' : '';
+        const desc = f.note ? ` aria-describedby="note-${esc(f.name)}"` : '';
+        input = `<input type="${esc(f.type)}" name="${esc(f.name)}" value="${esc(v)}"${placeholder}${tel}${req}${desc}>`;
       }
-      return `<label>${esc(f.label)}</label>${input}`;
+      const note = f.note ? `<p class="acct-edit-note" id="note-${esc(f.name)}">${esc(f.note)}</p>` : '';
+      return `<label>${esc(f.label)}${f.required ? ' *' : ''}</label>${input}${note}`;
     }).join('');
 
     return `
@@ -1619,7 +1627,9 @@
       { v: 'ai',    label: 'Dominate AI', enabled: currentPlan === 'launch' || currentPlan === 'scale' },
     ].filter((o) => o.enabled);
 
-    const setupTarget = currentSetup === 'guided' ? 'dfy' : 'guided';
+    // Guided self-setup is no longer sold: the only switch on offer is a Guided studio moving to Done-For-You.
+    const canSwitchSetup = currentSetup === 'guided';
+    const setupTarget = 'dfy';
     const setupTargetLabel = SETUP_LABEL[setupTarget];
 
     const backdrop = document.createElement('div');
@@ -1635,7 +1645,7 @@
           <label for="acctReqKind">What kind of request?</label>
           <select id="acctReqKind" name="kind">
             ${planOptions.length ? '<option value="plan_upgrade">Upgrade my plan</option>' : ''}
-            <option value="setup_change">Switch setup type (${esc(SETUP_LABEL[currentSetup] || currentSetup)} → ${esc(setupTargetLabel)})</option>
+            ${canSwitchSetup ? `<option value="setup_change">Switch setup type (${esc(SETUP_LABEL[currentSetup] || currentSetup)} → ${esc(setupTargetLabel)})</option>` : ''}
             <option value="custom_addon">Custom add-on (website, integration, etc.)</option>
             <option value="other">Something else</option>
           </select>

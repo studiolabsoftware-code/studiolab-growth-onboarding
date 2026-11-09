@@ -103,37 +103,32 @@
     return Boolean(s && s.token && s.expiresAt && new Date(s.expiresAt) > new Date());
   }
 
-  // Setup fee pricing per master reference doc (May 2026).
+  // Setup fee pricing per master reference doc (May 2026). Done-For-You is the only setup sold: Guided
+  // self-setup was withdrawn (Gary, 9 Nov 2026).
   // AU prices show ex-GST headline with inc-GST hint. US shows single USD.
   // Dominate AI: the dfy slot is renamed to AI Activation Pack at render time.
   const PRICING = {
     launch: {
       AU: {
-        guided: { amount: '$99', currency: 'AUD', tax: 'ex GST · $109 inc GST' },
         dfy:    { amount: '$400', currency: 'AUD', tax: 'ex GST · $440 inc GST' },
       },
       US: {
-        guided: { amount: '$79', currency: 'USD', tax: '' },
         dfy:    { amount: '$299', currency: 'USD', tax: '' },
       },
     },
     scale: {
       AU: {
-        guided: { amount: '$99', currency: 'AUD', tax: 'ex GST · $109 inc GST' },
         dfy:    { amount: '$400', currency: 'AUD', tax: 'ex GST · $440 inc GST' },
       },
       US: {
-        guided: { amount: '$79', currency: 'USD', tax: '' },
         dfy:    { amount: '$299', currency: 'USD', tax: '' },
       },
     },
     ai: {
       AU: {
-        guided: { amount: '$99',  currency: 'AUD', tax: 'ex GST · $109 inc GST' },
         dfy:    { amount: '$699', currency: 'AUD', tax: 'ex GST · $769 inc GST' },
       },
       US: {
-        guided: { amount: '$79',  currency: 'USD', tax: '' },
         dfy:    { amount: '$549', currency: 'USD', tax: '' },
       },
     },
@@ -151,10 +146,6 @@
   // real difference is how much of the rest we do, and whether we are on the
   // call while they do their part.
   const SETUP_DISPLAY = {
-    guided: {
-      label: 'Guided (self-setup)',
-      desc:  'You work through our checklist at your own pace. We send a walkthrough for each step that needs your own logins, and we are on hand if you get stuck.',
-    },
     dfy_default: {
       label: 'Done-For-You',
       desc:  'We do the bulk of the build, and sit with you on a call for the parts that need your logins, your domain, or your identity.',
@@ -204,8 +195,7 @@
     return regionTable[setupType] || regionTable.dfy;
   }
 
-  function setupLabelFor(setupType) {
-    if (setupType === 'guided') return SETUP_DISPLAY.guided;
+  function setupLabelFor() {
     return PLAN === 'ai' ? SETUP_DISPLAY.dfy_ai : SETUP_DISPLAY.dfy_default;
   }
 
@@ -304,6 +294,21 @@
   // BN they do. An ambiguous code is not evidence, so we fall through to the URL
   // region, which at least matches the common case.
   const DIAL_TO_COUNTRY = { 61: 'AU', 64: 'NZ', 44: 'UK' };
+
+  // The mobile number, as E.164 or '' when it cannot be one. Mirrors toE164 in
+  // supabase/functions/_shared/contact-phone.ts (the server re-checks); keep the two in step.
+  function toE164(raw) {
+    const cleaned = String(raw || '').trim().replace(/[\s().-]/g, '');
+    if (!/^(\+|00)?\d+$/.test(cleaned)) return '';
+    let digits;
+    if (cleaned.charAt(0) === '+') digits = cleaned.slice(1);
+    else if (cleaned.slice(0, 2) === '00') digits = cleaned.slice(2);
+    else digits = (REGION === 'AU' ? '61' : '1') + cleaned.replace(/^0+/, '');
+    if (!/^[1-9]\d{7,14}$/.test(digits)) return '';
+    if (digits.indexOf('61') === 0 && !/^614\d{8}$/.test(digits)) return '';
+    if (digits.charAt(0) === '1' && !/^1[2-9]\d{2}[2-9]\d{6}$/.test(digits)) return '';
+    return '+' + digits;
+  }
 
   function countryFromPhone(phone) {
     const cleaned = String(phone || '').trim().replace(/[\s().-]/g, '');
@@ -813,7 +818,6 @@
     // Setup-conditional UI: elements with .dfy-only are only visible when
     // Done-For-You is selected. Mirrored on the body so CSS can target it.
     document.body.classList.toggle('setup-dfy', setupName === 'dfy');
-    document.body.classList.toggle('setup-guided', setupName === 'guided');
     // The setup-fee + tax shown in the review summary depends on state.setup.
     // Refresh it live so the checkout figure tracks the user's choice on the
     // final step (the picker and the summary now live on the same panel).
@@ -825,9 +829,7 @@
     const svAuto = document.getElementById('sv-automations');
     if (svAuto) {
       const planName = PLAN_LABEL[state.plan] || 'Growth';
-      svAuto.textContent = setupName === 'guided'
-        ? 'Your checklist covers all ' + planName + ' automations'
-        : 'We switch on all ' + planName + ' automations for you';
+      svAuto.textContent = 'We switch on all ' + planName + ' automations for you';
     }
     // Sticky paybar at the top of the review step shows the authoritative
     // total (with tax + discount). Re-fetch it whenever the toggle changes so
@@ -1026,6 +1028,7 @@
         if (el.type === 'email') bad = !isEmail(v);
         else if (el.type === 'url') bad = !isUrl(v);
         else if (el.id === 'website') bad = !looksLikeDomain(v);
+        else if (el.id === 'contactPhone') bad = !toE164(v);
         else if (el.id === 'col1t') bad = !isHex(v);
         // The USD onboarding flow's free-text "Other country" must not be used
         // to slip an AU studio onto USD pricing — or, more importantly, an AU
@@ -1416,7 +1419,7 @@
 
   // ── Summary build ─────────────────────────────────────────────────────────
   const PLAN_LABEL = { launch: 'Launch', scale: 'Scale', ai: 'Dominate AI' };
-  const SETUP_LABEL = { dfy: 'Done-For-You', guided: 'Guided (self-setup)' };
+  const SETUP_LABEL = { dfy: 'Done-For-You' };
 
   // Business identity labels and helpers (Phase 1 of onboarding access plan).
   const PERSONAL_EMAIL_DOMAINS = new Set([
@@ -1809,7 +1812,9 @@
       first_name: valOrNull('firstName'),
       last_name: valOrNull('lastName'),
       contact_email: val('contactEmail'),
-      contact_phone: valOrNull('contactPhone'),
+      // E.164, and left out (not nulled) while it is not a mobile number, so autosave never erases an
+      // earlier number. The server stamps the consent time and source.
+      ...(toE164(val('contactPhone')) ? { contact_phone: toE164(val('contactPhone')) } : {}),
       role: valOrNull('contactRole'),
 
       logo_url: state.logoUrl,
@@ -1893,10 +1898,8 @@
     setText('done-studio', val('studioName') || 'Not provided');
     setText('done-plan', PLAN_LABEL[state.plan] || state.plan);
     setText('done-setup', setupFeeSummaryLine());
-    setText('done-timeline', state.setup === 'guided'
-      ? 'You complete setup at your own pace'
-      : (state.plan === 'ai' ? 'Most studios are live within 7 to 10 business days'
-                             : 'Most studios are live within 3 to 5 business days'));
+    setText('done-timeline', state.plan === 'ai' ? 'Most studios are live within 7 to 10 business days'
+                                                  : 'Most studios are live within 3 to 5 business days');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -2896,7 +2899,8 @@
     refreshAutoFill();
     syncSignOff();
     // Restore setup type if present
-    if (sub.setup_type) selectSetup(sub.setup_type);
+    // Done-For-You is the only setup now; a draft saved as Guided before it was withdrawn reopens as Done-For-You.
+    if (sub.setup_type) selectSetup('dfy');
     // Restore yn states
     if (sub.custom_domain != null) {
       const btn = document.querySelector('[data-yn="dns"][data-val="' + (sub.custom_domain ? 'true' : 'false') + '"]');
