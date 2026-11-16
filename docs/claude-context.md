@@ -139,3 +139,26 @@ spans both must deploy the functions FIRST and push afterwards, or studios run n
 against old server code. Bump the `?v=` cache-buster in all six
 `site/au|us/{launch,scale,ai}/index.html` files plus `site/setup/index.html` whenever
 `form.js` changes.
+
+## Added by the portfolio audit, Phase 2 (15 Nov 2026)
+
+
+## Rules carried over from AGENTS.md (Codex reads that file; keep it and this in step)
+- Before pricing, margin, feature packaging, setup, upgrade, Family App, Communities or client-recommendation questions, read in this order: the Dropbox active source `ACTIVE_SOURCE_OF_TRUTH/00-agent-start/agent-quick-start-current.md` (full path in the "Shared Knowledge Base" paragraph of `AGENTS.md`), then the local mirror `outputs/studiolab-growth-knowledge-base/agent-quick-start.md`, then the relevant file in that folder.
+- Do not rely on old chat exports, archived pricing files, old upgrade addendums or generated PDFs until the fact is promoted into the Dropbox source or confirmed by current code or catalog.
+- Save final deliverables to `outputs/` in lowercase kebab-case. Benefits before features in customer copy. Direct, commercial recommendations.
+- Copy-and-paste email templates for Gary: AGENTS.md says US English unless he asks otherwise. This conflicts with the global default (Australian English) and with the studio-country rule (ADR-0009). Gary to confirm which wins.
+
+## Standing hazards (from IN-FLIGHT.md; verify against the live database, not this file)
+- The Stripe account is SHARED and the dev team works in it. Our webhook was deleted there once and sat dead 15 days. `stripe-webhook-health` (cron) watches it.
+- Migrations apply by hand with `supabase db query --linked -f <file>`. Never `supabase db push`.
+- `get-studio-account` once had 58 type errors from a concatenated `.select()` list. Use one template literal.
+- Routing: AU goes to `au`, everything else to `us`; only an unmappable `plan` holds. `pricingCountryFor` reprices direct arrivals from both `resolve-pricing` and `create-checkout-session`, so shown and charged prices agree. The form and `sms_a2p` tile key their fields on COUNTRY (`_shared/business-identifiers.ts`, `_shared/sms-registration.ts`).
+- Known and deliberately not fixed: Supabase JS SDK loads from a CDN with no SRI or CSP on the six form pages; `send-otp` has no per-IP cap; `sync-to-sheet` returns 500 until `SHEETS_WEBAPP_URL` and `SHEETS_SHARED_SECRET` are set.
+- Gary's call, not to be re-opened: no refund and no recharge for the first paying studio.
+
+## Deploy and email rules (from memory)
+- Run function deploys and SQL yourself; never end with a checklist for Gary. Only Stripe Dashboard clicks fall back to him.
+- Test-mode emails: `stripe_mode = 'test'` with `STRIPE_TEST_EMAIL_RECIPIENT` set redirects to that address with a `[TEST]` subject prefix; unset sends to the real recipient. The test inbox address is not written in this public repo: it is in the shared memory `reference_email_test_inbox`.
+- Confirm with Gary only before: a live Stripe flip, destructive SQL, force pushes, mass emails.
+- When Gary must act, put a "Do this now" block first in the reply.
