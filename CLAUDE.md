@@ -12,9 +12,8 @@ Static site in `site/` (GitHub Pages, `app.studiolabgrowth.com`), Supabase Edge 
 - `docs/claude-context.md`: full detail.
 
 ## 3. Commands
-No install step (no package.json, no deno.json). Run from the repo root. No `.green-gate` file, so `~/.claude/bin/green-gate` is not the gate here. The gate is the three commands CI runs (`pages.yml` job `gate`; red blocks the deploy):
+No install step (no package.json, no deno.json). Run from the root of your checkout or worktree. No `.green-gate` file, so `~/.claude/bin/green-gate` is not the gate here. The gate is the three commands CI runs (`pages.yml` job `gate`; red blocks the deploy):
 ```bash
-cd "/Users/gary/Claude_Projects/Growth - Onboarding"
 ~/.claude/bin/heavy bash -c 'for f in supabase/functions/*/index.ts; do deno check "$f" || exit 1; done'
 ~/.claude/bin/heavy deno test --allow-read supabase/functions/_shared/
 ~/.claude/bin/heavy node scripts/check-inline-js.mjs
@@ -54,7 +53,7 @@ Public form pages and an admin portal, not the React platform canon. Reuse `site
 - `node scripts/check-inline-js.mjs`: exits 0 (check with `echo $?`, prints `0`).
 - `git status --short`: only the paths you meant. Nothing from `outputs/`, `calculators/`, `tmp/`.
 - `git diff origin/main --stat -- .github/workflows/pages.yml`: empty unless asked.
-- `grep -rn -i "<vendor name>" <changed files>`: no output (use the vendor's real name in the pattern).
+- `grep -rn -i "<vendor name>" <changed files>`: no output (the vendor's real name is in `~/.claude/CLAUDE.md`, "What not to do").
 - If `form.js` changed: `grep -c "form.js?v=" site/au/launch/index.html` shows the new value, and the functions were deployed before the push.
 
 ## 8. Where we work and where to look things up
